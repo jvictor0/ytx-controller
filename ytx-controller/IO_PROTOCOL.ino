@@ -359,6 +359,12 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
 
                     memHost->ReadFromEEPROM(message[ytxIOStructure::BANK],message[ytxIOStructure::BLOCK], section, sectionData, false);
                     
+                    //Jaques mod
+                    if(message[ytxIOStructure::BLOCK] == ytxIOBLOCK::Configuration){
+                      ytxConfigurationType *conf = (ytxConfigurationType*)&sectionData;
+                      conf->inputs.encoderCount -= 4;
+                    }
+
                     uint16_t sysexSize = encodeSysEx(sectionData, &sysexBlock[ytxIOStructure::DATA], memHost->SectionSize(message[ytxIOStructure::BLOCK]));
                     
                     sendSysExYTX(MIDI_USB, ytxIOStructure::SECTION_LSB + sysexSize, &sysexBlock[1], false);
@@ -513,6 +519,9 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
 }
 
 void SendComponentInfo(uint8_t componentType, uint16_t index){
+  if(componentType==ytxIOBLOCK::Encoder && index>=32)//Jaques mod
+    return;
+  
   uint8_t statusMsgSize = MSG_SIZE_CMP_INFO;
   uint8_t sysexBlock[statusMsgSize];
 
@@ -549,10 +558,10 @@ uint16_t GetHardwareID(uint8_t componentType, uint16_t index){
       return index;
     } break;
     case ytxIOBLOCK::Digital: {
-      return index + config->inputs.encoderCount;  
+      return index + config->inputs.encoderCount - 4;//Jaques mod  
     } break;
     case ytxIOBLOCK::Analog: {
-      return index + config->inputs.encoderCount + config->inputs.digitalCount;  
+      return index + config->inputs.encoderCount - 4 + config->inputs.digitalCount;//Jaques mod
     } break;
     default:{
       return 0;
