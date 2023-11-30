@@ -32,6 +32,7 @@ SOFTWARE.
 #include "Arduino.h"
 #include "Defines.h"
 #include "FeedbackClass.h"
+#include <SPIAnalogExpander.h>
 
 //----------------------------------------------------------------------------------------------------
 // CLASS DEFINITION
@@ -59,7 +60,7 @@ public:
     }flags;
   }analogBankData;
   
-  void      Init(uint8_t,uint8_t);
+  void      Init(uint8_t,uint8_t, SPIAdressableBUS*);
   void      Read();
   void      SetAnalogValue(uint8_t, uint8_t, uint16_t);
   uint16_t  GetAnalogValue(uint8_t);
@@ -82,6 +83,8 @@ private:
   int16_t MuxDigitalRead(uint8_t, uint8_t);
   uint16_t FilterGetNewExponentialAverage(uint8_t, uint16_t);
   
+  SPIAnalogExpander *spiAnalogExpander;
+
   // Variables
 
   uint8_t nBanks;
@@ -90,7 +93,8 @@ private:
   uint16_t minRawValue;
   uint16_t maxRawValue;
   bool priorityMode;
-  uint8_t analogPortsWithElements;
+  uint8_t analogMuxesWithElements;
+  bool spiAnalogExpanderEnable;
 
   analogBankData **aBankData;
 

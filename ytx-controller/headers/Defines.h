@@ -94,7 +94,7 @@ SOFTWARE.
 
 #define MAX_DIGITAL_AMOUNT    256
 #define MAX_ENCODER_AMOUNT    64
-#define MAX_ANALOG_AMOUNT     64
+#define MAX_ANALOG_AMOUNT     128
 
 // Note On and Note Off values
 #define NOTE_ON       127
@@ -281,11 +281,11 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
                                            analog[aIndex].feedback.message == analogMessageTypes::analog_msg_pb    ||   \
                                           analog[aIndex].feedback.message == analogMessageTypes::analog_msg_key  )
 
-#define ANALOG_PORTS              4
-#define ANALOGS_PER_PORT          16
-#define ANALOG_MODULES_PER_PORT   8
-#define ANALOG_MODULES_PER_MOD    ANALOGS_PER_PORT/ANALOG_MODULES_PER_PORT
-#define MAX_ANALOG_MODULES        ANALOG_PORTS*ANALOG_MODULES_PER_PORT
+#define ANALOG_MUXES              8
+#define ANALOG_PER_MUX            16
+#define ANALOG_MODULES_PER_MUX    8
+#define ANALOG_PER_MODULES        ANALOG_PER_MUX/ANALOG_MODULES_PER_MUX
+#define MAX_ANALOG_MODULES        ANALOG_MUXES*ANALOG_MODULES_PER_MUX
 
 // set low and high limits to adjust for VCC and GND noise
 #define RAW_THRESHOLD       5

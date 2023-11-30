@@ -522,9 +522,12 @@ void CountModules(){
     }
   }
   // CHECK WHETHER AMOUNT OF ANALOG INPUTS IN MODULES COMBINED MATCH THE AMOUNT OF ANALOG INPUTS IN CONFIG
-  for (int nPort = 0; nPort < ANALOG_PORTS; nPort++) {
-    for (int nMod = 0; nMod < ANALOG_MODULES_PER_PORT; nMod++) {
-      if (config->hwMapping.analog[nPort][nMod]) {
+  for (int nPort = 0; nPort < ANALOG_MUXES; nPort++) {
+    for (int nMod = 0; nMod < ANALOG_MODULES_PER_MUX; nMod++) {
+      int moduleType = (nPort < 4) ? config->hwMapping.analog[nPort][nMod]&0x0F : 
+                          (config->hwMapping.analog[nPort-4][nMod]>>4)&0x0F;
+                          
+      if (moduleType) {
         modulesInConfig.analog++;
       }
     }

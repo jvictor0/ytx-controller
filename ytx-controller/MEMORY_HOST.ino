@@ -220,6 +220,9 @@ int8_t memoryHost::GetCurrentBank()
 
 uint8_t memoryHost::LoadBankSingleSection(uint8_t bank, uint8_t block, uint16_t sectionIndex, bool rotaryQSTB)
 {
+  if(!block)
+    return 0;
+
   bankNow = -1;
   //  eep->read(eepIndex+bankSize*bank, (byte*)bankChunk, bankSize);
   switch (block) {
