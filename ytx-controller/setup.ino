@@ -69,7 +69,7 @@ void setup() {
   // General config block
   memHost->ConfigureBlock(ytxIOBLOCK::Configuration, 1, sizeof(ytxConfigurationType), true);
   config = (ytxConfigurationType*) memHost->Block(ytxIOBLOCK::Configuration);    
-  config->banks.count = 1;
+
 
   if(config->board.fwVersionMaj != FW_VERSION_MAJOR ||
      config->board.fwVersionMin != FW_VERSION_MINOR ||
@@ -180,7 +180,7 @@ void setup() {
       maxSPEED = SPI_SPEED_1_5_M;
     }
 
-    if(modulesInConfig.encoders){
+    if(modulesInConfig.encoders || config->inputs.analogCount>64){
       spiBUS[0] = new SPIAdressableBUS();
       spiBUS[0]->begin(&SPI,SPISettings(maxSPEED,MSBFIRST,SPI_MODE0),spiCS[0]);
     }

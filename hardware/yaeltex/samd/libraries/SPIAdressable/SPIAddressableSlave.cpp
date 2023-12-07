@@ -34,7 +34,7 @@
 SPIAddressableSlave::SPIAddressableSlave(){};
 
 void SPIAddressableSlave::begin(int _base,int _ctrlRegisters,int _usrRegisters){
-  
+  isWired = false;
   isAddressEnable = false;
   isTransmissionComplete = false;
   isConfigurationComplete = false;
@@ -61,40 +61,8 @@ void SPIAddressableSlave::begin(int _base,int _ctrlRegisters,int _usrRegisters){
   resetInternalState();
 }
 
-uint8_t* SPIAddressableSlave::getControlRegistersPointer(){
-  return (uint8_t*)controlRegister;
-}
-
-uint8_t* SPIAddressableSlave::getUserRegistersPointer(){
-  return (uint8_t*)userDataRegister;
-}
-
-void SPIAddressableSlave::hook(){
-  if(updateAddressingMode){
-    updateAddressingMode = false;
-
-    setNextAddress(nextAddress);
-  }
-
-  getAddress();
-
-  if(isTransmissionComplete){
-    registerIndex = 0;
-    isTransmissionComplete = 0;
-
-    if(transmissionCompleteCallback != NULL){
-      transmissionCompleteCallback();
-    }
-  }
-
-  if(isConfigurationComplete){
-    registerIndex = 0;
-    isConfigurationComplete = 0;
-
-    if(configurationCompleteCallback != NULL){
-      configurationCompleteCallback();
-    }
-  }
+void SPIAddressableSlave::setAddress(int address){
+  myAddress = address;
 }
 
 inline void SPIAddressableSlave::getAddress(){
@@ -129,6 +97,46 @@ void SPIAddressableSlave::wiring(int* inputWiring,int* outputWiring){
     pinMode(outputAddressPin[i],OUTPUT);
     digitalWrite(outputAddressPin[i],HIGH);
   }
+
+  isWired = true;
+}
+
+void SPIAddressableSlave::hook(){
+  if(isWired){
+    if(updateAddressingMode){
+      updateAddressingMode = false;
+
+      setNextAddress(nextAddress);
+    }
+
+    getAddress();
+  }
+
+  if(isTransmissionComplete){
+    registerIndex = 0;
+    isTransmissionComplete = false;
+
+    if(transmissionCompleteCallback != NULL){
+      transmissionCompleteCallback();
+    }
+  }
+
+  if(isConfigurationComplete){
+    registerIndex = 0;
+    isConfigurationComplete = false;
+
+    if(configurationCompleteCallback != NULL){
+      configurationCompleteCallback();
+    }
+  }
+}
+
+uint8_t* SPIAddressableSlave::getControlRegistersPointer(){
+  return (uint8_t*)controlRegister;
+}
+
+uint8_t* SPIAddressableSlave::getUserRegistersPointer(){
+  return (uint8_t*)userDataRegister;
 }
 
 void SPIAddressableSlave::setTransmissionCompleteCallback(voidFuncPtr callback){
@@ -362,8 +370,13 @@ void SERCOM4_Handler(void){
     if(SPIAddressableSlaveModule.state == GET_TRANSFER){
       if(opcode==OPCODER){
         SERCOM->SPI.DATA.reg = SPIAddressableSlaveModule.registers[SPIAddressableSlaveModule.registerIndex];
-      }
-      else if(opcode==OPCODEW){
+
+        SPIAddressableSlaveModule.registerIndex++;
+
+        if(SPIAddressableSlaveModule.registerIndex == (REGISTER_COUNT+SPIAddressableSlaveModule.usrRegistersCount)){
+            SPIAddressableSlaveModule.isTransmissionComplete = true;
+        }
+      }else if(opcode==OPCODEW){
         //Legacy code for compatibility with SPIGPIOExpander MCP23S17
         if(SPIAddressableSlaveModule.registerIndex==_ADDRESSING_REG){
 
@@ -379,14 +392,12 @@ void SERCOM4_Handler(void){
         }
         
         SPIAddressableSlaveModule.registers[SPIAddressableSlaveModule.registerIndex] = data;
-      }
+        
+        SPIAddressableSlaveModule.registerIndex++;
 
-      SPIAddressableSlaveModule.registerIndex++;
-
-      if(SPIAddressableSlaveModule.registerIndex == SPIAddressableSlaveModule.ctrlRegistersCount){
-        SPIAddressableSlaveModule.isConfigurationComplete = true;
-      }else if(SPIAddressableSlaveModule.registerIndex == (REGISTER_COUNT+SPIAddressableSlaveModule.usrRegistersCount)){
-        SPIAddressableSlaveModule.isTransmissionComplete = true;
+        if(opcode==OPCODEW && SPIAddressableSlaveModule.registerIndex == SPIAddressableSlaveModule.ctrlRegistersCount){
+          SPIAddressableSlaveModule.isConfigurationComplete = true;
+        }
       }
     }
   } 

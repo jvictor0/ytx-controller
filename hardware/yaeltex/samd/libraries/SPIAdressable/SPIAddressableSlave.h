@@ -68,6 +68,7 @@ class SPIAddressableSlave {
     void resetInternalState();
     void getAddress();
     void setNextAddress(int);
+    void setAddress(int);
     void setTransmissionCompleteCallback(voidFuncPtr);
     void setConfigurationCompleteCallback(voidFuncPtr);
     uint8_t* getControlRegistersPointer();
@@ -96,6 +97,7 @@ class SPIAddressableSlave {
   private:
     void SercomInit();
 
+    bool isWired;
     int inputAddressPin[3];
     int outputAddressPin[3];
 

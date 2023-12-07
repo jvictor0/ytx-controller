@@ -69,7 +69,7 @@ uint16_t SPIAnalogExpander::analogRead(uint32_t n) {
   spiBUS->port->beginTransaction(spiBUS->settings);
     ::digitalWrite(spiBUS->cs, LOW);
     spiBUS->port->transfer(cmd);
-    spiBUS->port->transfer(REGISTER_OFFSET+n*2);//index of analog value register
+    spiBUS->port->transfer(REGISTER_OFFSET+n*sizeof(uint16_t));//index of analog value register
     spiBUS->port->transfer(0xFF);//dummy 
     value = (uint16_t)(spiBUS->port->transfer(0xFF));
     value += (uint16_t)(spiBUS->port->transfer(0xFF))<<8;

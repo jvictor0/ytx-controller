@@ -1,3 +1,5 @@
+#include "defines.h"
+
 static inline void ADCsync() {
   while (ADC->STATUS.bit.SYNCBUSY == 1); //Just wait till the ADC is free
 }

@@ -81,6 +81,9 @@ void AnalogInputs::Init(byte maxBanks, byte numberOfAnalog, SPIAdressableBUS* sp
   
   //initialice SPI Analog Expander
   if(spiAnalogExpanderEnable){
+    // DISABLE HARDWARE ADDRESSING FOR ALL CHIPS - ONLY NEEDED FOR RESET
+    spiBUS->DisableHWAddress(ANALOG_EXPANDER_BASE_ADDRESS);
+    
     spiAnalogExpander = new SPIAnalogExpander();
 
     spiAnalogExpander->begin(spiBUS); // spi, chip select pin, address
@@ -88,7 +91,7 @@ void AnalogInputs::Init(byte maxBanks, byte numberOfAnalog, SPIAdressableBUS* sp
     SPIAnalogExpanderParameters parameters;
     parameters.inputs = numberOfAnalog-32;
     parameters.expFilter = 0.25;
-    parameters.noiseThreshold = 10;
+    parameters.noiseThreshold = 5;
 
     spiAnalogExpander->configure(&parameters); // nº of inputs, exponential filter constant, noise threshold
   }
@@ -258,7 +261,7 @@ void AnalogInputs::Read(){
       for(int a = 0; a < nAnalogInMod; a++){
         aInput = nMux*ANALOG_PER_MUX + nMod*ANALOG_PER_MODULES + a;  // establish which n° of analog input we're scanning 
 
-        SERIALPRINT("Read Analog input: "); SERIALPRINTLN(aInput);
+        // SERIALPRINT("Read Analog input: "); SERIALPRINTLN(aInput);
 
         if(analog[aInput].message == analogMessageTypes::analog_msg_none) continue;   // check if input is disabled in config
         
