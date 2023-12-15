@@ -53,7 +53,7 @@ void setup (void)
 
   memset((void*)analog,0,sizeof(analog));
   
-  parameters.inputs = 80;
+  parameters.inputs = 0;
   parameters.expFilter = 0.25;
   parameters.noiseThreshold = 10;
   

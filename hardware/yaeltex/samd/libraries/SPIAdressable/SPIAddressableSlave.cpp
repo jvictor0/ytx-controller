@@ -395,8 +395,9 @@ void SERCOM4_Handler(void){
         
         SPIAddressableSlaveModule.registerIndex++;
 
-        if(opcode==OPCODEW && SPIAddressableSlaveModule.registerIndex == SPIAddressableSlaveModule.ctrlRegistersCount){
+        if(SPIAddressableSlaveModule.registerIndex == SPIAddressableSlaveModule.ctrlRegistersCount){
           SPIAddressableSlaveModule.isConfigurationComplete = true;
+          // Serial.println("conf");
         }
       }
     }

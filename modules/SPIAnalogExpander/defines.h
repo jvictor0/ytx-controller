@@ -1,7 +1,7 @@
 #ifndef defines_h
 #define defines_h
 
-// #define SERIAL_DEBUG // comment this line out to not print debug data on the serial bus
+#define SERIAL_DEBUG // comment this line out to not print debug data on the serial bus
 
 #if defined(SERIAL_DEBUG)
   #define SERIALPRINT(a)        {Serial.print(a);     }
