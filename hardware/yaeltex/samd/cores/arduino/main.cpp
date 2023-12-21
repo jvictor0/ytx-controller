@@ -42,7 +42,7 @@ int main( void )
   
   // INIT USB DEVICE ONLY IF KILOMUX NOT DEFINDED
   // OTHERWISE INIT HAPPENS INSIDE KILOMUX SETUP
-  #if !defined(KILOMUX)
+  #if !defined(KILOMUX) && !defined(KILOMUX_BOOT)
     #if defined(USBCON)
       USBDevice.init();
       USBDevice.attach();

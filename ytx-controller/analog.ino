@@ -81,6 +81,11 @@ void AnalogInputs::Init(byte maxBanks, byte numberOfAnalog, SPIAdressableBUS* sp
   
   //initialice SPI Analog Expander
   if(spiAnalogExpanderEnable){
+    pinMode(A1, OUTPUT);//A1 its connected to RESET pin on spiAnalogExpander
+    digitalWrite(A1, LOW);
+    delay(5);
+    digitalWrite(A1, HIGH);
+    delay(5);
     // DISABLE HARDWARE ADDRESSING FOR ALL CHIPS - ONLY NEEDED FOR RESET
     spiBUS->DisableHWAddress(ANALOG_EXPANDER_BASE_ADDRESS);
     

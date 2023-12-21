@@ -62,7 +62,7 @@ void SPIAddressableSlave::begin(int _base,int _ctrlRegisters,int _usrRegisters){
 }
 
 void SPIAddressableSlave::setAddress(int address){
-  myAddress = address;
+  myAddress = base | address;
 }
 
 inline void SPIAddressableSlave::getAddress(){

@@ -1,5 +1,7 @@
 #include "defines.h"
 
+uint8_t arduinoWiring[NUM_MUX] = {19,25,15,14,17,18};
+
 static inline void ADCsync() {
   while (ADC->STATUS.bit.SYNCBUSY == 1); //Just wait till the ADC is free
 }
@@ -23,7 +25,10 @@ void FastADCsetup() {
   ADC->SAMPCTRL.reg = 0x00;                      // Sampling Time Length = 0
   ADC->CTRLA.bit.ENABLE = 1;                     // Enable ADC
   while( ADC->STATUS.bit.SYNCBUSY == 1 );        // Wait for synchronization
-  
+
+  for(uint8_t i=0;i<NUM_MUX;i++){
+    pinPeripheral(arduinoWiring[i],PIO_ANALOG);
+  }
 }
 
 uint32_t AnalogReadFast(byte ADCpin) {

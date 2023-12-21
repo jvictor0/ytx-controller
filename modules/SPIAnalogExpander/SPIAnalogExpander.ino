@@ -23,6 +23,11 @@ void cleanup(void){
 
 void configure(void){
   memcpy(&parameters,SPIAddressableSlaveModule.getControlRegistersPointer(),sizeof(SPIAnalogExpanderParameters));
+
+  parameters.inputs = constrain(parameters.inputs,0,MAX_ANALOG_INPUTS);
+  parameters.expFilter = constrain(parameters.expFilter,0.1,0.5);
+  parameters.noiseThreshold = constrain(parameters.noiseThreshold,5,20);
+  
   SERIALPRINT("Conf recibida,  inputs: ");SERIALPRINT(parameters.inputs);SERIALPRINT(" filter: ");SERIALPRINT(parameters.expFilter);
   SERIALPRINT(" noise: ");SERIALPRINTLN(parameters.noiseThreshold);
 }
@@ -33,6 +38,8 @@ void setup (void)
     Serial.begin (115200);   // debugging
   #endif
 
+  SERIALPRINTLN("Reset");
+  
   SPIAddressableSlaveModule.begin(SLAVE_BASE_ADDRESS,CTRL_REG_COUNT,USR_REG_COUNT);
   // SPIAddressableSlaveModule.setTransmissionCompleteCallback(cleanup);
   SPIAddressableSlaveModule.setConfigurationCompleteCallback(configure);
