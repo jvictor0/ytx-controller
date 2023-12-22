@@ -262,6 +262,20 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
 
                       if(memcmp(&config->inputs,&payload->inputs,sizeof(config->inputs))){
                         // SERIALPRINT(F("\n Input config changed"));
+                        
+                        //FUSE mod
+                        payload->inputs.analogCount += 36;
+                        payload->hwMapping.analog[0][0] |= (AnalogModuleTypes::P41<<4)&0xF0;
+                        payload->hwMapping.analog[0][2] |= (AnalogModuleTypes::P41<<4)&0xF0;
+                        payload->hwMapping.analog[0][4] |= (AnalogModuleTypes::P41<<4)&0xF0;
+                        payload->hwMapping.analog[0][6] |= (AnalogModuleTypes::P41<<4)&0xF0;
+                        payload->hwMapping.analog[1][0] |= (AnalogModuleTypes::P41<<4)&0xF0;
+                        payload->hwMapping.analog[1][2] |= (AnalogModuleTypes::P41<<4)&0xF0;
+                        payload->hwMapping.analog[1][4] |= (AnalogModuleTypes::P41<<4)&0xF0;
+                        payload->hwMapping.analog[1][6] |= (AnalogModuleTypes::P41<<4)&0xF0;
+                        payload->hwMapping.analog[2][0] |= (AnalogModuleTypes::P41<<4)&0xF0;
+                        
+
                         enableProcessing = false;
                         validConfigInEEPROM = false;
 
@@ -338,6 +352,21 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
                     sysexBlock[ytxIOStructure::SECTION_LSB] = section & 0x7F;     //section lsb
 
                     memHost->ReadFromEEPROM(message[ytxIOStructure::BANK],message[ytxIOStructure::BLOCK], section, sectionData, false);
+
+                    //FUSE mod
+                    if(message[ytxIOStructure::BLOCK] == ytxIOBLOCK::Configuration){
+                      ytxConfigurationType *conf = (ytxConfigurationType*)&sectionData;
+                      conf->inputs.analogCount -= 36;
+                      conf->hwMapping.analog[0][0] &= 0x0F;
+                      conf->hwMapping.analog[0][2] &= 0x0F;
+                      conf->hwMapping.analog[0][4] &= 0x0F;
+                      conf->hwMapping.analog[0][6] &= 0x0F;
+                      conf->hwMapping.analog[1][0] &= 0x0F;
+                      conf->hwMapping.analog[1][2] &= 0x0F;
+                      conf->hwMapping.analog[1][4] &= 0x0F;
+                      conf->hwMapping.analog[1][6] &= 0x0F;
+                      conf->hwMapping.analog[2][0] &= 0x0F;
+                    }
 
                     uint16_t sysexSize = encodeSysEx(sectionData, &sysexBlock[ytxIOStructure::DATA], memHost->SectionSize(message[ytxIOStructure::BLOCK]));
                     
