@@ -25,7 +25,7 @@ class SPIAnalogExpander : public SPIAddressableElement {
         void configure(SPIAnalogExpanderParameters *);
         void getActiveChannels(void);
         bool isActiveChannel(uint32_t n);
-        uint16_t analogRead(uint32_t n);
+        int16_t analogRead(uint32_t n);
 
     private:
         uint8_t activeChannels[MAX_ANALOG_CHANNELS/8];

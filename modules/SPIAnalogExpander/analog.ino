@@ -1,7 +1,5 @@
 #include "defines.h"
 
-uint8_t arduinoWiring[NUM_MUX] = {19,25,15,14,17,18};
-
 static inline void ADCsync() {
   while (ADC->STATUS.bit.SYNCBUSY == 1); //Just wait till the ADC is free
 }
@@ -26,13 +24,13 @@ void FastADCsetup() {
   ADC->CTRLA.bit.ENABLE = 1;                     // Enable ADC
   while( ADC->STATUS.bit.SYNCBUSY == 1 );        // Wait for synchronization
 
-  for(uint8_t i=0;i<NUM_MUX;i++){
-    pinPeripheral(arduinoWiring[i],PIO_ANALOG);
+  for(uint8_t i=0;i<MUX_COUNT;i++){
+    pinPeripheral(adcWiring[i],PIO_ANALOG);
   }
 }
 
-uint32_t AnalogReadFast(byte ADCpin) {
-  SelAnalog(ADCpin);
+uint32_t AnalogReadFast(byte channel) {
+  SelAnalog(channel);
   ADC->INTFLAG.bit.RESRDY = 1;              // Data ready flag cleared
   ADCsync();
   ADC->SWTRIG.bit.START = 1;                // Start ADC conversion
@@ -45,22 +43,18 @@ uint32_t AnalogReadFast(byte ADCpin) {
 }
 
 int16_t MuxAnalogRead(uint8_t mux, uint8_t chan){
-    if (chan >= 0 && chan <= 15 && mux < NUM_MUX){     
-      chan = MuxMapping[chan];      // Re-map hardware channels to have them read in the header order
+    if (chan >= 0 && chan <= 15 && mux < MUX_COUNT){     
+      chan = muxMapping[chan];      // Re-map hardware channels to have them read in the header order
     }
     else return -1;       // Return ERROR
 
   //Select channel
-  bitRead(chan, 0) ?  PORT->Group[g_APinDescription[_S0].ulPort].OUTSET.reg = (1ul << g_APinDescription[_S0].ulPin) :
-            PORT->Group[g_APinDescription[_S0].ulPort].OUTCLR.reg = (1ul << g_APinDescription[_S0].ulPin) ;
-  bitRead(chan, 1) ?  PORT->Group[g_APinDescription[_S1].ulPort].OUTSET.reg = (1ul << g_APinDescription[_S1].ulPin) :
-            PORT->Group[g_APinDescription[_S1].ulPort].OUTCLR.reg = (1ul << g_APinDescription[_S1].ulPin) ;
-  bitRead(chan, 2) ?  PORT->Group[g_APinDescription[_S2].ulPort].OUTSET.reg = (1ul << g_APinDescription[_S2].ulPin) :
-            PORT->Group[g_APinDescription[_S2].ulPort].OUTCLR.reg = (1ul << g_APinDescription[_S2].ulPin) ;
-  bitRead(chan, 3) ?  PORT->Group[g_APinDescription[_S3].ulPort].OUTSET.reg = (1ul << g_APinDescription[_S3].ulPin) :
-            PORT->Group[g_APinDescription[_S3].ulPort].OUTCLR.reg = (1ul << g_APinDescription[_S3].ulPin) ;
+  for(int i=0;i<MUX_SELECTION_LINES;i++){
+    bitRead(chan, i) ?  PORT->Group[g_APinDescription[muxSelectorsWiring[i]].ulPort].OUTSET.reg = (1ul << g_APinDescription[muxSelectorsWiring[i]].ulPin) :
+                        PORT->Group[g_APinDescription[muxSelectorsWiring[i]].ulPort].OUTCLR.reg = (1ul << g_APinDescription[muxSelectorsWiring[i]].ulPin);
+  }
 
-  return AnalogReadFast(muxPin[mux]);
+  return AnalogReadFast(acdChannel[mux]);
 }
 
 bool isNoise(analogType *input, uint8_t threshold) {

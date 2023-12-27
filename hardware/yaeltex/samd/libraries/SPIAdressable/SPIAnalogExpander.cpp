@@ -31,9 +31,9 @@
 #include "SPIAnalogExpander.h"
 
 void SPIAnalogExpander::begin(SPIAdressableBUS *_spiBUS) {
-    addr = 0;
+    addr = ANALOG_EXPANDER_ADDRESS;
     spiBUS = _spiBUS;
-    base = ANALOG_EXPANDER_BASE_ADDRESS<<4;
+    base = FIXED_ELEMENTS_BASE_ADDRESS<<4;
 
     enableAddressing(0);
     delay(5); // wait addresing ready
@@ -63,17 +63,32 @@ bool SPIAnalogExpander::isActiveChannel(uint32_t n) {
   return (bool)(activeChannels[n/8] & (1<<(n%8)));
 }
 
-uint16_t SPIAnalogExpander::analogRead(uint32_t n) {
-    uint16_t value;       
+int16_t SPIAnalogExpander::analogRead(uint32_t n) {
+    uint8_t lowByte;
+    uint8_t highByte;
+    uint16_t newRead; 
+    uint16_t localChecksum;
+    uint16_t transactionChecksum;
     uint8_t cmd = OPCODER | ((base | (addr & 0b111)) << 1);
+
   spiBUS->port->beginTransaction(spiBUS->settings);
     ::digitalWrite(spiBUS->cs, LOW);
     spiBUS->port->transfer(cmd);
     spiBUS->port->transfer(REGISTER_OFFSET+n*sizeof(uint16_t));//index of analog value register
     spiBUS->port->transfer(0xFF);//dummy 
-    value = (uint16_t)(spiBUS->port->transfer(0xFF));
-    value += (uint16_t)(spiBUS->port->transfer(0xFF))<<8;
+    lowByte = spiBUS->port->transfer(0xFF);
+    highByte = spiBUS->port->transfer(0xFF);
     ::digitalWrite(spiBUS->cs, HIGH);
   spiBUS->port->endTransaction();
-  return value;
+
+    newRead = ((uint16_t)highByte)<<8 | (uint16_t)lowByte;
+
+    localChecksum = (uint16_t)((newRead&0x00FF + (newRead>>8)&0x00FF))&0x000F;
+    transactionChecksum = (newRead>>12)&0x000F;
+
+    if(transactionChecksum==localChecksum){
+      return newRead&0x0FFF;
+    }else{
+      return -1;
+    }
 }

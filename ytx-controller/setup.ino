@@ -148,8 +148,6 @@ void setup() {
       #endif
     }
 
-    // config->inputs.encoderCount = 32;
-
     // Create memory map for eeprom
     memHost->ConfigureBlock(ytxIOBLOCK::Encoder, config->inputs.encoderCount, sizeof(ytxEncoderType), false);
     memHost->ConfigureBlock(ytxIOBLOCK::Analog, config->inputs.analogCount, sizeof(ytxAnalogType), false);
@@ -184,7 +182,7 @@ void setup() {
 
     if(modulesInConfig.encoders || config->inputs.analogCount>64){
       spiBUS[0] = new SPIAdressableBUS();
-      spiBUS[0]->begin(&SPI,SPISettings(maxSPEED,MSBFIRST,SPI_MODE0),spiCS[0]);
+      spiBUS[0]->begin(&SPI,SPISettings(SPI_SPEED_1_5_M,MSBFIRST,SPI_MODE0),spiCS[0]);
     }
 
     if(modulesInConfig.digital[0]){
@@ -774,6 +772,8 @@ void initFixedConfig() {
       analog[i].parameter[rotary_minMSB] = 0;
       analog[i].parameter[rotary_maxLSB] = 127;
       analog[i].parameter[rotary_maxMSB] = 127;
+      analog[i].splitMode = 0;              // BYTE 1 - BITS 2: SPLIT MODE. 1 OR 2 CC
+      analog[i].deadZone = 0;               // BYTE 1 - BITS 3: DEAD ZONE 
 
       strcpy(analog[i].comment, "ytx Ana.");
       analog[i].splitMode = splitModes::normal;

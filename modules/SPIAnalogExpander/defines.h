@@ -22,41 +22,51 @@ typedef struct analogType{
   bool direction;
 };
 
-// Constant value definitions
-#define ADC_MAX_VALUE   1023
-
 //noise filter
 #define ANALOG_INCREASING       0
 #define ANALOG_DECREASING       1
 
-#define MUX_A                0            // Mux A identifier
-#define MUX_B                1            // Mux B identifier
-#define MUX_C                2            // Mux C identifier
-#define MUX_D                3            // Mux D identifier
-#define MUX_E                4            // Mux E identifier
-#define MUX_F                5            // Mux F identifier
+enum{
+  MUX_A,
+  MUX_B,
+  MUX_C,
+  MUX_D,
+  MUX_E,
+  MUX_F,
+  MUX_COUNT
+};
 
-#define MUX_A_PIN            11           // Mux A pin
-#define MUX_B_PIN            10           // Mux B pin
-#define MUX_C_PIN            0            // Mux C pin
-#define MUX_D_PIN            2            // Mux D pin
-#define MUX_E_PIN            5            // Mux E pin
-#define MUX_F_PIN            4            // Mux F pin
+#define MUX_S0_PIN              4              // Mux selector 0 pin on arduino wiring(boards.txt)
+#define MUX_S1_PIN              3              // Mux selector 1 pin on arduino wiring(boards.txt)
+#define MUX_S2_PIN              8              // Mux selector 2 pin on arduino wiring(boards.txt)
+#define MUX_S3_PIN              9              // Mux selector 3 pin on arduino wiring(boards.txt)
+const byte muxSelectorsWiring[] = {MUX_S0_PIN,MUX_S1_PIN,MUX_S2_PIN,MUX_S3_PIN};
 
-#define NUM_MUX              6            // Number of multiplexers to address
-#define NUM_MUX_CHANNELS     16           // Number of multiplexing channels
-#define MAX_ANALOG_INPUTS    NUM_MUX*NUM_MUX_CHANNELS  
+#define MUX_SELECTION_LINES     sizeof(muxSelectorsWiring)
+#define NUM_MUX_CHANNELS        (1<<MUX_SELECTION_LINES)    // Number of multiplexing channels
+#define MAX_ANALOG_INPUTS       MUX_COUNT*NUM_MUX_CHANNELS  
 
-// Address lines for multiplexer
-const int _S0 = (4u);
-const int _S1 = (3u);
-const int _S2 = (8u);
-const int _S3 = (9u);
+
+#define ADC_CHANNEL_A            11           // ADC channel A on microcontroller
+#define ADC_CHANNEL_B            10           // ADC channel B on microcontroller
+#define ADC_CHANNEL_C            0            // ADC channel C on microcontroller
+#define ADC_CHANNEL_D            2            // ADC channel D on microcontroller
+#define ADC_CHANNEL_E            5            // ADC channel E on microcontroller
+#define ADC_CHANNEL_F            4            // ADC channel F on microcontroller
 // Input signal of multiplexers
-const byte muxPin[NUM_MUX] = {MUX_A_PIN, MUX_B_PIN, MUX_C_PIN, MUX_D_PIN, MUX_E_PIN, MUX_F_PIN};
+const byte acdChannel[MUX_COUNT] = {ADC_CHANNEL_A, ADC_CHANNEL_B, ADC_CHANNEL_C, ADC_CHANNEL_D, ADC_CHANNEL_E, ADC_CHANNEL_F};
 
-// Do not change - These are used to have the inputs and outputs of the headers in order
-const byte MuxMapping[NUM_MUX_CHANNELS] =   {1,        // INPUT 0   - Mux channel 2
+#define MUX_A_PIN               19           // Mux A pin on arduino wiring(boards.txt)
+#define MUX_B_PIN               25           // Mux B pin on arduino wiring(boards.txt)
+#define MUX_C_PIN               15           // Mux C pin on arduino wiring(boards.txt)
+#define MUX_D_PIN               14           // Mux D pin on arduino wiring(boards.txt)
+#define MUX_E_PIN               17           // Mux E pin on arduino wiring(boards.txt)
+#define MUX_F_PIN               18           // Mux F pin on arduino wiring(boards.txt)
+// Input signal of multiplexers
+const byte adcWiring[MUX_COUNT] = {MUX_A_PIN,MUX_B_PIN,MUX_C_PIN,MUX_D_PIN,MUX_E_PIN,MUX_F_PIN};
+
+// Do not change - These are used to have the inputs and outputs of the PCB headers in order
+const byte muxMapping[NUM_MUX_CHANNELS] =   {1,        // INPUT 0   - Mux channel 2
                                              0,        // INPUT 1   - Mux channel 0
                                              3,        // INPUT 2   - Mux channel 3
                                              2,        // INPUT 3   - Mux channel 1
@@ -72,6 +82,5 @@ const byte MuxMapping[NUM_MUX_CHANNELS] =   {1,        // INPUT 0   - Mux channe
                                              9,        // INPUT 13  - Mux channel 10
                                              8,        // INPUT 14  - Mux channel 8
                                              11};      // INPUT 15  - Mux channel 11
-
 
 #endif //defines_h

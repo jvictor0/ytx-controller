@@ -43,7 +43,7 @@ SOFTWARE.
 
 // #define DISABLE_ENCODER_BANKS
 // #define DISABLE_DIGITAL_BANKS
-// #define DISABLE_ANALOG_BANKS
+#define DISABLE_ANALOG_BANKS
 
 #if !defined(INIT_CONFIG)
 #define USE_KWHAT_COUNT_BUFFER
@@ -481,6 +481,7 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 
 #define MIDI_BUF_MAX_LEN          1000
 
+#define SPI_SPEED_1_M       1000000
 #define SPI_SPEED_1_5_M     1500000
 #define SPI_SPEED_2_M       2000000
 

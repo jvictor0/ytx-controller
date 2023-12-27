@@ -87,7 +87,7 @@ void AnalogInputs::Init(byte maxBanks, byte numberOfAnalog, SPIAdressableBUS* sp
     digitalWrite(A1, HIGH);
     delay(5);
     // DISABLE HARDWARE ADDRESSING FOR ALL CHIPS - ONLY NEEDED FOR RESET
-    spiBUS->DisableHWAddress(ANALOG_EXPANDER_BASE_ADDRESS);
+    spiBUS->DisableHWAddress(FIXED_ELEMENTS_BASE_ADDRESS);
     
     spiAnalogExpander = new SPIAnalogExpander();
 
@@ -96,7 +96,7 @@ void AnalogInputs::Init(byte maxBanks, byte numberOfAnalog, SPIAdressableBUS* sp
     SPIAnalogExpanderParameters parameters;
     parameters.inputs = numberOfAnalog-32;
     parameters.expFilter = 0.25;
-    parameters.noiseThreshold = 5;
+    parameters.noiseThreshold = 10;
 
     spiAnalogExpander->configure(&parameters); // nº of inputs, exponential filter constant, noise threshold
   }
@@ -173,7 +173,7 @@ void AnalogInputs::Init(byte maxBanks, byte numberOfAnalog, SPIAdressableBUS* sp
   for(int i = 0; i < nAnalog; i++){
      if(spiAnalogExpanderEnable && i>=32){
       int spiInput = i - 32;
-      aHwData[i].analogRawValue = spiAnalogExpander->analogRead(spiInput);
+      aHwData[i].analogRawValue = spiAnalogExpander->analogRead(spiInput)&0x0FFF;
     }
     else{
       int mux = i < 16 ? MUX_A :  (i < 32 ? MUX_B : ( i < 48 ? MUX_C : MUX_D)) ;    // Select correct multiplexer for this input
@@ -279,7 +279,11 @@ void AnalogInputs::Read(){
         if(spiAnalogExpanderEnable && aInput>=32){
           uint8_t expanderInput = aInput - 32;
           if(spiAnalogExpander->isActiveChannel(expanderInput)){
-            aHwData[aInput].analogRawValue = spiAnalogExpander->analogRead(expanderInput);
+            int16_t newRead = spiAnalogExpander->analogRead(expanderInput);
+
+            if(newRead >= 0){
+              aHwData[aInput].analogRawValue = (uint16_t)newRead;
+            }
           }
         }
         else{

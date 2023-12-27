@@ -58,7 +58,7 @@
 
 // AVAILABLE BASE ADDRESSES
 enum {
-    ANALOG_EXPANDER_BASE_ADDRESS = 0,
+    FIXED_ELEMENTS_BASE_ADDRESS = 0,
     _BASE_ADDRESS_1,    //unused
     MCP23017_BASE_ADDRESS,
     INF_POT_BASE_ADDRESS_A,
@@ -74,6 +74,18 @@ enum {
     _BASE_ADDRESS_13,   //unused
     _BASE_ADDRESS_14,   //unused
     _BASE_ADDRESS_15,   //unused
+};
+
+// FIXED_ELEMENTS ADDRESSES
+enum {
+    MAIN_FEEDBACK_ADDRESS = 0, //reserved
+    ANALOG_EXPANDER_ADDRESS,
+    _SELF_ADDRESS_2,    //unused
+    _SELF_ADDRESS_3,    //unused
+    _SELF_ADDRESS_4,    //unused
+    _SELF_ADDRESS_5,    //unused
+    _SELF_ADDRESS_6,    //unused
+    _SELF_ADDRESS_7     //unused
 };
 
 // AVAILABLE CONTROL REGISTERS

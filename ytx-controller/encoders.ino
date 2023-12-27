@@ -2205,15 +2205,13 @@ uint8_t EncoderInputs::GetEncoderBrightness(uint8_t index){
         case EncoderModuleTypes::E41H:
         case EncoderModuleTypes::E41V:
           if(IsPowerConnected()){
-            brightness = BRIGHTNESS_WITH_POWER;
+            brightness = 100;
             // brightness = 200;
           }else{
             if(nEncoders<32){
               brightness = BRIGHTNESS_WOP;
-              // brightness = 90;
             }else{
               brightness = 38;
-              // brightness = BRIGHTNESS_WOP_32_ENC;
             }
           }
           break;

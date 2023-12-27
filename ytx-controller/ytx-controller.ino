@@ -181,6 +181,7 @@ const uint32_t statusLEDColor[statusLEDtypes::STATUS_FB_LAST] = {off, magenta, b
 
 uint32_t antMillisPowerChange = 0;
 bool powerChangeFlag = false;
+bool powerAdapterConnected = false;
 
 // bool bankUpdateFirstTime = false;
   

@@ -328,38 +328,16 @@ void eeErase(uint8_t chunk, uint32_t startAddr, uint32_t endAddr) {
 }
 
 bool IsPowerConnected(){
-  return !digitalRead(externalVoltagePin);
+  return powerAdapterConnected;
 }
 
 void ChangeBrightnessISR(void) {    // External interrupt on "externalVoltagePin"
   // SERIALPRINT(F("HELP"));
-  feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
-  uint8_t powerAdapterConnected = !digitalRead(externalVoltagePin);
-  static int sumBright = 0;
+  
+  powerAdapterConnected = (bool)!digitalRead(externalVoltagePin);
 
   antMillisPowerChange = millis();
   powerChangeFlag = true;
-
-  if(!powerAdapterConnected){
-    if(config->inputs.encoderCount >= 28)  currentBrightness = BRIGHTNESS_WOP_32_ENC;
-    else                                   currentBrightness = BRIGHTNESS_WOP;
-  }else{
-    currentBrightness = BRIGHTNESS_WITH_POWER;
-  }
-
-  if (powerAdapterConnected) {
-    // SERIALPRINTLN(F("Power connected"));
-    feedbackHw.SendCommand(CHANGE_BRIGHTNESS);
-    feedbackHw.SendCommand(currentBrightness);
-    //SetStatusLED(STATUS_BLINK, 3, STATUS_FB_INIT);
-  } else {
-    // SERIALPRINTLN(F("Power disconnected"));
-    feedbackHw.SendCommand(CHANGE_BRIGHTNESS);
-    feedbackHw.SendCommand(currentBrightness);
-    //    feedbackHw.SendCommand(BRIGHNESS_WO_POWER+sumBright);
-    //SERIALPRINTLN(BRIGHNESS_WO_POWER+sumBright);
-    //SetStatusLED(STATUS_BLINK, 1, STATUS_FB_INIT);
-  }
 }
 
 long mapl(long x, long in_min, long in_max, long out_min, long out_max)

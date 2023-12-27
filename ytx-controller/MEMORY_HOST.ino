@@ -206,6 +206,7 @@ uint8_t memoryHost::LoadBank(uint8_t bank)
       #endif
     }
     bankNow = bank;
+    
     return bank;
   }
   else{
