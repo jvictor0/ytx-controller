@@ -83,7 +83,7 @@ int16_t SPIAnalogExpander::analogRead(uint32_t n) {
 
     newRead = ((uint16_t)highByte)<<8 | (uint16_t)lowByte;
 
-    localChecksum = (uint16_t)((newRead&0x00FF + (newRead>>8)&0x00FF))&0x000F;
+    localChecksum = ((uint16_t)getChecksum((uint8_t*)&newRead,sizeof(uint16_t)))&0x000F;
     transactionChecksum = (newRead>>12)&0x000F;
 
     if(transactionChecksum==localChecksum){

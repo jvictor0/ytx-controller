@@ -92,8 +92,6 @@ spielement.vid.0=0x04D8
 spielement.pid.0=0xEBBA
 spielement.build.mcu=cortex-m0plus
 spielement.build.f_cpu=48000000L
-spielement.build.usb_product="spiElementV2"
-spielement.build.usb_manufacturer="Yaeltex"
 spielement.build.board=spielement
 spielement.build.core=arduino
 spielement.build.openocdscript=openocd_scripts/arduino_zero.cfg
@@ -109,9 +107,9 @@ spielement.bootloader.file=zero\samd21_sam_ba.bin
 ## spiElement SAMD21 (No Bootloader)
 ## --------------------------
 spielement.menu.cpu.samd21_xtal_nb=SAMD21 (No Bootloader)
-spielement.menu.cpu.samd21_xtal_nb.build.extra_flags=-DSPI_SLAVE -D__SAMD21G18A__ {build.usb_flags}
+spielement.menu.cpu.samd21_xtal_nb.build.extra_flags=-DSPI_SLAVE -D__SAMD21G18A__
 
 ## spiElement SAMD21 CRYSTALLESS (No Bootloader)
 ## --------------------------
 spielement.menu.cpu.samd21_xtalless_nb=SAMD21 CRYSTALLESS (No Bootloader)
-spielement.menu.cpu.samd21_xtalless_nb.build.extra_flags=-DSPI_SLAVE -DCRYSTALLESS -D__SAMD21G18A__ {build.usb_flags}
+spielement.menu.cpu.samd21_xtalless_nb.build.extra_flags=-DSPI_SLAVE -DCRYSTALLESS -D__SAMD21G18A__

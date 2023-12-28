@@ -97,3 +97,13 @@ void SPIAddressableElement::writeChunk(uint8_t index, void *data, uint8_t size){
     ::digitalWrite(spiBUS->cs, HIGH);
   spiBUS->port->endTransaction();
 }
+
+uint8_t SPIAddressableElement::getChecksum(const uint8_t *data, uint32_t size){
+    uint8_t checksum = 0;
+
+    for (uint32_t i = 0; i < size; ++i) {
+        checksum += data[i];
+    }
+
+    return checksum;
+}

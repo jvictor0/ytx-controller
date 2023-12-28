@@ -91,9 +91,9 @@ void loop(){
     if(analog[aInput].rawValue != analog[aInput].rawValuePrev &&
       !isNoise(&analog[aInput],parameters.noiseThreshold)){
 
-        uint16_t checksum = (uint16_t)((analog[aInput].rawValue&0x00FF + (analog[aInput].rawValue>>8)&0x00FF))&0x000F;
+        uint16_t checksum = SPIAddressableSlaveModule.getChecksum((uint8_t*)&analog[aInput].rawValue,sizeof(uint16_t));
         
-        analogRegister[aInput] = analog[aInput].rawValue | (checksum<<12);
+        analogRegister[aInput] = analog[aInput].rawValue | ((checksum&0x000F)<<12);
 
         analog[aInput].rawValuePrev = analog[aInput].rawValue;
 

@@ -252,6 +252,16 @@ void SPIAddressableSlave::SercomInit(){
   while(SERCOM->SPI.SYNCBUSY.bit.CTRLB); //wait until receiver is enabled
 }
 
+uint8_t SPIAddressableSlave::getChecksum(const uint8_t *data, uint32_t size){
+    uint8_t checksum = 0;
+
+    for (uint32_t i = 0; i < size; ++i) {
+        checksum += data[i];
+    }
+
+    return checksum;
+}
+
 inline void OnTransmissionStart(){
   SPIAddressableSlaveModule.resetInternalState();
 }

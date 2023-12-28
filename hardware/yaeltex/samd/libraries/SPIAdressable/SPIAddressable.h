@@ -124,6 +124,7 @@ class SPIAddressableElement {
         SPIAddressableElement();
         virtual void begin(SPIAdressableBUS *, uint8_t);
 		virtual void begin(SPIAdressableBUS *, uint8_t, uint8_t);
+        uint8_t getChecksum(const uint8_t *data, uint32_t size);
     protected:
         SPIAdressableBUS *spiBUS; /*! This points to a valid SPI object created from the Arduino SPI library. */
         uint8_t base;  /*! base address */

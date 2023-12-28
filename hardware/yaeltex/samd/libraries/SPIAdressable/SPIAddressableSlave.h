@@ -69,10 +69,11 @@ class SPIAddressableSlave {
     void getAddress();
     void setNextAddress(int);
     void setAddress(int);
+    uint8_t* getUserRegistersPointer();
+    uint8_t* getControlRegistersPointer();
     void setTransmissionCompleteCallback(voidFuncPtr);
     void setConfigurationCompleteCallback(voidFuncPtr);
-    uint8_t* getControlRegistersPointer();
-    uint8_t* getUserRegistersPointer();
+    uint8_t getChecksum(const uint8_t *data, uint32_t size);
 
     volatile uint8_t  base;
     volatile uint8_t  registersCount;

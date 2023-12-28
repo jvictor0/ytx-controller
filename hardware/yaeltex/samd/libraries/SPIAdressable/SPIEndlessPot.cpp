@@ -50,8 +50,20 @@ void SPIEndlessPot::configure(SPIEndlessPotParameters *parameters){
 }
 
 uint16_t SPIEndlessPot::readModule() {
-  uint16_t data;
-  readChunk(REGISTER_OFFSET,&data,sizeof(data));
-  return data;
+    uint16_t data;
+    uint16_t localChecksum;
+    uint16_t transactionChecksum;
+    readChunk(REGISTER_OFFSET,&data,sizeof(data));
+
+    localChecksum = ((uint16_t)getChecksum((uint8_t*)&data,sizeof(uint16_t)))&0x000F;
+    transactionChecksum = (data>>12)&0x000F;
+
+    if(transactionChecksum==localChecksum){
+      return data&0x0FFF;
+    }else{
+      return 0;
+    }
+
+    return data;
 }
 

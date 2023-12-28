@@ -76,6 +76,10 @@ void cleanup(void){
 
 void configure(void){
   memcpy(&parameters,SPIAddressableSlaveModule.getControlRegistersPointer(),sizeof(SPIEndlessPotParameters));
+
+  parameters.sampleInterval = constrain(parameters.sampleInterval,800,1200);
+  parameters.expFilter = constrain(parameters.expFilter,0.1,0.5);
+  parameters.hysteresis = constrain(parameters.hysteresis,25,75);
 }
 
 void setup (void)
@@ -109,38 +113,45 @@ void loop()
 {
   SPIAddressableSlaveModule.hook();
 
+  uint8_t aux = 0;
+  uint8_t checksum = 0;
+  
   // Decode rotarys
   if(micros()-antMicrosSample>parameters.sampleInterval){
     antMicrosSample = micros();
 
-    uint8_t auxRotary = 0;
-    
     for(int i=0;i<POT_COUNT;i++){
       int direction = decodeInfinitePot(i);
     
       if(direction!=0){ //has activity
 
         //write activity
-        auxRotary |= (1<<(4+i)); 
+        aux |= (1<<(4+i)); 
 
         //write CW direction(otherwise CCW)
         if(direction>0)
-          auxRotary |= 1<<i;
+          aux |= 1<<i;
       }
     }
     //write complete register at once
-    SPIAddressableSlaveModule.userDataRegister[ROTARY_DATA] = auxRotary;
+    SPIAddressableSlaveModule.userDataRegister[ROTARY_DATA] = aux;
   }
+  checksum += SPIAddressableSlaveModule.userDataRegister[ROTARY_DATA];
+  aux = 0;
 
   // Poll switches
   for(int i=0;i<POT_COUNT;i++){
     
     int switchState = digitalRead(inputSwitchsPin[i]);
 
+
     if(switchState){
-      SPIAddressableSlaveModule.userDataRegister[SWITCH_DATA] |= (1<<i);
+      aux |= (1<<i);
     }else{
-      SPIAddressableSlaveModule.userDataRegister[SWITCH_DATA] &= ~(1<<i);
+      aux &= ~(1<<i);
     }
   }
+  checksum += aux;
+
+  SPIAddressableSlaveModule.userDataRegister[SWITCH_DATA] = aux|((checksum&0x0F)<<4);
 }
