@@ -48,7 +48,6 @@ SOFTWARE.
 #include "headers/EncoderInputs.h" 
 #include "headers/DigitalInputs.h"
 #include "headers/FeedbackClass.h"
-#include "headers/SPIExpander.h"
 
 //----------------------------------------------------------------------------------------------------
 // SPECIAL VARIABLES WITHOUT INIT (persist on RAM memory between resets)
@@ -182,6 +181,7 @@ const uint32_t statusLEDColor[statusLEDtypes::STATUS_FB_LAST] = {off, magenta, b
 
 uint32_t antMillisPowerChange = 0;
 bool powerChangeFlag = false;
+bool powerAdapterConnected = false;
 
 // bool bankUpdateFirstTime = false;
   
@@ -232,6 +232,9 @@ uint16_t countTimer = 0;
 //----------------------------------------------------------------------------------------------------
 
 SPISettings ytxSPISettings(SPI_SPEED_2_M, MSBFIRST, SPI_MODE0);
+
+SPIAdressableBUS *spiBUS[3] = {NULL,NULL,NULL};
+const uint8_t spiCS[3] = {2,7,10};
 
 // Arduino core definitions for product name, manufacturer name, and PIDs
 extern uint8_t STRING_PRODUCT[];

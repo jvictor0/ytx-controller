@@ -30,7 +30,9 @@ SOFTWARE.
 #define ENCODER_INPUTS_H
 
 #include <SPI.h>
-#include "SPIExpander.h"
+#include <SPIGPIOExpander.h>
+#include <SPIEndlessPot.h>
+
 #include "modules.h"
 #include "FeedbackClass.h"
 
@@ -147,7 +149,6 @@ static const PROGMEM uint8_t fullStepTable[7][4] = {
 
 class EncoderInputs{
 
-
 public:
 	// Data that changes with bank, and encoder
 	typedef struct __attribute__((packed)){
@@ -164,7 +165,7 @@ public:
 		uint8_t buttonSensitivityControlOn : 1;
 	}encoderBankData;	// 9 bytes
 
-	void Init(uint8_t,uint8_t, SPIClass*);
+	void Init(uint8_t,uint8_t, SPIAdressableBUS *);
 	void Read();
 	void SwitchAction(uint8_t, uint8_t, int8_t, bool initDump = false);
 	void SendRotaryMessage(uint8_t, uint8_t, bool initDump = false);
@@ -177,7 +178,9 @@ public:
 	void SetProgramChange(uint8_t,uint8_t,uint8_t);
 	void RefreshData(uint8_t, uint8_t);
 	uint8_t GetModuleOrientation(uint8_t);
+	uint8_t GetModuleType(uint8_t);
 	uint8_t GetThisEncoderBank(uint8_t);
+	uint8_t GetEncoderBrightness(uint8_t);
 	uint16_t GetEncoderValue(uint8_t);
 	uint16_t GetEncoderValue2(uint8_t);
 	uint16_t GetEncoderShiftValue(uint8_t);
@@ -197,11 +200,8 @@ private:
 	uint8_t nModules;
 	bool begun;
 
-	// setup the port expander
-	SPIExpander encodersMCP[MAX_ENCODER_MODS];
-	SPIClass *spi;
-	const uint8_t encodersMCPChipSelect = 2;
-	uint8_t *moduleOrientation;
+	// pointers to modules objects
+	void **encodersModule;
 
 	uint8_t priorityCount = 0;				// Amount of modules in priority list
   	uint8_t priorityList[2] = {0};			// Priority list: 1 or 2 modules to be read at a time, when changing
@@ -210,9 +210,9 @@ private:
 	uint8_t currentProgram[2][16];  // Program change # for each port (USB and HW) and channel
 
 	typedef struct __attribute__((packed)){
-		uint16_t mcpState;				// 16 bits - each is the state of one of the MCP digital pins
-  		uint16_t mcpStatePrev;			// 16 bits - each is the previous state of one of the MCP digital pins	
-  		uint8_t moduleOrientation:1;
+		uint16_t state;				// 16 bits - each is the state of one of the MCP digital pins
+  		uint16_t statePrev;			// 16 bits - each is the previous state of one of the MCP digital pins	
+  		uint8_t orientation:1;
   		uint8_t detent:1;
   		uint8_t unused1:6;
 	}moduleData;				//5 bytes
@@ -249,20 +249,17 @@ private:
 	encoderData* eHwData;
 
 	// CLASS METHODS
-	void SetNextAddress(SPIExpander*, uint8_t);
+	void InitRotaryModule(SPIAdressableBUS*,uint8_t);
 	void SwitchCheck(uint8_t, uint8_t);
-	void EncoderCheck(uint8_t, uint8_t);
+	void EncoderAction(uint8_t, uint8_t);
 	void AddToPriority(uint8_t);
 	void SetFeedback(uint8_t, uint8_t, uint8_t, uint8_t);
 	void FilterClear(uint8_t);
-  	int16_t FilterGetNewAverage(uint8_t, uint16_t);
-  	void EnableHWAddress();
-	void DisableHWAddress();
-	void SetAllAsOutput();
-	void InitPinsGhostModules();
-	void SetPullUps();
-	void readAllRegs();
-	void writeAllRegs(byte);
+	void ReadModule(uint8_t);
+	bool ModuleHasActivity(uint8_t);
+	bool RotaryHasConfiguration(uint8_t);
+	int DecodeRotaryDirection(uint8_t, uint8_t);
+	int16_t FilterGetNewAverage(uint8_t, uint16_t);
 };
 
 

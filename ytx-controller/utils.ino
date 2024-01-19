@@ -328,38 +328,16 @@ void eeErase(uint8_t chunk, uint32_t startAddr, uint32_t endAddr) {
 }
 
 bool IsPowerConnected(){
-  return !digitalRead(externalVoltagePin);
+  return powerAdapterConnected;
 }
 
 void ChangeBrightnessISR(void) {    // External interrupt on "externalVoltagePin"
   // SERIALPRINT(F("HELP"));
-  feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
-  uint8_t powerAdapterConnected = !digitalRead(externalVoltagePin);
-  static int sumBright = 0;
+  
+  powerAdapterConnected = (bool)!digitalRead(externalVoltagePin);
 
   antMillisPowerChange = millis();
   powerChangeFlag = true;
-
-  if(!powerAdapterConnected){
-    if(config->inputs.encoderCount >= 28)  currentBrightness = BRIGHTNESS_WOP_32_ENC;
-    else                                   currentBrightness = BRIGHTNESS_WOP;
-  }else{
-    currentBrightness = BRIGHTNESS_WITH_POWER;
-  }
-
-  if (powerAdapterConnected) {
-    // SERIALPRINTLN(F("Power connected"));
-    feedbackHw.SendCommand(CHANGE_BRIGHTNESS);
-    feedbackHw.SendCommand(currentBrightness);
-    //SetStatusLED(STATUS_BLINK, 3, STATUS_FB_INIT);
-  } else {
-    // SERIALPRINTLN(F("Power disconnected"));
-    feedbackHw.SendCommand(CHANGE_BRIGHTNESS);
-    feedbackHw.SendCommand(currentBrightness);
-    //    feedbackHw.SendCommand(BRIGHNESS_WO_POWER+sumBright);
-    //SERIALPRINTLN(BRIGHNESS_WO_POWER+sumBright);
-    //SetStatusLED(STATUS_BLINK, 1, STATUS_FB_INIT);
-  }
 }
 
 long mapl(long x, long in_min, long in_max, long out_min, long out_max)
@@ -498,7 +476,15 @@ void CountModules(){
   // CHECK WHETHER AMOUNT OF DIGITAL INPUTS IN MODULES COMBINED MATCH THE AMOUNT OF DIGITAL INPUTS IN CONFIG
   // AMOUNT OF DIGITAL MODULES
   for (int nMod = 0; nMod < MAX_ENCODER_MODS; nMod++) {
-    if (config->hwMapping.encoder[nMod]) {
+    uint8_t moduleType = config->hwMapping.encoder[nMod]&0x0F;
+
+    if (moduleType) {
+      modulesInConfig.encoders++;
+    }
+
+    moduleType = (config->hwMapping.encoder[nMod]>>4)&0x0F;
+
+    if (moduleType) {
       modulesInConfig.encoders++;
     }
   }
@@ -514,9 +500,12 @@ void CountModules(){
     }
   }
   // CHECK WHETHER AMOUNT OF ANALOG INPUTS IN MODULES COMBINED MATCH THE AMOUNT OF ANALOG INPUTS IN CONFIG
-  for (int nPort = 0; nPort < ANALOG_PORTS; nPort++) {
-    for (int nMod = 0; nMod < ANALOG_MODULES_PER_PORT; nMod++) {
-      if (config->hwMapping.analog[nPort][nMod]) {
+  for (int nPort = 0; nPort < ANALOG_MUXES; nPort++) {
+    for (int nMod = 0; nMod < ANALOG_MODULES_PER_MUX; nMod++) {
+      int moduleType = (nPort < 4) ? config->hwMapping.analog[nPort][nMod]&0x0F : 
+                          (config->hwMapping.analog[nPort-4][nMod]>>4)&0x0F;
+                          
+      if (moduleType) {
         modulesInConfig.analog++;
       }
     }

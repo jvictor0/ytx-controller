@@ -43,14 +43,14 @@ SOFTWARE.
 
 // #define DISABLE_ENCODER_BANKS
 // #define DISABLE_DIGITAL_BANKS
-// #define DISABLE_ANALOG_BANKS
+#define DISABLE_ANALOG_BANKS
 
 #if !defined(INIT_CONFIG)
 #define USE_KWHAT_COUNT_BUFFER
 #endif
 
 #define FW_VERSION_MAJOR      0
-#define FW_VERSION_MINOR      22
+#define FW_VERSION_MINOR      23
 
 #define HW_VERSION_MAJOR      1
 #define HW_VERSION_MINOR      0
@@ -93,8 +93,8 @@ SOFTWARE.
 #define MAX_DIGITAL_MODULES   DIGITAL_PORTS*MODULES_PER_PORT
 
 #define MAX_DIGITAL_AMOUNT    256
-#define MAX_ENCODER_AMOUNT    32
-#define MAX_ANALOG_AMOUNT     64
+#define MAX_ENCODER_AMOUNT    64
+#define MAX_ANALOG_AMOUNT     128
 
 // Note On and Note Off values
 #define NOTE_ON       127
@@ -205,7 +205,7 @@ SOFTWARE.
                                             encoder[eIndex].switchFeedback.message == switch_msg_pb     ||  \
                                             encoder[eIndex].switchFeedback.message == switch_msg_key))
     
-#define MAX_ENCODER_MODS      8
+#define MAX_ENCODER_MODS      16
 
 // #define FAST_SPEED_MILLIS  4
 // #define MID4_SPEED_MILLIS  6
@@ -240,7 +240,7 @@ uint8_t detentMillisSpeedThresholds[][ENCODER_MAX_SPEED] = {{40, 20, 16, 14, 12,
 #define D_MID2_SPEED_MILLIS    40
 #define D_MID1_SPEED_MILLIS    50
 
-#define SLOW_SPEED_COUNT      1
+#define SLOW_SPEED_COUNT        2
 
 // Value that each speed adds to current encoder value
 uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
@@ -281,11 +281,11 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
                                            analog[aIndex].feedback.message == analogMessageTypes::analog_msg_pb    ||   \
                                           analog[aIndex].feedback.message == analogMessageTypes::analog_msg_key  )
 
-#define ANALOG_PORTS              4
-#define ANALOGS_PER_PORT          16
-#define ANALOG_MODULES_PER_PORT   8
-#define ANALOG_MODULES_PER_MOD    ANALOGS_PER_PORT/ANALOG_MODULES_PER_PORT
-#define MAX_ANALOG_MODULES        ANALOG_PORTS*ANALOG_MODULES_PER_PORT
+#define ANALOG_MUXES              8
+#define ANALOG_PER_MUX            16
+#define ANALOG_MODULES_PER_MUX    8
+#define ANALOG_PER_MODULES        ANALOG_PER_MUX/ANALOG_MODULES_PER_MUX
+#define MAX_ANALOG_MODULES        ANALOG_MUXES*ANALOG_MODULES_PER_MUX
 
 // set low and high limits to adjust for VCC and GND noise
 #define RAW_THRESHOLD       5
@@ -481,14 +481,9 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 
 #define MIDI_BUF_MAX_LEN          1000
 
+#define SPI_SPEED_1_M       1000000
 #define SPI_SPEED_1_5_M     1500000
 #define SPI_SPEED_2_M       2000000
-
-//#define config->midiConfig.vumeterChannel             15    // CHANNEL 16
-//#define config->midiConfig.valueToColorChannel      15    // CHANNEL 16
-//#define config->midiConfig.valueToIntensityChannel  14    // CHANNEL 16
-//#define config->midiConfig.remoteBankChannel         15    // CHANNEL 16
-//#define config->midiConfig.splitModeChannel          14    // CHANNEL 15 (an analog control with a feedback loop might change an encoder ring's color if both features work on the same channel)
 
 /*! Enumeration of MIDI types */
 enum MidiTypeYTX: uint8_t

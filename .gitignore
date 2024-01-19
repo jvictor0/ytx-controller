@@ -4,6 +4,7 @@
 *.log
 *.hex
 *.elf
+*.map
 bootloader/bootloaderYTX/Bootloader/bootloaderYTX/jlink.log
 notes.txt
 Debug/

@@ -740,20 +740,16 @@ void FeedbackClass::FillFrameWithEncoderData(byte updateIndex){
         return;
       }
     }
-    // else if (valueToIntensity && !encoderHw.GetEncoderSwitchState(indexChanged)){
-    //   return;
-    // }
+    
+    uint8_t brightness = encoderHw.GetEncoderBrightness(indexChanged);
 
     sendSerialBufferDec[d_nRing] = indexChanged;
     sendSerialBufferDec[d_orientation] = newOrientation;
     sendSerialBufferDec[d_ringStateH] = encFbData[currentBank][indexChanged].encRingState >> 8;
     sendSerialBufferDec[d_ringStateL] = encFbData[currentBank][indexChanged].encRingState & 0xff;
-    // sendSerialBufferDec[d_currentValue] = newValue;
-    // sendSerialBufferDec[d_fbMin] = minValue;
-    // sendSerialBufferDec[d_fbMax] = maxValue;
-    sendSerialBufferDec[d_R] = colorR*intensityFactor/MAX_INTENSITY;
-    sendSerialBufferDec[d_G] = colorG*intensityFactor/MAX_INTENSITY;
-    sendSerialBufferDec[d_B] = colorB*intensityFactor/MAX_INTENSITY;
+    sendSerialBufferDec[d_R] = colorR*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
+    sendSerialBufferDec[d_G] = colorG*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
+    sendSerialBufferDec[d_B] = colorB*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
     sendSerialBufferDec[d_ENDOFFRAME] = END_OF_FRAME_BYTE;
     feedbackDataToSend = true;
   }
@@ -861,7 +857,7 @@ void FeedbackClass::FillFrameWithDigitalData(byte updateIndex){
     }
   }
 
-  // SERIALPRINT("newValue? "); SERIALPRINTLN(newValue);
+  uint8_t brightness = digitalHw.GetDigitalButtonBrightness(indexChanged);
 
   //sendSerialBufferDec[msgLength] = TX_BYTES;   // INIT SERIAL FRAME WITH CONSTANT DATA
   sendSerialBufferDec[d_frameType] = (indexChanged < amountOfDigitalInConfig[0]) ?  DIGITAL1_CHANGE_FRAME : 
@@ -870,9 +866,9 @@ void FeedbackClass::FillFrameWithDigitalData(byte updateIndex){
   sendSerialBufferDec[d_orientation] = 0;
   sendSerialBufferDec[d_digitalState] = (isShifter || newValue || lowI || valueToIntensity) ? 1 : 0;
   sendSerialBufferDec[d_ringStateL] = 0;
-  sendSerialBufferDec[d_R] = colorR*intensityFactor/MAX_INTENSITY;
-  sendSerialBufferDec[d_G] = colorG*intensityFactor/MAX_INTENSITY;
-  sendSerialBufferDec[d_B] = colorB*intensityFactor/MAX_INTENSITY;
+  sendSerialBufferDec[d_R] = colorR*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
+  sendSerialBufferDec[d_G] = colorG*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
+  sendSerialBufferDec[d_B] = colorB*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
   sendSerialBufferDec[d_ENDOFFRAME] = END_OF_FRAME_BYTE;
   feedbackDataToSend = true;
 }

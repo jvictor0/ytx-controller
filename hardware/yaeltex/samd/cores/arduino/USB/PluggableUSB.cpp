@@ -116,16 +116,18 @@ PluggableUSB_& PluggableUSB()
 
 PluggableUSB_::PluggableUSB_()
 {
-	if (PM->RCAUSE.bit.POR){
-   		// On power-on initialize, always cdc off
-   		cdcEnabled = false;
- 	}else{
- 		// On reset initialize, query cdcMagicData variable
- 		if(cdcMagicData == CDC_ENABLE_MAGIC){
- 			cdcEnabled = true;
- 			cdcMagicData = 0;
- 		}
- 	}
+   	#if defined(KILOMUX)
+		if (PM->RCAUSE.bit.POR){
+	   		// On power-on initialize, always cdc off
+	   		cdcEnabled = false;
+	 	}else{
+	 		// On reset initialize, query cdcMagicData variable
+	 		if(cdcMagicData == CDC_ENABLE_MAGIC){
+	 			cdcEnabled = true;
+	 			cdcMagicData = 0;
+	 		}
+	 	}
+   	#endif
 
 	if(cdcEnabled){
 		lastIf = CDC_ACM_INTERFACE + CDC_INTERFACE_COUNT;

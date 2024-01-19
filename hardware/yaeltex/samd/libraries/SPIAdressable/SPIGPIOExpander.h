@@ -1,5 +1,5 @@
 /*
- * Copyright (c) , Majenko Technologies
+ * Copyright (c) 2023, YAELTEX Technologies
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without modification, 
@@ -12,7 +12,7 @@
  *     this list of conditions and the following disclaimer in the documentation
  *      and/or other materials provided with the distribution.
  * 
- *  3. Neither the name of Majenko Technologies nor the names of its contributors may be used
+ *  3. Neither the name of YAELTEX Technologies nor the names of its contributors may be used
  *     to endorse or promote products derived from this software without 
  *     specific prior written permission.
  * 
@@ -29,8 +29,8 @@
  */
 
 
-#ifndef _SPIExpander_H
-#define _SPIExpander_H
+#ifndef _SPIGPIOExpander_H
+#define _SPIGPIOExpander_H
 
 #if (ARDUINO >= 100) 
 # include <Arduino.h>
@@ -40,42 +40,9 @@
 
 #include <SPI.h>
 
-#define MCP23017_ADDRESS 0x20
-
-#define    OPCODEW       (0b01000000)  // Opcode for MCP23S17 with LSB (bit0) set to write (0), address OR'd in later, bits 1-3
-#define    OPCODER       (0b01000001)  // Opcode for MCP23S17 with LSB (bit0) set to read (1), address OR'd in later, bits 1-3
-#define    ADDR_ENABLE   (0b00001000)  // Configuration register for MCP23S17, the only thing we change is enabling hardware addressing
-#define    ADDR_DISABLE  (0b00000000)  // Configuration register for MCP23S17, the only thing we change is disabling hardware addressing
-#define    SEQOP_ENABLE  (0b00100000)  // Configuration register for MCP23S17, the only thing we change is enabling sequential operation
+#include "SPIAddressable.h"
 
 // registers
-#define MCP23017_IODIRA     0x00
-#define MCP23017_IPOLA      0x02
-#define MCP23017_GPINTENA   0x04
-#define MCP23017_DEFVALA    0x06
-#define MCP23017_INTCONA    0x08
-#define MCP23017_IOCONA     0x0A
-#define MCP23017_GPPUA      0x0C
-#define MCP23017_INTFA      0x0E
-#define MCP23017_INTCAPA    0x10
-#define MCP23017_GPIOA      0x12
-#define MCP23017_OLATA      0x14
-
-
-#define MCP23017_IODIRB     0x01
-#define MCP23017_IPOLB      0x03
-#define MCP23017_GPINTENB   0x05
-#define MCP23017_DEFVALB    0x07
-#define MCP23017_INTCONB    0x09
-#define MCP23017_IOCONB     0x0B
-#define MCP23017_GPPUB      0x0D
-#define MCP23017_INTFB      0x0F
-#define MCP23017_INTCAPB    0x11
-#define MCP23017_GPIOB      0x13
-#define MCP23017_OLATB      0x15
-
-#define MCP23017_INT_ERR 255
-
 enum {
     IODIRA,     IODIRB,
     IPOLA,      IPOLB,
@@ -87,40 +54,38 @@ enum {
     INTFA,      INTFB,
     INTCAPA,    INTCAPB,
     GPIOA,      GPIOB,
-    OLATA,      OLATB
+    OLATA,      OLATB,
+    MCP23017_REGISTER_COUNT
 };
 
-class SPIExpander {
-    private:
-        SPIClass *_spi; /*! This points to a valid SPI object created from the Arduino SPI library. */
-        uint8_t _cs;    /*! Chip select pin */
-        uint8_t _addr;  /*! 3-bit chip address */
-    
-        uint8_t _reg[22];   /*! Local mirrors of the 22 internal registers of the MCP23S17 chip */        
+#define MCP23017_INT_ERR 255
 
-        void readRegister(uint8_t addr); 
-        void writeRegister(uint8_t addr);
+class SPIGPIOExpander : public SPIAddressableElement{
+    private:
+        uint8_t _reg[MCP23017_REGISTER_COUNT];   /*! Local mirrors of the 22 internal registers of the MCP23S17 chip */        
+
+        void readRegister(uint8_t index); 
+        void writeRegister(uint8_t index);
         void readAll();
         void writeAll();
         
     public:
-        SPIExpander();
-		void begin(SPIClass *spi, uint8_t cs, uint8_t addr);
-        void begin(SPIClass &spi, uint8_t cs, uint8_t addr);
+        SPIGPIOExpander();
+        void begin(SPIAdressableBUS *bus, uint8_t address, uint8_t nextAddress) override;
         void pinMode(uint8_t pin, uint8_t mode);
         void digitalWrite(uint8_t pin, uint8_t value);
         uint8_t digitalRead(uint8_t pin);
-		uint16_t digitalRead();
+        uint16_t digitalRead();
         
         void writeWord(uint8_t reg, uint16_t word);
         uint8_t readPort(uint8_t port);
         uint16_t readPort();
-		void updateRegisterBit(uint8_t pin, uint8_t pValue, uint8_t portAaddr, uint8_t portBaddr);
+        void updateRegisterBit(uint8_t pin, uint8_t pValue, uint8_t portAaddr, uint8_t portBaddr);
         void writePort(uint8_t port, uint8_t val);
         void writePort(uint16_t val);
-		uint8_t bitForPin(uint8_t pin);
-		uint8_t regForPin(uint8_t pin, uint8_t portAaddr, uint8_t portBaddr);
-		void pullUp(uint8_t p, uint8_t d);
+        uint8_t bitForPin(uint8_t pin);
+        uint8_t regForPin(uint8_t pin, uint8_t portAaddr, uint8_t portBaddr);
+        void pullUp(uint8_t p, uint8_t d);
         void enableInterrupt(uint8_t pin, uint8_t type);
         void disableInterrupt(uint8_t pin);
         void setMirror(boolean m);
@@ -129,5 +94,15 @@ class SPIExpander {
         void setInterruptLevel(uint8_t level);
         void setInterruptOD(boolean openDrain);
 
+};
+
+class SPIExpanderGroup : public SPIAdressableBUS{        
+    public:
+        SPIExpanderGroup();
+        void SetAllAsOutput();
+        void InitPinsGhostModules();
+        void SetPullUps();
+        void readAllRegs();
+        void writeAllRegs(byte);
 };
 #endif

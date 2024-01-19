@@ -256,13 +256,13 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
                     
                     static bool newMemReset = false;
 
-                    if(message[ytxIOStructure::BLOCK] == 0){
+                    if(message[ytxIOStructure::BLOCK] == ytxIOBLOCK::Configuration){
                       ytxConfigurationType* payload = (ytxConfigurationType *) decodedPayload;
                       // SERIALPRINT(F("\n Block 0 received"));
 
-                      
                       if(memcmp(&config->inputs,&payload->inputs,sizeof(config->inputs))){
                         // SERIALPRINT(F("\n Input config changed"));
+
                         enableProcessing = false;
                         validConfigInEEPROM = false;
 
@@ -297,10 +297,12 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
                       SERIALPRINT(F("\tSECTION RECEIVED: "));SERIALPRINT(section);
                       SERIALPRINT(F("\tSIZE OF SECTION: "));SERIALPRINT(memHost->SectionSize(message[ytxIOStructure::BLOCK]));
                     }
+
                     memHost->WriteToEEPROM( message[ytxIOStructure::BANK], 
                                             message[ytxIOStructure::BLOCK],
                                             section, 
                                             decodedPayload);
+
                     if(!newMemReset) {
                       memHost->LoadBankSingleSection( message[ytxIOStructure::BANK], 
                                                       message[ytxIOStructure::BLOCK], 
@@ -337,7 +339,7 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
                     sysexBlock[ytxIOStructure::SECTION_LSB] = section & 0x7F;     //section lsb
 
                     memHost->ReadFromEEPROM(message[ytxIOStructure::BANK],message[ytxIOStructure::BLOCK], section, sectionData, false);
-                    
+
                     uint16_t sysexSize = encodeSysEx(sectionData, &sysexBlock[ytxIOStructure::DATA], memHost->SectionSize(message[ytxIOStructure::BLOCK]));
                     
                     sendSysExYTX(MIDI_USB, ytxIOStructure::SECTION_LSB + sysexSize, &sysexBlock[1], false);
@@ -492,6 +494,7 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
 }
 
 void SendComponentInfo(uint8_t componentType, uint16_t index){
+  
   uint8_t statusMsgSize = MSG_SIZE_CMP_INFO;
   uint8_t sysexBlock[statusMsgSize];
 
@@ -528,10 +531,10 @@ uint16_t GetHardwareID(uint8_t componentType, uint16_t index){
       return index;
     } break;
     case ytxIOBLOCK::Digital: {
-      return index + config->inputs.encoderCount;  
+      return index + config->inputs.encoderCount; 
     } break;
     case ytxIOBLOCK::Analog: {
-      return index + config->inputs.encoderCount + config->inputs.digitalCount;  
+      return index + config->inputs.encoderCount + config->inputs.digitalCount;
     } break;
     default:{
       return 0;

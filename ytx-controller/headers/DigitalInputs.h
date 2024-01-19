@@ -30,7 +30,8 @@ SOFTWARE.
 #define DIGITAL_INPUTS_H
 
 #include <SPI.h>
-#include "SPIExpander.h"
+#include <SPIGPIOExpander.h>
+
 #include "modules.h"
 #include "FeedbackClass.h"
 //----------------------------------------------------------------------------------------------------
@@ -47,12 +48,13 @@ public:
 		uint16_t lastValue : 14;
   	}digitalBankData;
   	
-	void Init(uint8_t,uint16_t,SPIClass*);
+	void Init(uint8_t,uint16_t,SPIAdressableBUS*,SPIAdressableBUS*);
 	void Read();
 	void SetDigitalValue(uint8_t,uint16_t,uint16_t);
 	void SetButtonVelocity(uint8_t);
 	void SetProgramChange(uint8_t,uint8_t,uint8_t);
 	uint8_t GetButtonVelocity();
+	uint8_t GetDigitalButtonBrightness(uint8_t);
 	uint16_t GetDigitalValue(uint16_t);
 	bool GetDigitalState(uint16_t);
 	void DigitalAction(uint16_t,uint16_t, bool initDump = false);
@@ -64,12 +66,8 @@ private:
 	uint8_t nModules;
 	bool begun;
 	
-	// setup the port expander
-	SPIClass *spi;
-	const uint8_t digitalMCPChipSelect1 = 7;
-	const uint8_t digitalMCPChipSelect2 = 10;
-	
-	SPIExpander digitalMCP[MAX_DIGITAL_MODULES];
+	// pointers to modules objects
+	SPIGPIOExpander **digitalsModule;
 
 	uint8_t individualScanInterval;
 	uint32_t generalMillis;	
@@ -81,10 +79,10 @@ private:
 
   	typedef struct __attribute__((packed)){
 		uint32_t 	antMillisScan;
-		uint16_t 	mcpState;
-	  	uint16_t 	mcpStatePrev;
+		uint16_t 	state;
+	  	uint16_t 	statePrev;
 	  	uint16_t	digitalIndexStart;
-	  	uint8_t 	moduleType;
+	  	uint8_t 	type;
 	  	uint8_t 	unused;
   	}moduleData;
 	moduleData *digMData;
@@ -102,12 +100,6 @@ private:
 
 	void SetNextAddress(uint8_t, uint8_t);
 	void CheckIfChanged(uint8_t);
-	void EnableHWAddress();
-	void DisableHWAddress();
-	void SetPullUps();
-	void readAllRegs();
-	void writeAllRegs(byte);
-
 };
 
 

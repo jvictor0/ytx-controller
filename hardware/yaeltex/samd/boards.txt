@@ -86,33 +86,30 @@ kilomux.menu.cpu.samd21_xtal_arduino.build.ldscript=linker_scripts/gcc/flash_wit
 
 
 
-## iElement Board
+## spiElement Board
+spielement.name=spiElement
+spielement.vid.0=0x04D8
+spielement.pid.0=0xEBBA
+spielement.build.mcu=cortex-m0plus
+spielement.build.f_cpu=48000000L
+spielement.build.board=spielement
+spielement.build.core=arduino
+spielement.build.openocdscript=openocd_scripts/arduino_zero.cfg
+spielement.build.variant=YAELTEXV2
+spielement.build.variant_system_lib=
+spielement.build.extra_combine_flags=
+spielement.build.vid=0x04D8
+spielement.build.pid=0xEBBA
+spielement.build.ldscript=linker_scripts/gcc/flash_without_bootloader.ld
+spielement.bootloader.tool=
+spielement.bootloader.file=zero\samd21_sam_ba.bin
 
-ielement.name=iElement
-ielement.vid.0=0x04D8
-ielement.pid.0=0xEBBA
-ielement.build.mcu=cortex-m0plus
-ielement.build.f_cpu=48000000L
-ielement.build.usb_product="iElementV2"
-ielement.build.usb_manufacturer="Yaeltex"
-ielement.build.board=ielement
-ielement.build.core=arduino
-ielement.build.openocdscript=openocd_scripts/arduino_zero.cfg
-ielement.build.variant=YAELTEXV2
-ielement.build.variant_system_lib=
-ielement.build.extra_combine_flags=
-ielement.build.vid=0x04D8
-ielement.build.pid=0xEBBA
-ielement.build.ldscript=linker_scripts/gcc/flash_without_bootloader.ld
-ielement.bootloader.tool=
-ielement.bootloader.file=zero\samd21_sam_ba.bin
-
-## iElement SAMD21 (No Bootloader)
+## spiElement SAMD21 (No Bootloader)
 ## --------------------------
-ielement.menu.cpu.samd21_xtal_nb=SAMD21 (No Bootloader)
-ielement.menu.cpu.samd21_xtal_nb.build.extra_flags=-D__SAMD21G18A__ {build.usb_flags}
+spielement.menu.cpu.samd21_xtal_nb=SAMD21 (No Bootloader)
+spielement.menu.cpu.samd21_xtal_nb.build.extra_flags=-DSPI_SLAVE -D__SAMD21G18A__
 
-## iElement SAMD21 CRYSTALLESS (No Bootloader)
+## spiElement SAMD21 CRYSTALLESS (No Bootloader)
 ## --------------------------
-ielement.menu.cpu.samd21_xtalless_nb=SAMD21 CRYSTALLESS (No Bootloader)
-ielement.menu.cpu.samd21_xtalless_nb.build.extra_flags=-DCRYSTALLESS -D__SAMD21G18A__ {build.usb_flags}
+spielement.menu.cpu.samd21_xtalless_nb=SAMD21 CRYSTALLESS (No Bootloader)
+spielement.menu.cpu.samd21_xtalless_nb.build.extra_flags=-DSPI_SLAVE -DCRYSTALLESS -D__SAMD21G18A__

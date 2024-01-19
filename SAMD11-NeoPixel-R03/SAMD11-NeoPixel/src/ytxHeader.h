@@ -20,7 +20,7 @@
 #define ONE_SEC_TICKS			1000
 #define QUARTER_SEC_TICKS		250
 
-#define BAUD_RATE				2000000
+#define BAUD_RATE	2000000
 
 #define ACK_CMD					0xAA
 #define NEW_FRAME_BYTE          0xF0
@@ -59,7 +59,10 @@
 #define ENCODER_SWITCH_H_ON		0xC001
 #define ENCODER_SWITCH_V_ON		0x1C00
 
-
+bool activeRainbow = false;
+bool ledsUpdateOk = true;
+volatile uint8_t tickShow = LED_SHOW_TICKS;
+volatile uint8_t tickShowEnd = SHOW_END_REFRESH_TICKS;
 
 //enum MsgFrameEnc{
 ////msgLength = 0, frameType, nRing, orientation,ringStateH, ringStateL, currentValue,
@@ -94,10 +97,18 @@ enum LedStrips{
 	ENCODER1_STRIP, ENCODER2_STRIP, DIGITAL1_STRIP, DIGITAL2_STRIP, FB_STRIP, LAST_STRIP
 };
 //! [rx_buffer_var]
-#define MAX_RX_BUFFER_LENGTH_BYTE  16
 #define MAX_RX_BUFFER_LENGTH_ENC   e_ENDOFFRAME+1
 #define MAX_RX_BUFFER_LENGTH_DEC   d_B+1
-
+volatile uint8_t rxArrayIndex = 0;
+volatile bool rxComplete = false;
+volatile bool rcvdInitValues = false;
+volatile bool receivingInit = false;
+volatile bool receivingBrightness = false;
+volatile bool updateBank = false;
+volatile uint8_t rx_bufferEnc[MAX_RX_BUFFER_LENGTH_ENC];
+volatile uint8_t rx_bufferDec[MAX_RX_BUFFER_LENGTH_DEC];
+volatile uint16_t checkSumCalc = 0;
+volatile uint16_t checkSumRecv = 0;
 
 #define RING_BUFFER_LENGTH	128
 
@@ -116,16 +127,61 @@ typedef struct __attribute__((packed)){
 	uint8_t updateB;		// update B intensity
 } RingBufferData;
 
+volatile RingBufferData ringBuffer[RING_BUFFER_LENGTH];
+volatile uint8_t readIdx = 0;
+volatile uint8_t writeIdx = 0;
+volatile uint8_t bufferCurrentSize = 0;
+volatile bool changeBrightnessFlag = false;
+volatile uint8_t turnAllOffFlag = false;
+volatile uint8_t turnAllOnFlag = false;
+volatile uint8_t rainbowStart = false;
+volatile uint8_t onGoingFrame = false;
+volatile bool receivingLEDdata = false;
+volatile bool receivingBank = false;
+volatile bool ledShow = false;
+volatile bool timeToShow = false;
+volatile bool sendShowEnd = false;
+volatile bool frameComplete = false;
+volatile bool readingBuffer = false;
+
+volatile uint16_t tickCount = ONE_SEC_TICKS;
+volatile uint16_t ticksRainbow = 0;
+
+volatile uint8_t msgCount = 0;
+
+//! [module_inst]
+struct usart_module usart_instance;
+//! [module_inst]
+
+uint16_t indexChanged = 0;
+
+uint8_t whichStripToShow = 0;
+
+bool blinkLED = false;
+uint8_t blinkLEDcount = 0;
+
+uint8_t numStripsOn = 0;
+uint8_t numEncoders = 0;
+uint8_t numDigitals1 = 0;
+uint8_t numDigitals2 = 0;
+uint8_t numAnalogFb = 0;
+uint8_t currentBrightness = 0;
+//! [rx_buffer_var]
+
+uint8_t decodeSysEx(volatile uint8_t* inSysEx, volatile uint8_t* outData, uint8_t inLength);
+uint8_t encodeSysEx(uint8_t* inData, uint8_t* outSysEx, uint8_t inLength);
 
 void usart_read_callback(struct usart_module *const usart_module);
 void usart_write_callback(struct usart_module *const usart_module);
 
 void RX_Handler  ( void );
-void CheckReceivedData ( void );
 bool SendToMain(uint8_t command);
 
 void configure_usart(void);
 void configure_usart_callbacks(void);
+
+uint16_t checkSum(volatile uint8_t *data, uint8_t len);
+uint8_t CRC8(const uint8_t *data, uint8_t len);
 
 void UpdateLEDs(uint8_t nStrip, uint8_t nToChange, bool vertical, uint16_t newState, 
 				uint8_t intR, uint8_t intG, uint8_t intB);
