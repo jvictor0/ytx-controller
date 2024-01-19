@@ -168,8 +168,8 @@ void setup() {
     }
     currentBank = memHost->LoadBank(0);
 #endif       
-    //FUSE mod
-    initFixedConfig();
+    
+    initFixedConfig(); // Only will do something if it is implemented
     
     // If there is more than 16 modules adding digitals and encoders, lower SPI speed
     CountModules(); // Count modules in config
@@ -760,34 +760,8 @@ void initInputsConfig(uint8_t b) {
 #endif
 
 void initFixedConfig() {
-    //FUSE mod
-    uint8_t firstCC = config->inputs.encoderCount;
-    for (int i = 64; i < config->inputs.analogCount; i++) {
-      analog[i].message = analogMessageTypes::analog_msg_cc;
-      analog[i].channel = 0;
-      analog[i].midiPort = midiPortsType::midi_hw_usb;
-      analog[i].parameter[rotary_LSB] = firstCC+i;
-      analog[i].parameter[rotary_MSB] = 0;
-      analog[i].parameter[rotary_minLSB] = 0;
-      analog[i].parameter[rotary_minMSB] = 0;
-      analog[i].parameter[rotary_maxLSB] = 127;
-      analog[i].parameter[rotary_maxMSB] = 127;
-      analog[i].splitMode = 0;              // BYTE 1 - BITS 2: SPLIT MODE. 1 OR 2 CC
-      analog[i].deadZone = 0;               // BYTE 1 - BITS 3: DEAD ZONE 
-
-      strcpy(analog[i].comment, "ytx Ana.");
-      analog[i].splitMode = splitModes::normal;
-
-      analog[i].feedback.message = analog_msg_cc;
-      analog[i].feedback.channel = 0;
-      analog[i].feedback.source = midiPortsType::midi_hw_usb;
-      analog[i].feedback.parameterLSB = firstCC+i;
-      analog[i].feedback.parameterMSB = 0;
-      analog[i].feedback.valueToColor = false;
-      analog[i].feedback.color[R_INDEX] = 0xFF;
-      analog[i].feedback.color[G_INDEX] = 0x00;
-      analog[i].feedback.color[B_INDEX] = 0x00;
-  }
+  // MOD HERE IF NEEDED
+  
 }
 
 
