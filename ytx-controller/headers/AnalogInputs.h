@@ -62,13 +62,14 @@ public:
   
   void      Init(uint8_t,uint8_t, SPIAdressableBUS*);
   void      Read();
+  void      IrqHandler();
   void      SetAnalogValue(uint8_t, uint8_t, uint16_t);
   uint16_t  GetAnalogValue(uint8_t);
   void      SetBankForAnalog(uint8_t);
   uint32_t  AnalogReadFast(byte);
   void      SendMessage(uint8_t);
   void      SendNRPN();
-  inline void SetPriority(bool priority) { priorityMode = priority; }
+  inline void SetPriority(bool priority) { priorityMode = 0; }
   inline bool IsPriorityModeOn() { return priorityMode; }
 
   
@@ -111,6 +112,9 @@ private:
 
   uint64_t updateValue;
   uint32_t antMillisAnalogUpdate;
+
+  volatile bool computeSampling;
+  volatile bool sampleReady;
   
   // Address lines for multiplexer
   const int _S0 = (4u);

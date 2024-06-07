@@ -100,14 +100,16 @@ void loop() {
     }
   }
 
-  if(encoderHw.EncodersInMotion() && !analogHw.IsPriorityModeOn()){   // If encoders are being used and analogs aren't in priority mode
-    analogHw.SetPriority(true);
-    // SERIALPRINTLN("Analog priority mode on");
-  }else if(!encoderHw.EncodersInMotion() && analogHw.IsPriorityModeOn()){
-    analogHw.SetPriority(false);
-    // SERIALPRINTLN("Analog priority mode off");
-  }
+  // if(encoderHw.EncodersInMotion() && !analogHw.IsPriorityModeOn()){   // If encoders are being used and analogs aren't in priority mode
+  //   analogHw.SetPriority(true);
+  //   // SERIALPRINTLN("Analog priority mode on");
+  // }else if(!encoderHw.EncodersInMotion() && analogHw.IsPriorityModeOn()){
+  //   analogHw.SetPriority(false);
+  //   // SERIALPRINTLN("Analog priority mode off");
+  // }
 
     if(testMicrosLoop) 
       SERIALPRINTLN(micros()-antMicrosLoop);    
 }
+
+

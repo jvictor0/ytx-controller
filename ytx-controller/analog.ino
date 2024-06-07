@@ -210,458 +210,555 @@ void AnalogInputs::Init(byte maxBanks, byte numberOfAnalog, SPIAdressableBUS* sp
   ALPS_RSA0_Taper[0][1] = minRawValue;
 
   begun = true;
+
+  computeSampling = false;
+
+  ADC->INTENSET.reg = ADC_INTENSET_RESRDY;
+
+  NVIC_SetPriority(ADC_IRQn, 3); //set priority of the interrupt - higher number -> lower priority
+  NVIC_EnableIRQ(ADC_IRQn); // enable ADC interrupts
+
+  // Start conversion
+  ADC->SWTRIG.bit.START = 1;
+}
+
+
+void AnalogInputs::IrqHandler(){
+  typedef enum FSM_Analog_Sampler {
+    CONFIGURE_CONVERSION,
+    ACQUIRE_CONVERSION,
+  };
+
+  static uint8_t extChannelIndex = 0; 
+  static uint8_t intChannelIndex = 0;
+  static uint8_t samplerInputIndex = 0;
+  static uint8_t samplerState = CONFIGURE_CONVERSION;
+
+  switch(samplerState){
+    case CONFIGURE_CONVERSION:{
+        uint8_t selectionPin[] = {_S0,_S1,_S2,_S3};
+        for(int i=0;i<4;i++){
+          bool state = MuxMapping[extChannelIndex]&(1<<i);
+          digitalWrite(selectionPin[i],state);
+        }
+        samplerState = ACQUIRE_CONVERSION;
+    }break;
+
+    default:
+    case ACQUIRE_CONVERSION:{
+      // On conversion done
+      aHwData[samplerInputIndex].analogRawValue = ADC->RESULT.reg;
+
+      if(samplerInputIndex==nAnalog-1){
+        intChannelIndex = 0;
+        extChannelIndex = 0;
+        computeSampling = true;
+        samplerState = CONFIGURE_CONVERSION;
+        return;
+      }else{
+        if(++intChannelIndex>=NUM_MUX){
+          intChannelIndex=0;
+
+          if(++extChannelIndex>=16){
+            extChannelIndex = 0;
+          }
+          samplerState = CONFIGURE_CONVERSION;
+        }
+      }
+    }break;
+  }
+
+  if(samplerState==ACQUIRE_CONVERSION){  
+    samplerInputIndex = intChannelIndex*16 + extChannelIndex;
+
+    uint8_t internalChannels[NUM_MUX] = {A4,A3,A1,A2};
+
+    int ulPin = internalChannels[intChannelIndex];
+    // Select internal channel on ulPin
+    ADC->INPUTCTRL.bit.MUXPOS = g_APinDescription[ulPin].ulADCChannelNumber; 
+    // Wait for synchronization
+    while( ADC->STATUS.bit.SYNCBUSY == 1 ); 
+  }
+
+  // Start conversion
+  ADC->SWTRIG.bit.START = 1;    
 }
 
 
 void AnalogInputs::Read(){
+  static uint32_t antMillisAnalogs=0;
+
   if(!nBanks || nBanks == 0xFF || !nAnalog || nAnalog == 0xFF) return;  // If number of analog or banks is zero or 0xFF (EEPROM cleared), return
 
   if(!begun) return;    // If didn't go through INIT, return;
 
-  int aInput = 0;
-  int nAnalogInMod = 0;
-  bool isJoystickX = false;
-  bool isJoystickY = false;
-  bool isFaderModule = false;
-  bool isLogFader = false;
-  static byte initMuxRead = 0;
-  static byte lastMuxRead = 1;
+  if(!(millis()-antMillisAnalogs>0))return; //minimum 1ms beetwen rotary reads
 
-  uint8_t noiseTh = 0;
+  antMillisAnalogs=millis();
 
-  // Scan all analog inputs to detect changes
-  for (int nMux = initMuxRead; nMux < lastMuxRead; nMux++) {
-    if(spiAnalogExpanderEnable && nMux==2){
-      spiAnalogExpander->getActiveChannels();
-    }
-    for (int nMod = 0; nMod < ANALOG_MODULES_PER_MUX; nMod++) {
-      int hwMapping = (nMux < 4) ? config->hwMapping.analog[nMux][nMod]&0x0F : (config->hwMapping.analog[nMux-4][nMod]>>4)&0x0F;
 
-      isFaderModule = false; // reset flags for new component
-      isLogFader = false;
-      isJoystickX = false;
+  static uint32_t antMillisAnalogCompute=0;
 
-      // Get module type and number of analog inputs in it
-      switch(hwMapping){
-        case AnalogModuleTypes::P41:
-        case AnalogModuleTypes::F41: {
-          nAnalogInMod = defP41module.nAnalog;    // both have 4 components
-          isFaderModule = (hwMapping == AnalogModuleTypes::F41) ? true : false;
-        } break;
-        case AnalogModuleTypes::F21100: {
-          nAnalogInMod = defF21100module.nAnalog;    // have 2 components
-          isFaderModule = true;
-          isLogFader = true;
-        } break;
-        case AnalogModuleTypes::JAL:
-        case AnalogModuleTypes::JAF: {
-          isJoystickX = true;
-          nAnalogInMod = defJAFmodule.nAnalog;    // both have 2 components
-        }break;
-        default:
-          continue;
-        break;
+
+
+  if(computeSampling){
+    computeSampling = false;
+// SerialUSB.println("COMPUTE");
+    //SerialUSB.print("I: ");SerialUSB.println(micros()-antMillisAnalogCompute);
+
+    antMillisAnalogCompute = micros();
+
+    int aInput = 0;
+    int nAnalogInMod = 0;
+    bool isJoystickX = false;
+    bool isJoystickY = false;
+    bool isFaderModule = false;
+    bool isLogFader = false;
+    static byte initMuxRead = 0;
+    static byte lastMuxRead = 1;
+
+    uint8_t noiseTh = 0;
+
+    // Scan all analog inputs to detect changes
+    for (int nMux = 0; nMux < NUM_MUX; nMux++) {
+      if(spiAnalogExpanderEnable && nMux==2){
+        spiAnalogExpander->getActiveChannels();
       }
-      // Scan inputs for this module
-      for(int a = 0; a < nAnalogInMod; a++){
-        aInput = nMux*ANALOG_PER_MUX + nMod*ANALOG_PER_MODULES + a;  // establish which n° of analog input we're scanning 
+      for (int nMod = 0; nMod < ANALOG_MODULES_PER_MUX; nMod++) {
+        int hwMapping = (nMux < 4) ? config->hwMapping.analog[nMux][nMod]&0x0F : (config->hwMapping.analog[nMux-4][nMod]>>4)&0x0F;
 
-        // SERIALPRINT("Read Analog input: "); SERIALPRINTLN(aInput);
+        isFaderModule = false; // reset flags for new component
+        isLogFader = false;
+        isJoystickX = false;
 
-        if(analog[aInput].message == analogMessageTypes::analog_msg_none) continue;   // check if input is disabled in config
-        
-        bool is14bit =  analog[aInput].message == analog_msg_nrpn || 
-                        analog[aInput].message == analog_msg_rpn || 
-                        analog[aInput].message == analog_msg_pb;
-        
-        noiseTh = is14bit ? NOISE_THRESHOLD_RAW_14BIT : NOISE_THRESHOLD_RAW_7BIT;
-
-        if(spiAnalogExpanderEnable && aInput>=32){
-          uint8_t expanderInput = aInput - 32;
-          if(spiAnalogExpander->isActiveChannel(expanderInput)){
-            int16_t newRead = spiAnalogExpander->analogRead(expanderInput);
-
-            if(newRead >= 0){
-              aHwData[aInput].analogRawValue = (uint16_t)newRead;
-            }
-          }
+        // Get module type and number of analog inputs in it
+        switch(hwMapping){
+          case AnalogModuleTypes::P41:
+          case AnalogModuleTypes::F41: {
+            nAnalogInMod = defP41module.nAnalog;    // both have 4 components
+            isFaderModule = (hwMapping == AnalogModuleTypes::F41) ? true : false;
+          } break;
+          case AnalogModuleTypes::F21100: {
+            nAnalogInMod = defF21100module.nAnalog;    // have 2 components
+            isFaderModule = true;
+            isLogFader = true;
+          } break;
+          case AnalogModuleTypes::JAL:
+          case AnalogModuleTypes::JAF: {
+            isJoystickX = true;
+            nAnalogInMod = defJAFmodule.nAnalog;    // both have 2 components
+          }break;
+          default:
+            continue;
+          break;
         }
-        else{
-          byte mux = aInput < 16 ? MUX_A :  (aInput < 32 ? MUX_B : ( aInput < 48 ? MUX_C : MUX_D)) ;    // Select correct multiplexer for this input
-          byte muxChannel = aInput % NUM_MUX_CHANNELS;
-        
-        
-          aHwData[aInput].analogRawValue = MuxAnalogRead(mux, muxChannel);         // Read analog value from MUX_A and channel 'aInput'
+        // Scan inputs for this module
+        for(int a = 0; a < nAnalogInMod; a++){
+          aInput = nMux*ANALOG_PER_MUX + nMod*ANALOG_PER_MODULES + a;  // establish which n° of analog input we're scanning 
 
-          // exponential average filter
-          aHwData[aInput].analogRawValue = FilterGetNewExponentialAverage(aInput, aHwData[aInput].analogRawValue);             
-        }
+          // SERIALPRINT("Read Analog input: "); SERIALPRINTLN(aInput);
 
-        // if raw value didn't change, do not go on
-        if( aHwData[aInput].analogRawValue == aHwData[aInput].analogRawValuePrev ) continue;        
-        
-         // Adjust min and max raw values
-        if(aHwData[aInput].analogRawValue < minRawValue && aHwData[aInput].analogRawValue >= ADC_MIN_BUS_COUNT){
-          minRawValue = aHwData[aInput].analogRawValue;   // add one to the min raw value detected to ensure minValue
-          ALPS_RSA0_Taper[0][0] = minRawValue;
-          ALPS_RSA0_Taper[0][1] = minRawValue;
-          TTE_PS45M_Taper[0][0] = minRawValue;
-          TTE_PS45M_Taper[0][1] = minRawValue;
-          // SERIALPRINT("New min raw value: "); SERIALPRINTLN(minRawValue);
-        } 
-        if(aHwData[aInput].analogRawValue > maxRawValue && aHwData[aInput].analogRawValue <= ADC_MAX_BUS_COUNT){
-          maxRawValue = aHwData[aInput].analogRawValue;   // take one to the max raw value detected to ensure maxValue
-          uint16_t maxRawValueGuard = 5;
-          for(int i = 1; i < FADER_ALPS_RSA0_TAPERS_TABLE_SIZE; i++){
-            ALPS_RSA0_Taper[i][0] = (uint16_t)(ALPS_RSA0_Taper_Template[i][0]*(maxRawValue-maxRawValueGuard)/100.0);
-            ALPS_RSA0_Taper[i][1] = (uint16_t)(ALPS_RSA0_Taper_Template[i][1]*(maxRawValue-maxRawValueGuard)/100.0);
-          }
-          for(int i = 1; i < FADER_TTE_PS45M_TABLE_SIZE; i++){
-            TTE_PS45M_Taper[i][0] = (uint16_t)(TTE_PS45M_Taper_Template[i][0]*maxRawValue/100.0);
-            TTE_PS45M_Taper[i][1] = (uint16_t)(TTE_PS45M_Taper_Template[i][1]*maxRawValue/100.0);
-          }
-          // SERIALPRINT("New max raw value: "); SERIALPRINTLN(maxRawValue);
-        } 
-
-        uint16_t linearVal = aHwData[aInput].analogRawValue;
-
-        if(isFaderModule){
-          if(isLogFader){
-            for(int limitIndex = 0; limitIndex < (FADER_ALPS_RSA0_TAPERS_TABLE_SIZE-1); limitIndex++){   // Check to which interval corresponds the value read
-              int nextLimit = ALPS_RSA0_Taper[limitIndex+1][0];
-
-              if(aHwData[aInput].analogRawValue <= nextLimit){
-                // Depending on the interval, apply the right math to get the travel % (scaled to the max value)
-                
-                linearVal = mapl(aHwData[aInput].analogRawValue, ALPS_RSA0_Taper[limitIndex][0], 
-                                                                 ALPS_RSA0_Taper[limitIndex+1][0], 
-                                                                 ALPS_RSA0_Taper[limitIndex][1],
-                                                                 ALPS_RSA0_Taper[limitIndex+1][1]);   
-                // Linearize mapping between adjacent table values                    
-
-                linearVal = constrain(linearVal,minRawValue,maxRawValue);   // Constrain to max and min limits
-                break;
-              }
-            }
-          }else{
-            for(int limitIndex = 0; limitIndex < (FADER_TTE_PS45M_TABLE_SIZE-1); limitIndex++){   // Check to which interval corresponds the value read
-              int nextLimit = TTE_PS45M_Taper[limitIndex+1][0];
-
-              if(aHwData[aInput].analogRawValue <= nextLimit){
-                // Depending on the interval, apply the right math to get the travel % (scaled to the max value)
-                linearVal = mapl(aHwData[aInput].analogRawValue, TTE_PS45M_Taper[limitIndex][0], 
-                                                                 TTE_PS45M_Taper[limitIndex+1][0], 
-                                                                 TTE_PS45M_Taper[limitIndex][1],
-                                                                 TTE_PS45M_Taper[limitIndex+1][1]);   
-                
-                // Linearize mapping between adjacent table values
-                linearVal = constrain(linearVal,minRawValue,maxRawValue); 
-                break;
-              }
-            }                 
-          }
-        }
-
-        // increase noise th while in auto-select mode, to prevent card jumps
-        noiseTh += autoSelectMode*10;
-
-        // Threshold filter
-        if(IsNoise( aHwData[aInput].analogRawValue, 
-                    aHwData[aInput].analogRawValuePrev, 
-                    aInput,
-                    noiseTh,
-                    true))  continue;                     // if noise is detected in raw value, don't go on
-        
-        // Get data from config for this input
-        uint16_t paramToSend = analog[aInput].parameter[analog_MSB]<<7 | analog[aInput].parameter[analog_LSB];
-        byte channelToSend = analog[aInput].channel + 1;
-        uint16_t minValue = (is14bit ? analog[aInput].parameter[analog_minMSB]<<7 : 0) | 
-                                       analog[aInput].parameter[analog_minLSB];
-        uint16_t maxValue = (is14bit ? analog[aInput].parameter[analog_maxMSB]<<7 : 0) | 
-                                       analog[aInput].parameter[analog_maxLSB];
-
-        // If min > max, then invert range                               
-        bool invert = false;
-        if(minValue > maxValue){
-          invert = true;
-        }
-
-        // constrain raw value (12 bit) to these limits
-        uint16_t constrainedValue = constrain(linearVal, 
-                                              minRawValue+RAW_THRESHOLD, 
-                                              maxRawValue-RAW_THRESHOLD);
-        uint16_t hwPositionValue = 0;
-
-        // if(!(aInput%2)) analog[aInput].deadZone = deadZone::dz_on;
-
-        // CENTERED DOUBLE ANALOG
-        if(analog[aInput].splitMode == splitModes::splitCenter){   // SPLIT MODE
-          uint16_t dead_space = is14bit ? SPLIT_DEAD_ZONE<<6 : SPLIT_DEAD_ZONE;
-
-          // map to min and max values in config
-          uint16_t lower = invert ? maxValue : minValue;
-          uint16_t higher = maxValue*2+1;   //default
+          if(analog[aInput].message == analogMessageTypes::analog_msg_none) continue;   // check if input is disabled in config
           
-          if(analog[aInput].deadZone == deadZone::dz_off){
-            higher = invert ? minValue*2+1 :    // double the range
-                              maxValue*2+1;
-          }else if(analog[aInput].deadZone == deadZone::dz_on){
-            higher = invert ? minValue*2+1+dead_space :    // add the extra dead zone range
-                              maxValue*2+1+dead_space;
-          }
+          bool is14bit =  analog[aInput].message == analog_msg_nrpn || 
+                          analog[aInput].message == analog_msg_rpn || 
+                          analog[aInput].message == analog_msg_pb;
           
-          hwPositionValue = mapl(constrainedValue,
-                                 minRawValue+RAW_THRESHOLD, 
-                                 maxRawValue-RAW_THRESHOLD,
-                                 lower,
-                                 higher);     // if it is a center duplicate, extend double range
-          // Could be configurable percentage of travel for analog control!
-          uint16_t centerValue = 0;
-          if((lower+higher)%2)   centerValue = (lower+higher+1)/2;
-          else                   centerValue = (lower+higher)/2;
+          noiseTh = is14bit ? NOISE_THRESHOLD_RAW_14BIT : NOISE_THRESHOLD_RAW_7BIT;
 
-          if(analog[aInput].deadZone == deadZone::dz_off){
-            if (hwPositionValue < centerValue){
-              hwPositionValue = mapl(hwPositionValue, lower, centerValue-1, maxValue, minValue);
-              channelToSend = config->midiConfig.splitModeChannel+1;
-            }else{
-              hwPositionValue = mapl(hwPositionValue, centerValue, higher, minValue, maxValue);
-            }
-          }else if(analog[aInput].deadZone == deadZone::dz_on){ 
-            if (hwPositionValue < centerValue - dead_space/2){
-              hwPositionValue = mapl(hwPositionValue, lower, centerValue - dead_space/2 - 1, maxValue, minValue);
-              channelToSend = config->midiConfig.splitModeChannel+1;
-            }else if(hwPositionValue > centerValue + dead_space/2){
-              hwPositionValue = mapl(hwPositionValue, centerValue + dead_space/2 + 1, higher, minValue, maxValue);
-            }else{
-              if(hwPositionValue < centerValue){
-                hwPositionValue = minValue;
-                channelToSend = config->midiConfig.splitModeChannel+1;
-              }else if(hwPositionValue > centerValue){
-                hwPositionValue = minValue;
+          if(spiAnalogExpanderEnable && aInput>=32){
+            uint8_t expanderInput = aInput - 32;
+            if(spiAnalogExpander->isActiveChannel(expanderInput)){
+              int16_t newRead = spiAnalogExpander->analogRead(expanderInput);
+
+              if(newRead >= 0){
+                aHwData[aInput].analogRawValue = (uint16_t)newRead;
               }
-              else continue; // within the dead zone, skip the rest of the input processing
             }
           }
+          else{
+            // byte mux = aInput < 16 ? MUX_A :  (aInput < 32 ? MUX_B : ( aInput < 48 ? MUX_C : MUX_D)) ;    // Select correct multiplexer for this input
+            // byte muxChannel = aInput % NUM_MUX_CHANNELS;
+          
+          
+            // aHwData[aInput].analogRawValue = MuxAnalogRead(mux, muxChannel);         // Read analog value from MUX_A and channel 'aInput'
 
-        }else{  // Normal mode (NOT SPLIT)
-          if(analog[aInput].deadZone == deadZone::dz_off){
+            // exponential average filter
+            aHwData[aInput].analogRawValue = FilterGetNewExponentialAverage(aInput, aHwData[aInput].analogRawValue);   
+
+            // SerialUSB.print("Compute Filter: ");SerialUSB.println(micros()-antMillisAnalogCompute);          
+          }
+
+          // if raw value didn't change, do not go on
+          if( aHwData[aInput].analogRawValue == aHwData[aInput].analogRawValuePrev ) continue;        
+          
+           // Adjust min and max raw values
+          if(aHwData[aInput].analogRawValue < minRawValue && aHwData[aInput].analogRawValue >= ADC_MIN_BUS_COUNT){
+            minRawValue = aHwData[aInput].analogRawValue;   // add one to the min raw value detected to ensure minValue
+            ALPS_RSA0_Taper[0][0] = minRawValue;
+            ALPS_RSA0_Taper[0][1] = minRawValue;
+            TTE_PS45M_Taper[0][0] = minRawValue;
+            TTE_PS45M_Taper[0][1] = minRawValue;
+            // SERIALPRINT("New min raw value: "); SERIALPRINTLN(minRawValue);
+          } 
+          if(aHwData[aInput].analogRawValue > maxRawValue && aHwData[aInput].analogRawValue <= ADC_MAX_BUS_COUNT){
+            maxRawValue = aHwData[aInput].analogRawValue;   // take one to the max raw value detected to ensure maxValue
+            uint16_t maxRawValueGuard = 5;
+            for(int i = 1; i < FADER_ALPS_RSA0_TAPERS_TABLE_SIZE; i++){
+              ALPS_RSA0_Taper[i][0] = (uint16_t)(ALPS_RSA0_Taper_Template[i][0]*(maxRawValue-maxRawValueGuard)/100.0);
+              ALPS_RSA0_Taper[i][1] = (uint16_t)(ALPS_RSA0_Taper_Template[i][1]*(maxRawValue-maxRawValueGuard)/100.0);
+            }
+            for(int i = 1; i < FADER_TTE_PS45M_TABLE_SIZE; i++){
+              TTE_PS45M_Taper[i][0] = (uint16_t)(TTE_PS45M_Taper_Template[i][0]*maxRawValue/100.0);
+              TTE_PS45M_Taper[i][1] = (uint16_t)(TTE_PS45M_Taper_Template[i][1]*maxRawValue/100.0);
+            }
+            // SERIALPRINT("New max raw value: "); SERIALPRINTLN(maxRawValue);
+          } 
+
+          uint16_t linearVal = aHwData[aInput].analogRawValue;
+
+          if(isFaderModule){
+            if(isLogFader){
+              for(int limitIndex = 0; limitIndex < (FADER_ALPS_RSA0_TAPERS_TABLE_SIZE-1); limitIndex++){   // Check to which interval corresponds the value read
+                int nextLimit = ALPS_RSA0_Taper[limitIndex+1][0];
+
+                if(aHwData[aInput].analogRawValue <= nextLimit){
+                  // Depending on the interval, apply the right math to get the travel % (scaled to the max value)
+                  
+                  linearVal = mapl(aHwData[aInput].analogRawValue, ALPS_RSA0_Taper[limitIndex][0], 
+                                                                   ALPS_RSA0_Taper[limitIndex+1][0], 
+                                                                   ALPS_RSA0_Taper[limitIndex][1],
+                                                                   ALPS_RSA0_Taper[limitIndex+1][1]);   
+                  // Linearize mapping between adjacent table values                    
+
+                  linearVal = constrain(linearVal,minRawValue,maxRawValue);   // Constrain to max and min limits
+                  break;
+                }
+              }
+            }else{
+              for(int limitIndex = 0; limitIndex < (FADER_TTE_PS45M_TABLE_SIZE-1); limitIndex++){   // Check to which interval corresponds the value read
+                int nextLimit = TTE_PS45M_Taper[limitIndex+1][0];
+
+                if(aHwData[aInput].analogRawValue <= nextLimit){
+                  // Depending on the interval, apply the right math to get the travel % (scaled to the max value)
+                  linearVal = mapl(aHwData[aInput].analogRawValue, TTE_PS45M_Taper[limitIndex][0], 
+                                                                   TTE_PS45M_Taper[limitIndex+1][0], 
+                                                                   TTE_PS45M_Taper[limitIndex][1],
+                                                                   TTE_PS45M_Taper[limitIndex+1][1]);   
+                  
+                  // Linearize mapping between adjacent table values
+                  linearVal = constrain(linearVal,minRawValue,maxRawValue); 
+                  break;
+                }
+              }                 
+            }
+          }
+          // SerialUSB.print("Compute Map: ");SerialUSB.println(micros()-antMillisAnalogCompute);
+          // increase noise th while in auto-select mode, to prevent card jumps
+          noiseTh += autoSelectMode*10;
+
+          // Threshold filter
+          if(IsNoise( aHwData[aInput].analogRawValue, 
+                      aHwData[aInput].analogRawValuePrev, 
+                      aInput,
+                      noiseTh,
+                      true))  continue;                     // if noise is detected in raw value, don't go on
+          
+          // Get data from config for this input
+          uint16_t paramToSend = analog[aInput].parameter[analog_MSB]<<7 | analog[aInput].parameter[analog_LSB];
+          byte channelToSend = analog[aInput].channel + 1;
+          uint16_t minValue = (is14bit ? analog[aInput].parameter[analog_minMSB]<<7 : 0) | 
+                                         analog[aInput].parameter[analog_minLSB];
+          uint16_t maxValue = (is14bit ? analog[aInput].parameter[analog_maxMSB]<<7 : 0) | 
+                                         analog[aInput].parameter[analog_maxLSB];
+
+          // If min > max, then invert range                               
+          bool invert = false;
+          if(minValue > maxValue){
+            invert = true;
+          }
+
+          // constrain raw value (12 bit) to these limits
+          uint16_t constrainedValue = constrain(linearVal, 
+                                                minRawValue+RAW_THRESHOLD, 
+                                                maxRawValue-RAW_THRESHOLD);
+          uint16_t hwPositionValue = 0;
+
+          // if(!(aInput%2)) analog[aInput].deadZone = deadZone::dz_on;
+
+          // CENTERED DOUBLE ANALOG
+          if(analog[aInput].splitMode == splitModes::splitCenter){   // SPLIT MODE
+            uint16_t dead_space = is14bit ? SPLIT_DEAD_ZONE<<6 : SPLIT_DEAD_ZONE;
+
             // map to min and max values in config
-            hwPositionValue = mapl(constrainedValue,
-                                   minRawValue+RAW_THRESHOLD, 
-                                   maxRawValue-RAW_THRESHOLD,
-                                   minValue,
-                                   maxValue); 
-          }else if(analog[aInput].deadZone == deadZone::dz_on){       // Dead zone ON
-            uint16_t dead_space = is14bit ? NORMAL_DEAD_ZONE<<6 : NORMAL_DEAD_ZONE;
-
             uint16_t lower = invert ? maxValue : minValue;
-            uint16_t higher = invert ?  minValue + dead_space+1 :    // Add dead zone to extended range
-                                        maxValue + dead_space+1;
-
-            uint16_t extendedCenter = 0;
-            if((lower+higher)%2)   extendedCenter = (lower+higher+1)/2;     // Get center of extended range
-            else                   extendedCenter = (lower+higher)/2;
-            uint16_t outputCenter = 0;
-            if((minValue+maxValue)%2)   outputCenter = (minValue+maxValue+1)/2;   // Get center of output range
-            else                        outputCenter = (minValue+maxValue)/2;
-
+            uint16_t higher = maxValue*2+1;   //default
+            
+            if(analog[aInput].deadZone == deadZone::dz_off){
+              higher = invert ? minValue*2+1 :    // double the range
+                                maxValue*2+1;
+            }else if(analog[aInput].deadZone == deadZone::dz_on){
+              higher = invert ? minValue*2+1+dead_space :    // add the extra dead zone range
+                                maxValue*2+1+dead_space;
+            }
+            
             hwPositionValue = mapl(constrainedValue,
                                    minRawValue+RAW_THRESHOLD, 
                                    maxRawValue-RAW_THRESHOLD,
                                    lower,
-                                   higher); 
-            // map to min and max values in config
-            if (hwPositionValue < extendedCenter - dead_space/2){  
-              hwPositionValue = mapl(hwPositionValue,
-                                     lower, 
-                                     extendedCenter-dead_space/2-1,
-                                     minValue,
-                                     outputCenter-1); 
-            
-            }else if (hwPositionValue > extendedCenter + dead_space/2){  // <<5 cause this is raw value
-              hwPositionValue = mapl(hwPositionValue,
-                                     extendedCenter+dead_space/2+1, 
-                                     higher,
-                                     outputCenter+1,
-                                     maxValue);   
-            
-            }else{
-              if(hwPositionValue != outputCenter) hwPositionValue = outputCenter;   // if inside dead zone, assign center value
-              else continue;
-            }              
-          }
-        }
-        
-// **********************************************************************************************//
-        // Start of takeover mode operation
-        // Possible scenarios are No takeover, PickUp and Value Scaling
-        // targetValue is the value the scaledValue will progressively move towards
-        // scaledValue is the final value to be sent in the message
-        uint16_t targetValue = aBankData[currentBank][aInput].analogValue;
-        uint16_t scaledValue = 0;
-        
-        // VALUE SCALING TAKEOVER MODE 
-        if( config->board.takeoverMode == takeOverTypes::takeover_valueScaling && 
-            aBankData[currentBank][aInput].flags.takeOverOn){ // If takeover mode is ON
-          
-          // IF THE VALUE CHANGED DIRECTION, RESET PIVOTS TO CURRENT TARGET VALUE AND HARDWARE POSITION
-          if (aBankData[currentBank][aInput].flags.lastDirection != aHwData[aInput].analogDirectionRaw){
-            aBankData[currentBank][aInput].flags.lastDirection = aHwData[aInput].analogDirectionRaw;
-            SetPivotValues(currentBank, aInput, targetValue);
-          }
+                                   higher);     // if it is a center duplicate, extend double range
+            // Could be configurable percentage of travel for analog control!
+            uint16_t centerValue = 0;
+            if((lower+higher)%2)   centerValue = (lower+higher+1)/2;
+            else                   centerValue = (lower+higher)/2;
 
-          // Set scaled value to target value, and from there it'll move accordingly
-          scaledValue = aBankData[currentBank][aInput].analogValue;
-          
-          // Difference between the input's physical value and the last pivot the value started scaling from
-          uint16_t hwDiff = abs(hwPositionValue - aBankData[currentBank][aInput].hardwarePivot);
-          uint16_t valueIncrement = 0, valueDecrement = 0;
-
-          if(hwDiff > 0){  
-            scaledValue = aBankData[currentBank][aInput].targetValuePivot;            
-            if(aHwData[aInput].analogDirectionRaw == ANALOG_INCREASING){  
-              valueIncrement = (hwDiff)*abs(maxValue-aBankData[currentBank][aInput].targetValuePivot)/
-                                abs(maxValue-aBankData[currentBank][aInput].hardwarePivot); 
-              scaledValue += valueIncrement;                              
-              scaledValue = constrain(scaledValue, minValue, maxValue);  
-            }else if(aHwData[aInput].analogDirectionRaw == ANALOG_DECREASING){
-              valueDecrement = (hwDiff)*abs(aBankData[currentBank][aInput].targetValuePivot-minValue)/
-                              abs(aBankData[currentBank][aInput].hardwarePivot-minValue);
-              scaledValue -=  valueDecrement;
-              scaledValue = constrain(scaledValue, minValue, maxValue);
-            } 
-            
-            if((hwPositionValue >= targetValue && aBankData[currentBank][aInput].hardwarePivot < aBankData[currentBank][aInput].targetValuePivot)||
-              (hwPositionValue <= targetValue && aBankData[currentBank][aInput].hardwarePivot > aBankData[currentBank][aInput].targetValuePivot)){
-              aBankData[currentBank][aInput].flags.takeOverOn = 0;
+            if(analog[aInput].deadZone == deadZone::dz_off){
+              if (hwPositionValue < centerValue){
+                hwPositionValue = mapl(hwPositionValue, lower, centerValue-1, maxValue, minValue);
+                channelToSend = config->midiConfig.splitModeChannel+1;
+              }else{
+                hwPositionValue = mapl(hwPositionValue, centerValue, higher, minValue, maxValue);
+              }
+            }else if(analog[aInput].deadZone == deadZone::dz_on){ 
+              if (hwPositionValue < centerValue - dead_space/2){
+                hwPositionValue = mapl(hwPositionValue, lower, centerValue - dead_space/2 - 1, maxValue, minValue);
+                channelToSend = config->midiConfig.splitModeChannel+1;
+              }else if(hwPositionValue > centerValue + dead_space/2){
+                hwPositionValue = mapl(hwPositionValue, centerValue + dead_space/2 + 1, higher, minValue, maxValue);
+              }else{
+                if(hwPositionValue < centerValue){
+                  hwPositionValue = minValue;
+                  channelToSend = config->midiConfig.splitModeChannel+1;
+                }else if(hwPositionValue > centerValue){
+                  hwPositionValue = minValue;
+                }
+                else continue; // within the dead zone, skip the rest of the input processing
+              }
             }
 
-            aBankData[currentBank][aInput].flags.lastDirection = aHwData[aInput].analogDirectionRaw;  
-            
-            aBankData[currentBank][aInput].analogValue = scaledValue;
-          }
-        // PICK-UP TAKEOVER MODE
-        }else if( config->board.takeoverMode == takeOverTypes::takeover_pickup &&  
-                  aBankData[currentBank][aInput].flags.takeOverOn){
-          uint8_t pickupThreshold = 0;
-          if(is14bit){
-            pickupThreshold = (maxValue-minValue)>>6; // Pick Up Threshold is relative to the range. Larger range, larger threshold. For 14 bit inputs divide by 64
-          }else{
-            pickupThreshold = (maxValue-minValue)>>5; // For 7 bit inputs divide by 32
-          }
-          // If hardware position entered the threshold between (target - threshold) and (target + threshold), turn off take over mode
-          if(hwPositionValue >= (targetValue - pickupThreshold) && hwPositionValue <= (targetValue + pickupThreshold)){
-            aBankData[currentBank][aInput].flags.takeOverOn = 0;
-          }
-        // NO TAKEOVER MODE
-        }else{
-          aBankData[currentBank][aInput].analogValue = hwPositionValue;
-        }
-// **********************************************************************************************//
-        
-        aHwData[aInput].analogRawValuePrev = aHwData[aInput].analogRawValue;    // update previous value
-        
-        if(testAnalog){
-          SERIALPRINT(F("Raw value: ")); SERIALPRINT(aHwData[aInput].analogRawValue);                       
-          SERIALPRINT(F("\tLinearized value: "));SERIALPRINT(linearVal);
-          SERIALPRINT(F("\tMapped value: "));SERIALPRINT(aBankData[currentBank][aInput].analogValue);
-          SERIALPRINT(F("\t<- ANA "));SERIALPRINTLN(aInput); 
-        }
-          
-        // if message is configured as NRPN or RPN or PITCH BEND, process again for noise in higher range
-        if(is14bit){
-          int maxMinDiff = maxValue - minValue;         
-          byte noiseTh14 = abs(maxMinDiff) >> 8;    // divide range to get noise threshold. Max th is 127/4 = 64 : Min th is 0.     
-          if(IsNoise( aBankData[currentBank][aInput].analogValue, 
-                      aBankData[currentBank][aInput].analogValuePrev, 
-                      aInput,
-                      noiseTh14,
-                      false))  continue;
-        }
-        
-        // if after all filtering and noise detecting, we arrived here, check if new processed valued changed from last processed value
-        if(aBankData[currentBank][aInput].analogValue != aBankData[currentBank][aInput].analogValuePrev){
-          // update as previous value
-          aBankData[currentBank][aInput].analogValuePrev = aBankData[currentBank][aInput].analogValue;
-          
-          uint16_t valueToSend = aBankData[currentBank][aInput].analogValue;
+          }else{  // Normal mode (NOT SPLIT)
+            if(analog[aInput].deadZone == deadZone::dz_off){
+              // map to min and max values in config
+              hwPositionValue = mapl(constrainedValue,
+                                     minRawValue+RAW_THRESHOLD, 
+                                     maxRawValue-RAW_THRESHOLD,
+                                     minValue,
+                                     maxValue); 
+            }else if(analog[aInput].deadZone == deadZone::dz_on){       // Dead zone ON
+              uint16_t dead_space = is14bit ? NORMAL_DEAD_ZONE<<6 : NORMAL_DEAD_ZONE;
 
-          // Act accordingly to configuration
-          switch(analog[aInput].message){
-            case analogMessageTypes::analog_msg_note:{
-              if(analog[aInput].midiPort & (1<<MIDI_USB))
-                MIDI.sendNoteOn( paramToSend&0x7f, valueToSend&0x7f, channelToSend);
-              if(analog[aInput].midiPort & (1<<MIDI_HW))
-                MIDIHW.sendNoteOn( paramToSend&0x7f, valueToSend&0x7f, channelToSend);
-            }break;
-            case analogMessageTypes::analog_msg_cc:{
-              if(analog[aInput].midiPort & (1<<MIDI_USB))
-                MIDI.sendControlChange( paramToSend&0x7f, valueToSend&0x7f, channelToSend);
-              if(analog[aInput].midiPort & (1<<MIDI_HW))
-                MIDIHW.sendControlChange( paramToSend&0x7f, valueToSend&0x7f, channelToSend);
-            }break;
-            case analogMessageTypes::analog_msg_pc:{
-              if(analog[aInput].midiPort & (1<<MIDI_USB)){
-                MIDI.sendProgramChange( valueToSend&0x7f, channelToSend);
-              }
-              if(analog[aInput].midiPort & (1<<MIDI_HW)){
-                MIDIHW.sendProgramChange( valueToSend&0x7f, channelToSend);
-              }
-            }break;
-            case analogMessageTypes::analog_msg_nrpn:{
-              updateValue |= ((uint64_t) 1 << (uint64_t) aInput);
-            }break;
-            case analogMessageTypes::analog_msg_rpn:{
-              updateValue |= ((uint64_t) 1 << (uint64_t) aInput);
-            }break;
-            case analogMessageTypes::analog_msg_pb:{
-              int16_t valuePb = mapl(valueToSend, minValue, maxValue,((int16_t) minValue)-8192, ((int16_t) maxValue)-8192);
-                            
-              if(analog[aInput].midiPort & (1<<MIDI_USB))
-                MIDI.sendPitchBend( valuePb, channelToSend);    
-              if(analog[aInput].midiPort & (1<<MIDI_HW))
-                MIDIHW.sendPitchBend( valuePb, channelToSend);    
-            }break;
-            case analogMessageTypes::analog_msg_key:{
-              if(analog[aInput].parameter[analog_modifier])
-                YTXKeyboard->press(analog[aInput].parameter[analog_modifier]);
-              if(analog[aInput].parameter[analog_key])
-                YTXKeyboard->press(analog[aInput].parameter[analog_key]);
+              uint16_t lower = invert ? maxValue : minValue;
+              uint16_t higher = invert ?  minValue + dead_space+1 :    // Add dead zone to extended range
+                                          maxValue + dead_space+1;
+
+              uint16_t extendedCenter = 0;
+              if((lower+higher)%2)   extendedCenter = (lower+higher+1)/2;     // Get center of extended range
+              else                   extendedCenter = (lower+higher)/2;
+              uint16_t outputCenter = 0;
+              if((minValue+maxValue)%2)   outputCenter = (minValue+maxValue+1)/2;   // Get center of output range
+              else                        outputCenter = (minValue+maxValue)/2;
+
+              hwPositionValue = mapl(constrainedValue,
+                                     minRawValue+RAW_THRESHOLD, 
+                                     maxRawValue-RAW_THRESHOLD,
+                                     lower,
+                                     higher); 
+              // map to min and max values in config
+              if (hwPositionValue < extendedCenter - dead_space/2){  
+                hwPositionValue = mapl(hwPositionValue,
+                                       lower, 
+                                       extendedCenter-dead_space/2-1,
+                                       minValue,
+                                       outputCenter-1); 
               
-              millisKeyboardPress = millis()+KEYBOARD_MILLIS_ANALOG;
-              keyboardReleaseFlag = true; 
-            }break;
+              }else if (hwPositionValue > extendedCenter + dead_space/2){  // <<5 cause this is raw value
+                hwPositionValue = mapl(hwPositionValue,
+                                       extendedCenter+dead_space/2+1, 
+                                       higher,
+                                       outputCenter+1,
+                                       maxValue);   
+              
+              }else{
+                if(hwPositionValue != outputCenter) hwPositionValue = outputCenter;   // if inside dead zone, assign center value
+                else continue;
+              }              
+            }
           }
-          // blink status LED
-          SetStatusLED(STATUS_BLINK, 1, statusLEDtypes::STATUS_FB_MSG_OUT);
+          
+  // **********************************************************************************************//
+          // Start of takeover mode operation
+          // Possible scenarios are No takeover, PickUp and Value Scaling
+          // targetValue is the value the scaledValue will progressively move towards
+          // scaledValue is the final value to be sent in the message
+          uint16_t targetValue = aBankData[currentBank][aInput].analogValue;
+          uint16_t scaledValue = 0;
+          
+          // VALUE SCALING TAKEOVER MODE 
+          if( config->board.takeoverMode == takeOverTypes::takeover_valueScaling && 
+              aBankData[currentBank][aInput].flags.takeOverOn){ // If takeover mode is ON
+            
+            // IF THE VALUE CHANGED DIRECTION, RESET PIVOTS TO CURRENT TARGET VALUE AND HARDWARE POSITION
+            if (aBankData[currentBank][aInput].flags.lastDirection != aHwData[aInput].analogDirectionRaw){
+              aBankData[currentBank][aInput].flags.lastDirection = aHwData[aInput].analogDirectionRaw;
+              SetPivotValues(currentBank, aInput, targetValue);
+            }
 
-          if(autoSelectMode && (GetHardwareID(ytxIOBLOCK::Analog, aInput) != lastComponentInfoId)){
-            SendComponentInfo(ytxIOBLOCK::Analog, aInput);
+            // Set scaled value to target value, and from there it'll move accordingly
+            scaledValue = aBankData[currentBank][aInput].analogValue;
+            
+            // Difference between the input's physical value and the last pivot the value started scaling from
+            uint16_t hwDiff = abs(hwPositionValue - aBankData[currentBank][aInput].hardwarePivot);
+            uint16_t valueIncrement = 0, valueDecrement = 0;
+
+            if(hwDiff > 0){  
+              scaledValue = aBankData[currentBank][aInput].targetValuePivot;            
+              if(aHwData[aInput].analogDirectionRaw == ANALOG_INCREASING){  
+                valueIncrement = (hwDiff)*abs(maxValue-aBankData[currentBank][aInput].targetValuePivot)/
+                                  abs(maxValue-aBankData[currentBank][aInput].hardwarePivot); 
+                scaledValue += valueIncrement;                              
+                scaledValue = constrain(scaledValue, minValue, maxValue);  
+              }else if(aHwData[aInput].analogDirectionRaw == ANALOG_DECREASING){
+                valueDecrement = (hwDiff)*abs(aBankData[currentBank][aInput].targetValuePivot-minValue)/
+                                abs(aBankData[currentBank][aInput].hardwarePivot-minValue);
+                scaledValue -=  valueDecrement;
+                scaledValue = constrain(scaledValue, minValue, maxValue);
+              } 
+              
+              if((hwPositionValue >= targetValue && aBankData[currentBank][aInput].hardwarePivot < aBankData[currentBank][aInput].targetValuePivot)||
+                (hwPositionValue <= targetValue && aBankData[currentBank][aInput].hardwarePivot > aBankData[currentBank][aInput].targetValuePivot)){
+                aBankData[currentBank][aInput].flags.takeOverOn = 0;
+              }
+
+              aBankData[currentBank][aInput].flags.lastDirection = aHwData[aInput].analogDirectionRaw;  
+              
+              aBankData[currentBank][aInput].analogValue = scaledValue;
+            }
+          // PICK-UP TAKEOVER MODE
+          }else if( config->board.takeoverMode == takeOverTypes::takeover_pickup &&  
+                    aBankData[currentBank][aInput].flags.takeOverOn){
+            uint8_t pickupThreshold = 0;
+            if(is14bit){
+              pickupThreshold = (maxValue-minValue)>>6; // Pick Up Threshold is relative to the range. Larger range, larger threshold. For 14 bit inputs divide by 64
+            }else{
+              pickupThreshold = (maxValue-minValue)>>5; // For 7 bit inputs divide by 32
+            }
+            // If hardware position entered the threshold between (target - threshold) and (target + threshold), turn off take over mode
+            if(hwPositionValue >= (targetValue - pickupThreshold) && hwPositionValue <= (targetValue + pickupThreshold)){
+              aBankData[currentBank][aInput].flags.takeOverOn = 0;
+            }
+          // NO TAKEOVER MODE
+          }else{
+            aBankData[currentBank][aInput].analogValue = hwPositionValue;
           }
-        }         
-        if(isJoystickX){
-          isJoystickX = false; isJoystickY = true;
-        }else if(isJoystickY){
-          isJoystickY = false;
+  // **********************************************************************************************//
+          
+          aHwData[aInput].analogRawValuePrev = aHwData[aInput].analogRawValue;    // update previous value
+          
+          if(testAnalog){
+            SERIALPRINT(F("Raw value: ")); SERIALPRINT(aHwData[aInput].analogRawValue);                       
+            SERIALPRINT(F("\tLinearized value: "));SERIALPRINT(linearVal);
+            SERIALPRINT(F("\tMapped value: "));SERIALPRINT(aBankData[currentBank][aInput].analogValue);
+            SERIALPRINT(F("\t<- ANA "));SERIALPRINTLN(aInput); 
+          }
+            
+          // if message is configured as NRPN or RPN or PITCH BEND, process again for noise in higher range
+          if(is14bit){
+            int maxMinDiff = maxValue - minValue;         
+            byte noiseTh14 = abs(maxMinDiff) >> 8;    // divide range to get noise threshold. Max th is 127/4 = 64 : Min th is 0.     
+            if(IsNoise( aBankData[currentBank][aInput].analogValue, 
+                        aBankData[currentBank][aInput].analogValuePrev, 
+                        aInput,
+                        noiseTh14,
+                        false))  continue;
+          }
+          
+          // if after all filtering and noise detecting, we arrived here, check if new processed valued changed from last processed value
+          if(aBankData[currentBank][aInput].analogValue != aBankData[currentBank][aInput].analogValuePrev){
+            // update as previous value
+            aBankData[currentBank][aInput].analogValuePrev = aBankData[currentBank][aInput].analogValue;
+            
+            uint16_t valueToSend = aBankData[currentBank][aInput].analogValue;
+
+            // Act accordingly to configuration
+            switch(analog[aInput].message){
+              case analogMessageTypes::analog_msg_note:{
+                if(analog[aInput].midiPort & (1<<MIDI_USB))
+                  MIDI.sendNoteOn( paramToSend&0x7f, valueToSend&0x7f, channelToSend);
+                if(analog[aInput].midiPort & (1<<MIDI_HW))
+                  MIDIHW.sendNoteOn( paramToSend&0x7f, valueToSend&0x7f, channelToSend);
+              }break;
+              case analogMessageTypes::analog_msg_cc:{
+                if(analog[aInput].midiPort & (1<<MIDI_USB))
+                  MIDI.sendControlChange( paramToSend&0x7f, valueToSend&0x7f, channelToSend);
+                if(analog[aInput].midiPort & (1<<MIDI_HW))
+                  MIDIHW.sendControlChange( paramToSend&0x7f, valueToSend&0x7f, channelToSend);
+              }break;
+              case analogMessageTypes::analog_msg_pc:{
+                if(analog[aInput].midiPort & (1<<MIDI_USB)){
+                  MIDI.sendProgramChange( valueToSend&0x7f, channelToSend);
+                }
+                if(analog[aInput].midiPort & (1<<MIDI_HW)){
+                  MIDIHW.sendProgramChange( valueToSend&0x7f, channelToSend);
+                }
+              }break;
+              case analogMessageTypes::analog_msg_nrpn:{
+                updateValue |= ((uint64_t) 1 << (uint64_t) aInput);
+              }break;
+              case analogMessageTypes::analog_msg_rpn:{
+                updateValue |= ((uint64_t) 1 << (uint64_t) aInput);
+              }break;
+              case analogMessageTypes::analog_msg_pb:{
+                int16_t valuePb = mapl(valueToSend, minValue, maxValue,((int16_t) minValue)-8192, ((int16_t) maxValue)-8192);
+                              
+                if(analog[aInput].midiPort & (1<<MIDI_USB))
+                  MIDI.sendPitchBend( valuePb, channelToSend);    
+                if(analog[aInput].midiPort & (1<<MIDI_HW))
+                  MIDIHW.sendPitchBend( valuePb, channelToSend);    
+              }break;
+              case analogMessageTypes::analog_msg_key:{
+                if(analog[aInput].parameter[analog_modifier])
+                  YTXKeyboard->press(analog[aInput].parameter[analog_modifier]);
+                if(analog[aInput].parameter[analog_key])
+                  YTXKeyboard->press(analog[aInput].parameter[analog_key]);
+                
+                millisKeyboardPress = millis()+KEYBOARD_MILLIS_ANALOG;
+                keyboardReleaseFlag = true; 
+              }break;
+            }
+            // blink status LED
+            SetStatusLED(STATUS_BLINK, 1, statusLEDtypes::STATUS_FB_MSG_OUT);
+
+            if(autoSelectMode && (GetHardwareID(ytxIOBLOCK::Analog, aInput) != lastComponentInfoId)){
+              SendComponentInfo(ytxIOBLOCK::Analog, aInput);
+            }
+          }         
+          if(isJoystickX){
+            isJoystickX = false; isJoystickY = true;
+          }else if(isJoystickY){
+            isJoystickY = false;
+          }
         }
+        // P41 and F41 (4 inputs) take 2 module spaces
+        if (hwMapping == AnalogModuleTypes::P41 ||
+            hwMapping == AnalogModuleTypes::F41){
+          nMod++;     
+        }      
       }
-      // P41 and F41 (4 inputs) take 2 module spaces
-      if (hwMapping == AnalogModuleTypes::P41 ||
-          hwMapping == AnalogModuleTypes::F41){
-        nMod++;     
-      }      
     }
-  }
 
-  if(priorityMode){
-    if(!(++initMuxRead % analogMuxesWithElements)){
+    if(priorityMode){
+      if(!(++initMuxRead % analogMuxesWithElements)){
+        initMuxRead = 0;
+      }
+      lastMuxRead = initMuxRead+1;
+    }else{
       initMuxRead = 0;
+      lastMuxRead = analogMuxesWithElements;
     }
-    lastMuxRead = initMuxRead+1;
-  }else{
-    initMuxRead = 0;
-    lastMuxRead = analogMuxesWithElements;
+
+    // Start conversion
+    ADC->SWTRIG.bit.START = 1; 
+    // SerialUSB.print("R: ");SerialUSB.println(micros()-antMillisAnalogCompute);
   }
 }
 
@@ -966,9 +1063,28 @@ bool AnalogInputs::IsNoise(uint16_t currentValue, uint16_t prevValue, uint16_t i
 }
 
 uint16_t AnalogInputs::FilterGetNewExponentialAverage(uint8_t input, uint16_t newVal) {
-  float alpha = 0.25;
 
-  aHwData[input].exponentialFilter = alpha*newVal + (1-alpha)*aHwData[input].exponentialFilter;
+  //Version original: matematica float, 1700 us para procesar 64 inputs
+  // float alpha = 0.25;
+
+  // aHwData[input].exponentialFilter = alpha*newVal + (1-alpha)*aHwData[input].exponentialFilter;
+
+  // //Primera optimizacion: matematica integer con factor de escala 100, 700 us para procesar 64 inputs
+  // #define alpha (25UL)
+  // #define beta  (100UL - alpha)
+
+  // aHwData[input].exponentialFilter = (alpha*newVal + beta*aHwData[input].exponentialFilter)/100;
+
+  // //Segunda optimizacion: matematica integer con factor de escala 64, me permite shiftear en vez de dividir, 550 us para procesar 64 inputs
+  // #define alpha (16UL)
+  // #define beta  (64UL - alpha)
+
+  // aHwData[input].exponentialFilter = (alpha*newVal + beta*aHwData[input].exponentialFilter)/64;
+
+  // aHwData[input].exponentialFilter = (alpha*newVal + beta*aHwData[input].exponentialFilter)>>6;
+
+  //Tercera optimizacion: matematica integer con factor de escala 64, sin multiplicacion ni division, 500 us para procesar 64 inputs
+  aHwData[input].exponentialFilter = ((newVal<<4) + (aHwData[input].exponentialFilter<<6)-(aHwData[input].exponentialFilter<<4))>>6;
 
   return aHwData[input].exponentialFilter;
 }
@@ -1128,7 +1244,7 @@ void AnalogInputs::FastADCsetup() {
   
   ADC->CTRLA.bit.ENABLE = 0;                     // Disable ADC
   while( ADC->STATUS.bit.SYNCBUSY == 1 );        // Wait for synchronization
-  ADC->CTRLB.reg = ADC_CTRLB_PRESCALER_DIV32 |   // Divide Clock by 64.
+  ADC->CTRLB.reg = ADC_CTRLB_PRESCALER_DIV128 |   // Divide Clock by 64.
                    ADC_CTRLB_RESSEL_12BIT;       // Result on 12 bits
   ADC->AVGCTRL.reg = ADC_AVGCTRL_SAMPLENUM_1 |   // 1 sample
                      ADC_AVGCTRL_ADJRES(0x00ul); // Adjusting result by 0
@@ -1136,33 +1252,7 @@ void AnalogInputs::FastADCsetup() {
   ADC->CTRLA.bit.ENABLE = 1;                     // Enable ADC
   while( ADC->STATUS.bit.SYNCBUSY == 1 );        // Wait for synchronization
   
-  //Input control register
-//  ADCsync();
-//  ADC->INPUTCTRL.bit.GAIN = ADC_INPUTCTRL_GAIN_1X_Val;      // Gain select as 1X
-////  ADC->INPUTCTRL.bit.GAIN = ADC_INPUTCTRL_GAIN_DIV2_Val;  // Gain select as 1/2X - When AREF is VCCINT (default)
-//  //Set ADC reference source
-//  ADCsync();
-//  ADC->REFCTRL.bit.REFSEL = ADC_REFCTRL_REFSEL_AREFA_Val;
-//  // Set sample length and averaging
-//  ADCsync();
-//  ADC->AVGCTRL.reg = 0x00 ;       //Single conversion no averaging
-//  ADCsync();
-//  ADC->SAMPCTRL.reg = 0x00;       //Minimal sample length is 1/2 CLK_ADC cycle
-//  //Control B register
-//  ADCsync();
-//  ADC->CTRLB.reg =  PRESCALER_32 | RESOL_12BIT; // Prescale 64, 12 bit resolution, single conversion
-//  /* ADC->CTRLB.reg &= 0b1111100011111111;          // mask PRESCALER bits
-//  ADC->CTRLB.reg |= ADC_CTRLB_PRESCALER_DIV16;   // divide Clock by 64 */
-//  // Enable ADC in control B register
-//  ADCsync();
-//  ADC->CTRLA.bit.ENABLE = 0x01;
 
- //Enable interrupts
-  // ADC->INTENSET.reg |= ADC_INTENSET_RESRDY; // enable Result Ready ADC interrupts
-  // ADCsync();
-
-   // NVIC_EnableIRQ(ADC_IRQn); // enable ADC interrupts
-   // NVIC_SetPriority(ADC_IRQn, 1); //set priority of the interrupt - higher number -> lower priority
 }
 
 
