@@ -135,18 +135,7 @@ void setup() {
     USB_DeviceDescriptor.idProduct = config->board.pid;
     USB_DeviceDescriptorB.idProduct = config->board.pid;
 
-    // INIT USB DEVICE (this was taken from Arduino zero's core main.cpp - It was done before setup())
-    #if defined(USBCON)
-      USBDevice.init();
-      USBDevice.attach();
-    #endif
-    
-    // Wait for serial monitor to open
-    if(cdcEnabled){
-      #if defined(WAIT_FOR_SERIAL)
-      while(!SerialUSB);
-      #endif
-    }
+
 
     // Create memory map for eeprom
     memHost->ConfigureBlock(ytxIOBLOCK::Encoder, config->inputs.encoderCount, sizeof(ytxEncoderType), false);
@@ -215,6 +204,28 @@ void setup() {
     if(configStatus == CONFIG_VALID){
       enableProcessing = true; // process inputs on loop
       validConfigInEEPROM = true;
+    }
+
+    // Fill MIDI Buffer with messages in config
+    MidiBufferInit();
+    
+    // If there was a keyboard message found in config, begin keyboard communication
+    // SERIALPRINT(F("IS KEYBOARD? ")); SERIALPRINTLN(keyboardEnable ? F("YES") : F("NO"));
+    if(keyboardEnable){
+      YTXKeyboard = new YTXKeyboard_();
+    }
+
+    // INIT USB DEVICE (this was taken from Arduino zero's core main.cpp - It was done before setup())
+    #if defined(USBCON)
+      USBDevice.init();
+      USBDevice.attach();
+    #endif
+    
+    // Wait for serial monitor to open
+    if(cdcEnabled){
+      #if defined(WAIT_FOR_SERIAL)
+      while(!SerialUSB);
+      #endif
     }
     
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -323,14 +334,7 @@ void setup() {
       nrpnIntervalStep = 10;    // milliseconds to send new NRPN message
     }
 
-    // Fill MIDI Buffer with messages in config
-    MidiBufferInit();
-    
-    // If there was a keyboard message found in config, begin keyboard communication
-    // SERIALPRINT(F("IS KEYBOARD? ")); SERIALPRINTLN(keyboardEnable ? F("YES") : F("NO"));
-    if(keyboardEnable){
-      YTXKeyboard = new YTXKeyboard_();
-    }
+
 
     // Load bank 0 to begin
     currentBank = memHost->LoadBank(0);
