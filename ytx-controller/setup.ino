@@ -211,22 +211,24 @@ void setup() {
     
     // If there was a keyboard message found in config, begin keyboard communication
     // SERIALPRINT(F("IS KEYBOARD? ")); SERIALPRINTLN(keyboardEnable ? F("YES") : F("NO"));
-    if(keyboardEnable){
-      YTXKeyboard = new YTXKeyboard_();
-    }
 
     // INIT USB DEVICE (this was taken from Arduino zero's core main.cpp - It was done before setup())
     #if defined(USBCON)
+      if(keyboardEnable){
+        YTXKeyboard = new YTXKeyboard_();
+      }
+
       USBDevice.init();
       USBDevice.attach();
+      
+      // Wait for serial monitor to open
+      if(cdcEnabled){
+        #if defined(WAIT_FOR_SERIAL)
+        while(!SerialUSB);
+        #endif
+      }
     #endif
     
-    // Wait for serial monitor to open
-    if(cdcEnabled){
-      #if defined(WAIT_FOR_SERIAL)
-      while(!SerialUSB);
-      #endif
-    }
     
 ////////////////////////////////////////////////////////////////////////////////////////////////
 //// INVALID CONFIG  ///////////////////////////////////////////////////////////////////////////
@@ -393,7 +395,6 @@ void setup() {
     SetStatusLED(STATUS_BLINK, 1, STATUS_FB_NO_CONFIG);  
   }
 
-  
   // STATUS LED
   statusLED = new Adafruit_NeoPixel(N_STATUS_PIXEL, STATUS_LED_PIN, NEO_GRB + NEO_KHZ800); 
   statusLED->begin();
