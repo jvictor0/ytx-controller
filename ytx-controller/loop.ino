@@ -39,7 +39,9 @@ void loop() {
   static uint32_t antMicrosTest = micros();  
 
   // Check for incoming Serial messages
-  if(cdcEnabled) CheckSerialUSB();
+  if(cdcEnabled){
+    CheckSerialUSB();
+  } 
 
   // if configuration is valid, and not in kwhat mode
   if(enableProcessing){
@@ -72,18 +74,20 @@ void loop() {
         // SERIALPRINTLN(F("Backup"));
       } 
     }
+    // If there was an interrupt because the power source changed, re-set brightness
+    if(powerChangeFlag){
+      if(millis() - antMillisPowerChange > 50){
+
+        SERIALPRINT(F("\nPOWER SUPPLY CONNECTED? ")); 
+        SERIALPRINT(IsPowerConnected() ? F("YES\n") : F("NO\n"));
+
+        powerChangeFlag = false;
+        feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
+        feedbackHw.SetBankChangeFeedback(FB_BANK_CHANGED);
+      } 
+    }
   }
   
-  // If there was an interrupt because the power source changed, re-set brightness
-  if(enableProcessing && powerChangeFlag && millis() - antMillisPowerChange > 50){
-    if(testMode){
-      SERIALPRINT(F("\nPOWER SUPPLY CONNECTED? ")); 
-      SERIALPRINT(IsPowerConnected() ? F("YES\n") : F("NO\n"));
-    }
-    powerChangeFlag = false;
-    feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
-    feedbackHw.SetBankChangeFeedback(FB_BANK_CHANGED);
-  }
  
   if(millis()-antMillisWD > WATCHDOG_CHECK_MS){   
     Watchdog.reset();               // Reset count for WD
@@ -100,16 +104,8 @@ void loop() {
     }
   }
 
-  // if(encoderHw.EncodersInMotion() && !analogHw.IsPriorityModeOn()){   // If encoders are being used and analogs aren't in priority mode
-  //   analogHw.SetPriority(true);
-  //   // SERIALPRINTLN("Analog priority mode on");
-  // }else if(!encoderHw.EncodersInMotion() && analogHw.IsPriorityModeOn()){
-  //   analogHw.SetPriority(false);
-  //   // SERIALPRINTLN("Analog priority mode off");
-  // }
-
-    if(testMicrosLoop) 
-      SERIALPRINTLN(micros()-antMicrosLoop);    
+  if(testMicrosLoop) 
+    SERIALPRINTLN(micros()-antMicrosLoop);    
 }
 
 

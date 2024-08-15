@@ -16,3 +16,34 @@ void TC5_Handler (void) {
     
   countTimer++;
 }
+
+void SERCOM5_Handler()
+{
+  Serial.IrqHandler();  // Call irq handler
+
+  if(Serial.available()){
+    byte cmd = Serial.read();
+    // SERIALPRINT("IRQ:"); SERIALPRINTLNF(cmd, HEX);
+    if(cmd == SHOW_IN_PROGRESS){
+      fbShowInProgress = true;
+      antMicrosAuxShow = micros();
+      // SERIALPRINTLN("SHOW IN PROGRESS");
+      // Serial.read();
+    }else if(cmd == SHOW_END){
+      fbShowInProgress = false;
+      // SERIALPRINTLN("SHOW ENDED");
+      // Serial.read();
+    }else if(cmd == ACK_CMD){
+      waitingForAck = false;
+      // SERIALPRINTLN("SHOW ENDED");
+      // Serial.read();
+    }else if(cmd == RESET_HAPPENED){
+      feedbackHw.InitAuxController(true); // Flag reset so it doesn't do a rainbow
+      // Serial.read();
+    }else if(cmd == END_OF_RAINBOW){
+      waitingForRainbow = false;
+      // SERIALPRINTLN("END OF RAINBOW RECEIVED!");
+      // Serial.read();
+    }
+  }
+}
