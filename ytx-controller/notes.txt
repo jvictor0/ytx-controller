@@ -1,5 +1,0 @@
-Para que la eeprom funcione correctamente hay que agrandar el buffer serie en el archivo RingBuffer.h 
-
-#define SERIAL_BUFFER_SIZE 64 --> #define SERIAL_BUFFER_SIZE 150
-
-Luego utilizar libreria modificada extEEPROM para SAMD21

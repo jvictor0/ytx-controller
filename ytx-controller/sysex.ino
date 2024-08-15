@@ -459,11 +459,11 @@ void SendAck(){
 }
 
 void sendSysExYTX(bool port, uint16_t length, const byte* msg, bool inArrayContainsBoundaries){
-  tcDisable();
+  incomingMIDIpull.stop();
   if(port == MIDI_USB){
     MIDI.sendSysEx(length, msg, inArrayContainsBoundaries);
   }else if(port == MIDI_HW){
     MIDIHW.sendSysEx(length, msg, inArrayContainsBoundaries);
   }
-  tcStartCounter();
+  incomingMIDIpull.start();
 }

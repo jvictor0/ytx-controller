@@ -29,6 +29,7 @@ SOFTWARE.
 
 #include <extEEPROM.h>
 #include <YTXKeyboard.h>
+#include <PeriodicTask.h>
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_SleepyDog.h>
 
@@ -103,8 +104,9 @@ bool countOn = false;
 
 uint32_t antMillisWD = 0;
 uint32_t antMillisSaveControllerState = 0;
-
 uint32_t antMillisStateBackup = 0;
+
+PeriodicTask incomingMIDIpull(7000); //hz sample rate, determines how often TC5_Handler is called
 
 //----------------------------------------------------------------------------------------------------
 // ANALOG VARIABLES
