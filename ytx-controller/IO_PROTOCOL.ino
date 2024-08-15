@@ -375,14 +375,7 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
             SERIALPRINTLN(F("REQUEST: BOOTLOADER MODE"));
           }
           feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
-          
-          config->board.bootFlag = 1;                                            
-          byte bootFlagState = 0;
-          eep.read(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
-          bootFlagState |= 1;
-          eep.write(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
-
-          SelfReset(RESET_TO_CONTROLLER);
+          SelfReset(RESET_TO_BOOTLOADER);
         }else if(message[ytxIOStructure::REQUEST_ID] == ytxIOSpecialRequests::fwVersion){
           if(testSysex){
             SERIALPRINTLN(F("REQUEST: FIRMWARE VERSION"));
@@ -447,9 +440,7 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
             SERIALPRINTLN(F("REQUEST: ENABLE CDC"));
           } 
           
-          // /* First tap */
-          // CDC_ENABLE_DATA = CDC_ENABLE_MAGIC;
-          cdcMagicData = CDC_ENABLE_MAGIC;
+          cdcMagicData = ENABLE_MAGIC_TRICK;
           SelfReset(RESET_TO_CONTROLLER);
         }
 

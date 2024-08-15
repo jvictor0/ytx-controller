@@ -280,24 +280,20 @@ void SelfReset(bool toBootloader) {
   if(cdcEnabled){
     SERIALPRINTLN(F("Rebooting..."));
   }
+  
   if(toBootloader){
-    config->board.bootFlag = 1;                                            
-    byte bootFlagState = 0;
-    eep.read(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
-    bootFlagState |= 1;
-    eep.write(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
+    BOOTLOADER_ENABLE_DATA = ENABLE_MAGIC_TRICK;
   }
 
   SPI.end();
-  if(cdcEnabled){
-    SerialUSB.end();
-  }
-
   Serial.end();
 
   #if defined(USBCON)
-  USBDevice.detach();
-  USBDevice.end();
+    if(cdcEnabled){
+      SerialUSB.end();
+    }
+    USBDevice.detach();
+    USBDevice.end();
   #endif
   
   NVIC_SystemReset();      // processor software reset

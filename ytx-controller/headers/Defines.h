@@ -77,9 +77,10 @@ SOFTWARE.
  * It is the exact previous address to the BOOT_DOUBLE_TAP used by the bootloader
  * YAELTEX NOTE: We found that the last 616 bytes are used by something between the bootloader and the application, but can't find what
  */
-#define CDC_ENABLE_ADDRESS           (0x20007C00ul) 
-#define CDC_ENABLE_DATA              (*((volatile uint32_t *) CDC_ENABLE_ADDRESS))
-#define CDC_ENABLE_MAGIC              0x07738135
+#define ENABLE_MAGIC_TRICK                  (0x07738135ul)
+
+#define BOOTLOADER_ENABLE_ADDRESS           (0x20007FFCul) 
+#define BOOTLOADER_ENABLE_DATA              (*((volatile uint32_t *) BOOTLOADER_ENABLE_ADDRESS))
 
 #define EEPROM_PAGE_SIZE      128
 #define EEPROM_TOTAL_SIZE     65536

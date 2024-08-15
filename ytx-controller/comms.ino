@@ -1356,14 +1356,10 @@ void CheckSerialUSB(){
     printMidiBuffer();  
   }else if(testMode && cmd == 'x'){
     SERIALPRINTLN("Rebooting to bootloader mode...");
-    config->board.bootFlag = 1;                                            
-    byte bootFlagState = 0;
-    eep.read(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
-    bootFlagState |= 1;
-    eep.write(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
-    feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
 
-    SelfReset(RESET_TO_CONTROLLER);  
+    feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
+    SelfReset(RESET_TO_BOOTLOADER);  
+
   }else if(testMode && cmd == 'v'){
     SERIALPRINTLN("Erasing controller state...");  
     eeErase(128, CTRLR_STATE_GENERAL_SETT_ADDRESS, 65535);
@@ -1393,10 +1389,7 @@ void CheckSerialUSB(){
     testEncoderSwitch = testHardware;
     testDigital = testHardware;
   }else if(testMode && cmd == 'j'){
-    CDC_ENABLE_DATA = CDC_ENABLE_MAGIC;
-    
-    SelfReset(RESET_TO_CONTROLLER);
+
   }
-  }
-  
+  } 
 }
