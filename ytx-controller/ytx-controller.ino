@@ -44,6 +44,7 @@ SOFTWARE.
 #include "headers/Defines.h"
 #include "headers/types.h"
 #include "headers/modules.h"
+#include "headers/memoryHost.h"
 #include "headers/AnalogInputs.h"
 #include "headers/EncoderInputs.h" 
 #include "headers/DigitalInputs.h"
@@ -242,7 +243,7 @@ extern uint8_t STRING_MANUFACTURER[];
 extern DeviceDescriptor USB_DeviceDescriptorB;
 extern DeviceDescriptor USB_DeviceDescriptor;
 
-extEEPROM eep(kbits_512, 1, EEPROM_PAGE_SIZE);//device size, number of devices, page size
+extEEPROM externalMemory(kbits_512, 1, EEPROM_PAGE_SIZE);//device size, number of devices, page size
 
 memoryHost *memHost; // Mem host object
 

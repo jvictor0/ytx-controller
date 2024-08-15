@@ -56,8 +56,7 @@ void setup() {
   randomSeed(analogRead(A4));
 
   // EEPROM INITIALIZATION
-  uint8_t eepStatus = eep.begin(extEEPROM::twiClock400kHz,extEEPROM::twiClock400kHz); //go fast!
-  if (eepStatus) {
+  if (externalMemory.begin()){
     // SERIALPRINT(F("extEEPROM.begin() failed, status = ")); SERIALPRINTLN(eepStatus);
     delay(1000);
     while (1);
@@ -65,7 +64,7 @@ void setup() {
 
   delay(250); // delay to allow correct initialization of the eeprom
 
-  memHost = new memoryHost(&eep, ytxIOBLOCK::BLOCKS_COUNT);
+  memHost = new memoryHost(&externalMemory, ytxIOBLOCK::BLOCKS_COUNT);
   // General config block
   memHost->ConfigureBlock(ytxIOBLOCK::Configuration, 1, sizeof(ytxConfigurationType), true);
   config = (ytxConfigurationType*) memHost->Block(ytxIOBLOCK::Configuration);    
@@ -78,13 +77,13 @@ void setup() {
     
     // WRITE TO EEPROM FW AND HW VERSION
     config->board.fwVersionMin = FW_VERSION_MINOR;
-    eep.write(FW_VERSION_ADDR, &config->board.fwVersionMin, sizeof(byte));
+    externalMemory.write(FW_VERSION_ADDR, &config->board.fwVersionMin, sizeof(byte));
     config->board.fwVersionMaj = FW_VERSION_MAJOR;
-    eep.write(FW_VERSION_ADDR+1, &config->board.fwVersionMaj, sizeof(byte));
+    externalMemory.write(FW_VERSION_ADDR+1, &config->board.fwVersionMaj, sizeof(byte));
     config->board.hwVersionMin = HW_VERSION_MINOR;
-    eep.write(HW_VERSION_ADDR, &config->board.hwVersionMin, sizeof(byte));
+    externalMemory.write(HW_VERSION_ADDR, &config->board.hwVersionMin, sizeof(byte));
     config->board.hwVersionMaj = HW_VERSION_MAJOR;
-    eep.write(HW_VERSION_ADDR+1, &config->board.hwVersionMaj, sizeof(byte));
+    externalMemory.write(HW_VERSION_ADDR+1, &config->board.hwVersionMaj, sizeof(byte));
   }
 
 

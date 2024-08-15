@@ -78,14 +78,10 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   // Reset to bootloader if there isn't enough RAM
   if(FreeMemory() < nBanks*nEncoders*sizeof(encFeedbackData) + nBanks*nDigitals*sizeof(digFeedbackData) + 800){
     SERIALPRINTLN("NOT ENOUGH RAM / FEEDBACK -> REBOOTING TO BOOTLOADER...");
+    
     delay(500);
-    config->board.bootFlag = 1;                                            
-    byte bootFlagState = 0;
-    eep.read(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
-    bootFlagState |= 1;
-    eep.write(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
 
-    SelfReset(RESET_TO_CONTROLLER);
+    SelfReset(RESET_TO_BOOTLOADER);
   }
 
   for (int b = 0; b < nBanks; b++) {

@@ -512,7 +512,6 @@ void SendComponentInfo(uint8_t componentType, uint16_t index){
   if(testSysex){
     PrintSysex(statusMsgSize, sysexBlock);
   }
-  
 }
 
 uint16_t GetHardwareID(uint8_t componentType, uint16_t index){

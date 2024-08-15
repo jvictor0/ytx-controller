@@ -130,13 +130,8 @@ void AnalogInputs::Init(byte maxBanks, byte numberOfAnalog, SPIAdressableBUS* sp
     SERIALPRINTLN("NOT ENOUGH RAM / ANALOG -> REBOOTING TO BOOTLOADER...");
     
     delay(500);
-    config->board.bootFlag = 1;                                            
-    byte bootFlagState = 0;
-    eep.read(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
-    bootFlagState |= 1;
-    eep.write(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
 
-    SelfReset(RESET_TO_CONTROLLER);
+    SelfReset(RESET_TO_BOOTLOADER);
   }
 
   aHwData = (analogHwData*) memHost->AllocateRAM(nAnalog*sizeof(analogHwData));

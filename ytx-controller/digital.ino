@@ -87,14 +87,10 @@ void DigitalInputs::Init(uint8_t maxBanks, uint16_t numberOfDigital, SPIAdressab
   if(FreeMemory() < ( nBanks*nDigitals*sizeof(digitalBankData) + 
                       nDigitals*sizeof(digitalHwData) + 800)){
     SERIALPRINTLN("NOT ENOUGH RAM / DIGITAL -> REBOOTING TO BOOTLOADER...");
+    
     delay(500);
-    config->board.bootFlag = 1;                                            
-    byte bootFlagState = 0;
-    eep.read(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
-    bootFlagState |= 1;
-    eep.write(BOOT_FLAGS_ADDR, (byte *) &bootFlagState, sizeof(bootFlagState));
 
-    SelfReset(RESET_TO_CONTROLLER);
+    SelfReset(RESET_TO_BOOTLOADER);
   }
 
   // Allocate RAM for digital controls data

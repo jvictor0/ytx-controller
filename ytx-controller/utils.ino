@@ -304,23 +304,22 @@ void SelfReset(bool toBootloader) {
 void eeErase(uint8_t chunk, uint32_t startAddr, uint32_t endAddr) {
   chunk &= 0xFC;                //force chunk to be a multiple of 4
   uint8_t data[chunk];
-  if(cdcEnabled){
-    SERIALPRINTLN(F("Erasing..."));
-  }
+
+  SERIALPRINTLN(F("Erasing..."));
+
   for (int i = 0; i < chunk; i++) data[i] = 0xFF;
   uint32_t msStart = millis();
 
   for (uint32_t a = startAddr; a <= endAddr; a += chunk) {
     if ( (a & 0xFFF) == 0 ) SERIALPRINTLN(a);
-    eep.write(a, data, chunk);
+    externalMemory.write(a, data, chunk);
   }
 
   uint32_t msLapse = millis() - msStart;
-  if(cdcEnabled){
-    SERIALPRINT(F("Erase lapse: "));
-    SERIALPRINT(msLapse);
-    SERIALPRINTLN(F(" ms"));
-  }
+
+  SERIALPRINT(F("Erase lapse: "));
+  SERIALPRINT(msLapse);
+  SERIALPRINTLN(F(" ms"));
 }
 
 bool IsPowerConnected(){
@@ -340,8 +339,6 @@ long mapl(long x, long in_min, long in_max, long out_min, long out_max)
 {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
-
-
 
 void SetStatusLED(uint8_t onOrBlinkOrOff, uint8_t nTimes, uint8_t status_type) {
   
