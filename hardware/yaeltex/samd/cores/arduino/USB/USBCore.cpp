@@ -65,15 +65,15 @@ extern uint8_t STRING_PRODUCT[] = USB_PRODUCT;
 
 #if !defined(USB_MANUFACTURER)
 // Fall through to unknown if no manufacturer name was provided in a macro
-#  define USB_MANUFACTURER "Yaeltex"
+#define USB_MANUFACTURER "Yaeltex"
 #endif
 
 // YAELTEX - const to extern
-extern uint8_t STRING_MANUFACTURER[] = USB_MANUFACTURER;
+uint8_t STRING_MANUFACTURER[] = USB_MANUFACTURER;
 
 //	DEVICE DESCRIPTOR - YAELTEX set to extern
-extern DeviceDescriptor USB_DeviceDescriptorB = D_DEVICE(0xEF, 0x02, 0x01, 64, USB_VID, USB_PID, 0x100, IMANUFACTURER, IPRODUCT, ISERIAL, 1);
-extern DeviceDescriptor USB_DeviceDescriptor = D_DEVICE(0x00, 0x00, 0x00, 64, USB_VID, USB_PID, 0x100, IMANUFACTURER, IPRODUCT, ISERIAL, 1);
+DeviceDescriptor USB_DeviceDescriptorB = D_DEVICE(0xEF, 0x02, 0x01, 64, USB_VID, USB_PID, 0x100, IMANUFACTURER, IPRODUCT, ISERIAL, 1);
+DeviceDescriptor USB_DeviceDescriptor = D_DEVICE(0x00, 0x00, 0x00, 64, USB_VID, USB_PID, 0x100, IMANUFACTURER, IPRODUCT, ISERIAL, 1);
 
 //==================================================================
 
