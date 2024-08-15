@@ -37,19 +37,15 @@ BEGIN_MIDI_NAMESPACE
  data you want to send.
  \param inData The data to encode.
  \param outSysEx The output buffer where to store the encoded message.
- \param inLength The lenght of the input buffer.
- \param inFlipHeaderBits True for Korg and other who store MSB in reverse order
- \return The lenght of the encoded output buffer.
+ \param inLength The length of the input buffer.
+ \return The length of the encoded output buffer.
  @see decodeSysEx
  Code inspired from Ruin & Wesen's SysEx encoder/decoder - http://ruinwesen.com
  */
-unsigned encodeSysEx(const byte* inData,
-                     byte* outSysEx,
-                     unsigned inLength,
-                     bool inFlipHeaderBits)
+unsigned encodeSysEx(const byte* inData, byte* outSysEx, unsigned inLength)
 {
-    unsigned outLength  = 0;     // Num bytes in output array.
-    byte count          = 0;     // Num 7bytes in a block.
+    unsigned outLength   = 0;     // Num bytes in output array.
+    unsigned count      = 0;     // Num 7bytes in a block.
     outSysEx[0]         = 0;
 
     for (unsigned i = 0; i < inLength; ++i)
@@ -58,7 +54,7 @@ unsigned encodeSysEx(const byte* inData,
         const byte msb  = data >> 7;
         const byte body = data & 0x7f;
 
-        outSysEx[0] |= (msb << (inFlipHeaderBits ? count : (6 - count)));
+        outSysEx[0] |= (msb << count);
         outSysEx[1 + count] = body;
 
         if (count++ == 6)
@@ -78,38 +74,30 @@ unsigned encodeSysEx(const byte* inData,
  your received message.
  \param inSysEx The SysEx data received from MIDI in.
  \param outData    The output buffer where to store the decrypted message.
- \param inLength The lenght of the input buffer.
- \param inFlipHeaderBits True for Korg and other who store MSB in reverse order
- \return The lenght of the output buffer.
+ \param inLength The length of the input buffer.
+ \return The length of the output buffer.
  @see encodeSysEx @see getSysExArrayLength
  Code inspired from Ruin & Wesen's SysEx encoder/decoder - http://ruinwesen.com
  */
-unsigned decodeSysEx(const byte* inSysEx,
-                     byte* outData,
-                     unsigned inLength,
-                     bool inFlipHeaderBits)
+unsigned decodeSysEx(const byte* inSysEx, byte* outData, unsigned inLength)
 {
-    unsigned count  = 0;
-    byte msbStorage = 0;
-    byte byteIndex  = 0;
+    unsigned count      = 0;
+    byte msbStorage  = 0;
 
     for (unsigned i = 0; i < inLength; ++i)
     {
         if ((i % 8) == 0)
         {
             msbStorage = inSysEx[i];
-            byteIndex  = 6;
         }
         else
         {
-            const byte body     = inSysEx[i];
-            const byte shift    = inFlipHeaderBits ? 6 - byteIndex : byteIndex;
-            const byte msb      = byte(((msbStorage >> shift) & 1) << 7);
-            byteIndex--;
-            outData[count++] = msb | body;
+            outData[count++] = inSysEx[i] | ((msbStorage & 1) << 7);
+            msbStorage >>= 1;
         }
     }
     return count;
 }
+
 
 END_MIDI_NAMESPACE

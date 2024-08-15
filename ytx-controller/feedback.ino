@@ -995,7 +995,7 @@ void FeedbackClass::SendFeedbackData(){
   bool okToContinue = false;
   uint8_t cmd = 0;
   static uint32_t ackNotReceivedCount = 0;
-  uint8_t encodedFrameSize = encodeSysEx(sendSerialBufferDec, sendSerialBufferEnc, d_ENDOFFRAME);
+  uint8_t encodedFrameSize = midi::encodeSysEx(sendSerialBufferDec, sendSerialBufferEnc, d_ENDOFFRAME);
   
   // Adds checksum bytes to encoded frame
   AddCheckSum();

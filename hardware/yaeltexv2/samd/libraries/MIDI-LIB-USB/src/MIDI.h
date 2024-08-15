@@ -252,12 +252,10 @@ private:
 
 unsigned encodeSysEx(const byte* inData,
                      byte* outSysEx,
-                     unsigned inLenght,
-                     bool inFlipHeaderBits = false);
+                     unsigned inLenght);
 unsigned decodeSysEx(const byte* inSysEx,
                      byte* outData,
-                     unsigned inLenght,
-                     bool inFlipHeaderBits = false);
+                     unsigned inLenght);
 
 END_MIDI_NAMESPACE
 
