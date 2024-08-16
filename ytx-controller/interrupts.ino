@@ -5,45 +5,37 @@ void ADC_Handler(void) {
   }
 }
 
-void TC5_Handler (void) {
-  TC5->COUNT16.INTFLAG.bit.MC0 = 1; //Writing a 1 to INTFLAG.bit.MC0 clears the interrupt so that it will run again
-
-  // Call MIDI read function and if message arrived, the callbacks get called
+void MIDIpull_Handler(void) {
+  // Call MIDI read functions and run callbacks if message arrived
   if(feedbackHw.fbItemsToSend < FEEDBACK_UPDATE_BUFFER_SIZE && !feedbackHw.SendingData()){
     MIDI.read();
     MIDIHW.read();
   }
-    
-  countTimer++;
 }
 
-void SERCOM5_Handler()
+void AuxControllerReception_Handler()
 {
-  Serial.IrqHandler();  // Call irq handler
-
-  if(Serial.available()){
-    byte cmd = Serial.read();
-    // SERIALPRINT("IRQ:"); SERIALPRINTLNF(cmd, HEX);
-    if(cmd == SHOW_IN_PROGRESS){
-      fbShowInProgress = true;
-      antMicrosAuxShow = micros();
-      // SERIALPRINTLN("SHOW IN PROGRESS");
-      // Serial.read();
-    }else if(cmd == SHOW_END){
-      fbShowInProgress = false;
-      // SERIALPRINTLN("SHOW ENDED");
-      // Serial.read();
-    }else if(cmd == ACK_CMD){
-      waitingForAck = false;
-      // SERIALPRINTLN("SHOW ENDED");
-      // Serial.read();
-    }else if(cmd == RESET_HAPPENED){
-      feedbackHw.InitAuxController(true); // Flag reset so it doesn't do a rainbow
-      // Serial.read();
-    }else if(cmd == END_OF_RAINBOW){
-      waitingForRainbow = false;
-      // SERIALPRINTLN("END OF RAINBOW RECEIVED!");
-      // Serial.read();
-    }
+  byte cmd = Serial.read();
+  // SERIALPRINT("IRQ:"); SERIALPRINTLNF(cmd, HEX);
+  if(cmd == SHOW_IN_PROGRESS){
+    fbShowInProgress = true;
+    antMicrosAuxShow = micros();
+    // SERIALPRINTLN("SHOW IN PROGRESS");
+    // Serial.read();
+  }else if(cmd == SHOW_END){
+    fbShowInProgress = false;
+    // SERIALPRINTLN("SHOW ENDED");
+    // Serial.read();
+  }else if(cmd == ACK_CMD){
+    waitingForAck = false;
+    // SERIALPRINTLN("SHOW ENDED");
+    // Serial.read();
+  }else if(cmd == RESET_HAPPENED){
+    feedbackHw.InitAuxController(true); // Flag reset so it doesn't do a rainbow
+    // Serial.read();
+  }else if(cmd == END_OF_RAINBOW){
+    waitingForRainbow = false;
+    // SERIALPRINTLN("END OF RAINBOW RECEIVED!");
+    // Serial.read();
   }
 }

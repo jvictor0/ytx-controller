@@ -5,9 +5,9 @@
 
 class PeriodicTask {
 	public:
-		PeriodicTask(int sampleRate);
+		PeriodicTask();
 
-		void begin();
+		void begin(void (*callback)(void),int sampleRate);
 		
 		void start();
 		void reset();

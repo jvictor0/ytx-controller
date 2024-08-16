@@ -38,13 +38,16 @@ class Uart : public HardwareSerial
     int read();
     void flush();
     size_t write(const uint8_t data);
+    size_t write9bit(const uint8_t data);
     using Print::write; // pull in write(str) and write(buf, size) from Print
 
     void IrqHandler();
+    void setReceptionCallback(void (*callback)(void));
 
     operator bool() { return true; }
 
   private:
+    size_t xwrite(const uint8_t data, const bool bit9);
     SERCOM *sercom;
     RingBuffer rxBuffer;
     RingBuffer txBuffer;
@@ -62,4 +65,6 @@ class Uart : public HardwareSerial
     SercomNumberStopBit extractNbStopBit(uint16_t config);
     SercomUartCharSize extractCharSize(uint16_t config);
     SercomParityMode extractParity(uint16_t config);
+
+    void (*mReceptionCallback)(void);
 };

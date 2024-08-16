@@ -36,6 +36,7 @@ void setup() {
   SPI.begin();              // TO ENCODERS AND DIGITAL
   
   Serial.begin(2000000);    // FEEDBACK -> SAMD11
+  Serial.setReceptionCallback(AuxControllerReception_Handler);
 
   // LAST RESET CAUSE
   //  SERIALPRINTLN(PM->RCAUSE.reg);
@@ -294,9 +295,9 @@ void setup() {
   MIDIHW.turnThruOff();            // Por default, la librería de Arduino MIDI tiene el THRU en ON, y NO QUEREMOS ESO!
   MIDIHW.setHandleSystemExclusive(handleSystemExclusiveHW);
 
-  // Configure a timer interrupt where we'll call MIDI.read()
-  incomingMIDIpull.begin(); //configure the timer interrupt
-  incomingMIDIpull.start(); //starts the timer
+  // Configure a periodic interrupt where we'll call MIDI.read()
+  MIDIpullTask.begin(MIDIpull_Handler,7000); //callback, hz sample rate
+  MIDIpullTask.start(); //starts the timer
 
   if(validConfigInEEPROM){ 
     MIDI.setHandleNoteOn(handleNoteOnUSB);

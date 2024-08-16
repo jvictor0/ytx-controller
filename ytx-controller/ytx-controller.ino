@@ -106,7 +106,7 @@ uint32_t antMillisWD = 0;
 uint32_t antMillisSaveControllerState = 0;
 uint32_t antMillisStateBackup = 0;
 
-PeriodicTask incomingMIDIpull(7000); //hz sample rate, determines how often TC5_Handler is called
+PeriodicTask MIDIpullTask; 
 
 //----------------------------------------------------------------------------------------------------
 // ANALOG VARIABLES
@@ -228,7 +228,6 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 uint16_t dataPacketSize;
 bool receivingConfig = 0;
 uint32_t antMicrosSysex = 0;
-uint16_t countTimer = 0;
 
 //----------------------------------------------------------------------------------------------------
 // COMMS - EEPROM VARIABLES AND OBJECTS

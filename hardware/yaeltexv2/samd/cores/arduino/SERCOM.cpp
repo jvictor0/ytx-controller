@@ -179,6 +179,17 @@ int SERCOM::writeDataUART(uint8_t data)
   return 1;
 }
 
+int SERCOM::writeDataUART9bit(uint8_t data)
+{
+  // Wait for data register to be empty
+  while(!isDataRegisterEmptyUART());
+
+  //Put data into DATA register
+  sercom->USART.DATA.reg = (((uint16_t)data) + 0x100);
+
+  return 1;
+}
+
 void SERCOM::enableDataRegisterEmptyInterruptUART()
 {
   sercom->USART.INTENSET.reg = SERCOM_USART_INTENSET_DRE;
