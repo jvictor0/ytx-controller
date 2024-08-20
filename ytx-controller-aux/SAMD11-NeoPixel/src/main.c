@@ -12,6 +12,11 @@
 #include <ytxHeader.h>
 
 
+bool receivingMIDI = false;
+uint32_t failsPerSecond = 0;
+uint32_t framesPerSecond = 0;
+
+
 /*! \brief Encode System Exclusive messages.
  SysEx messages are encoded to guarantee transmission of data bytes higher than
  127 without breaking the MIDI protocol. Use this static method to convert theC:\Users\Franco\Documents\Arduino\hardware\yaeltex\samd\bootloaders\zero\samd21_sam_ba.bin
@@ -111,7 +116,7 @@ uint16_t checkSum(volatile uint8_t *data, uint8_t len)
 
 bool SendToMain(uint8_t command){
 	if(SERCOM2->USART.INTFLAG.bit.DRE){
-		SERCOM2->USART.DATA.reg = command;
+		SERCOM2->USART.DATA.reg = (((uint16_t)command) + 0x100);
 		return 1;
 	}else{
 		return 0;
@@ -120,107 +125,232 @@ bool SendToMain(uint8_t command){
 
 /*edbg_usart handler*/
 void RX_Handler(void){
-	uint8_t rcvByte = 0;
-	
-	if(SERCOM2->USART.INTFLAG.bit.RXC){			// if RX interrupt flag is set
-		rcvByte = SERCOM2->USART.DATA.reg;		// get data from register
-		SERCOM2->USART.INTFLAG.bit.RXC = 0;		// clear interrupt flag
+	if(SERCOM2->USART.INTFLAG.bit.RXC){					// if RX interrupt flag is set
+		uint16_t rcvWord = SERCOM2->USART.DATA.reg;		// get data from register
+		SERCOM2->USART.INTFLAG.bit.RXC = 0;				// clear interrupt flag
+
+	  	bool isCommand = (rcvWord&0x100) ? true : false;
+	  	uint8_t rcvByte = (uint8_t)(rcvWord&0x00FF);
 		
-		if(!rcvdInitValues){
-			if (rcvByte == INIT_VALUES && !receivingInit){
+		// if(isCommand){
+		// 	if(!rcvdInitValues){
+		// 		if (rcvByte == INIT_VALUES && !receivingInit){
+		// 			// INIT VALUES COMMAND
+		// 			receivingInit = true;
+		// 			rxArrayIndex = 0;
+		// 		}else if (receivingInit){
+		// 			// INIT VALUES BYTES
+		// 			rx_bufferEnc[rxArrayIndex++] = rcvByte;
+		// 			if (rxArrayIndex == INIT_ENDOFFRAME){
+		// 				rxArrayIndex = 0;
+		// 				rcvdInitValues = true;
+		// 				receivingInit = false;
+		// 				//SendToMain(ACK_CMD);
+		// 			}
+		// 		}
+		// 	}else{
+		// 		if (rcvByte == CMD_ALL_LEDS_OFF)	{		// TURN ALL LEDS OFF COMMAND
+		// 			turnAllOffFlag = true;
+		// 		}else if (rcvByte == CMD_ALL_LEDS_ON)	{		// TURN ALL LEDS OFF COMMAND
+		// 			turnAllOnFlag = true;
+		// 		}else if (rcvByte == CMD_RAINBOW_START)	{		// START RAINBOW
+		// 			rainbowStart = true;
+		// 		}else if (rcvByte == CHANGE_BRIGHTNESS && !receivingBrightness)	{
+		// 			// CHANGE BRIGHTNESS COMMAND
+		// 			receivingBrightness = true;
+		// 		}else if (receivingBrightness){
+		// 			// CHANGE BRIGHTNESS COMMAND - BYTE 2 - NEW BRIGHTNESS
+		// 			receivingBrightness = false;
+		// 			currentBrightness = rcvByte;
+		// 			changeBrightnessFlag = true;
+		// 		}else if (rcvByte == BURST_INIT && !receivingBank){
+		// 			// BANK INIT COMMAND
+		// 			receivingBank = true;
+		// 			receivingLEDdata = true;
+		// 		}else if (rcvByte == BURST_END && receivingBank && receivingLEDdata){
+		// 			// BANK END COMMAND
+		// 			receivingBank = false;
+		// 			receivingLEDdata = false;
+		// 			updateBank = true;
+		// 			//ledShow = true;
+		// 			//SendToMain(1);
+		// 		}else if(rcvByte == NEW_FRAME_BYTE){
+		// 			// FIRST BYTE OF A DATA FRAME
+		// 			rxArrayIndex = 0;
+		// 			if(!receivingBank) receivingLEDdata = true;
+		// 		}else if(rcvByte == END_OF_FRAME_BYTE && receivingLEDdata){
+		// 			// LAST BYTE OF A DATA FRAME
+		// 			//frameComplete = true;
+		// 			// checksum to encoded frame, from 2nd byte, and length is total length without length and checksum bytes (msb and lsb)
+		// 			checkSumCalc = (2019 - checkSum(&rx_bufferEnc[e_fill1], rx_bufferEnc[e_msgLength]-3)) & 0x3FFF;
+
+		// 			checkSumRecv = (uint16_t) (rx_bufferEnc[e_checkSum_MSB]<<7) | (uint16_t)  rx_bufferEnc[e_checkSum_LSB];
+				
+		// 			//uint8_t crcCalc = CRC8(rx_bufferEnc, B+1);
+
+		// 			//if(checkSumCalc == checkSumRecv && crcCalc == rx_bufferEnc[CRC]){
+		// 			if(checkSumCalc == checkSumRecv){
+		// 				//SendToMain(rx_bufferEnc[e_checkSum_LSB]); // ack is checksum LSB byte
+		// 				SendToMain(ACK_CMD);
+					
+		// 				// length and checksum MSB,LSB are not encoded
+		// 				uint8_t decodedFrameSize = decodeSysEx(&rx_bufferEnc[e_fill1], rx_bufferDec, rx_bufferEnc[e_msgLength]-3);
+					
+		// 				ringBuffer[writeIdx].updateFrame	= rx_bufferDec[d_frameType];
+					
+		// 				if(	ringBuffer[writeIdx].updateFrame == ENCODER_CHANGE_FRAME ||
+		// 					ringBuffer[writeIdx].updateFrame == ENCODER_DOUBLE_FRAME ||
+		// 					ringBuffer[writeIdx].updateFrame == ENCODER_VUMETER_FRAME ||
+		// 					ringBuffer[writeIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
+		// 					ringBuffer[writeIdx].updateN		=	rx_bufferDec[d_nRing];
+		// 					ringBuffer[writeIdx].updateO		=	rx_bufferDec[d_orientation];
+		// 					ringBuffer[writeIdx].updateState	=	rx_bufferDec[d_ringStateH] << 8 | rx_bufferDec[d_ringStateL];
+		// 				}else if(	ringBuffer[writeIdx].updateFrame == DIGITAL1_CHANGE_FRAME ||
+		// 				ringBuffer[writeIdx].updateFrame == DIGITAL2_CHANGE_FRAME){
+		// 					ringBuffer[writeIdx].updateN		=	rx_bufferDec[d_nDigital];
+		// 					ringBuffer[writeIdx].updateState	=	rx_bufferDec[d_digitalState];
+		// 				}
+		// 				//ringBuffer[writeIdx].updateValue		=	rx_bufferDec[d_currentValue];
+		// 				//ringBuffer[writeIdx].updateMin			=	rx_bufferDec[d_minVal];
+		// 				//ringBuffer[writeIdx].updateMax			=	rx_bufferDec[d_maxVal];
+		// 				ringBuffer[writeIdx].updateR			=	rx_bufferDec[d_R];
+		// 				ringBuffer[writeIdx].updateG			=	rx_bufferDec[d_G];
+		// 				ringBuffer[writeIdx].updateB			=	rx_bufferDec[d_B];
+
+		// 				if(++writeIdx >= RING_BUFFER_LENGTH)	writeIdx = 0;
+					
+		// 				if(!receivingBank) receivingLEDdata = false;
+		// 			}else{
+		// 				SendToMain(CHECKSUM_ERROR);
+		// 			}
+		// 			//msgCount++;
+		// 		}else if(receivingLEDdata)	{	rx_bufferEnc[rxArrayIndex++] = rcvByte;	} // DATA BYTES OF A FRAME
+		// 	}
+		// }else{
+		// 	rx_bufferEnc[rxArrayIndex++] = rcvByte;	
+		// }	
+
+			    if(isCommand){
+
+			if (rcvByte == INIT_VALUES){
 				// INIT VALUES COMMAND
-				receivingInit = true;
-				rxArrayIndex = 0;
-			}else if (receivingInit){
-				// INIT VALUES BYTES
-				rx_bufferEnc[rxArrayIndex++] = rcvByte;
-				if (rxArrayIndex == INIT_ENDOFFRAME){
+				if(!receivingInit){
+					receivingInit = true;
 					rxArrayIndex = 0;
-					rcvdInitValues = true;
-					receivingInit = false;
-					//SendToMain(ACK_CMD);
 				}
-			}
-		}else{
-			if (rcvByte == CMD_ALL_LEDS_OFF)	{		// TURN ALL LEDS OFF COMMAND
+			}else if (rcvByte == CMD_ALL_LEDS_OFF){		// TURN ALL LEDS OFF COMMAND
 				turnAllOffFlag = true;
-			}else if (rcvByte == CMD_ALL_LEDS_ON)	{		// TURN ALL LEDS OFF COMMAND
+			}else if (rcvByte == CMD_ALL_LEDS_ON){		// TURN ALL LEDS OFF COMMAND
 				turnAllOnFlag = true;
-			}else if (rcvByte == CMD_RAINBOW_START)	{		// START RAINBOW
+			}else if (rcvByte == CMD_RAINBOW_START){		// START RAINBOW
 				rainbowStart = true;
-			}else if (rcvByte == CHANGE_BRIGHTNESS && !receivingBrightness)	{
+			}else if (rcvByte == CHANGE_BRIGHTNESS && !receivingBrightness){
 				// CHANGE BRIGHTNESS COMMAND
 				receivingBrightness = true;
-			}else if (receivingBrightness){
-				// CHANGE BRIGHTNESS COMMAND - BYTE 2 - NEW BRIGHTNESS
-				receivingBrightness = false;
-				currentBrightness = rcvByte;
-				changeBrightnessFlag = true;
 			}else if (rcvByte == BURST_INIT && !receivingBank){
+				// SerialUSB.println("BANK INIT");
 				// BANK INIT COMMAND
 				receivingBank = true;
 				receivingLEDdata = true;
 			}else if (rcvByte == BURST_END && receivingBank && receivingLEDdata){
 				// BANK END COMMAND
+				// SerialUSB.println("BANK END COMMAND");
 				receivingBank = false;
 				receivingLEDdata = false;
 				updateBank = true;
-				//ledShow = true;
-				//SendToMain(1);
 			}else if(rcvByte == NEW_FRAME_BYTE){
+				// SerialUSB.println("NEW_FRAME_BYTE");
 				// FIRST BYTE OF A DATA FRAME
 				rxArrayIndex = 0;
-				if(!receivingBank) receivingLEDdata = true;
-			}else if(rcvByte == END_OF_FRAME_BYTE && receivingLEDdata){
+				framesPerSecond++;
+				if(!receivingBank) 
+					receivingLEDdata = true;
+			}else if(rcvByte == NEW_MIDI_FRAME_BYTE){
+				// SerialUSB.println("NEW_FRAME_BYTE");
+				// FIRST BYTE OF A DATA FRAME
+				rxArrayIndex = 0;
+				receivingMIDI = true;
+			}else if(rcvByte == END_OF_FRAME_BYTE){
 				// LAST BYTE OF A DATA FRAME
-				//frameComplete = true;
-				// checksum to encoded frame, from 2nd byte, and length is total length without length and checksum bytes (msb and lsb)
-				checkSumCalc = (2019 - checkSum(&rx_bufferEnc[e_fill1], rx_bufferEnc[e_msgLength]-3)) & 0x3FFF;
+				uint8_t messageSize = rxArrayIndex;
 
-				checkSumRecv = (uint16_t) (rx_bufferEnc[e_checkSum_MSB]<<7) | (uint16_t)  rx_bufferEnc[e_checkSum_LSB];
-			
-				//uint8_t crcCalc = CRC8(rx_bufferEnc, B+1);
-
-				//if(checkSumCalc == checkSumRecv && crcCalc == rx_bufferEnc[CRC]){
-				if(checkSumCalc == checkSumRecv){
-					//SendToMain(rx_bufferEnc[e_checkSum_LSB]); // ack is checksum LSB byte
-					SendToMain(ACK_CMD);
-				
-					// length and checksum MSB,LSB are not encoded
-					uint8_t decodedFrameSize = decodeSysEx(&rx_bufferEnc[e_fill1], rx_bufferDec, rx_bufferEnc[e_msgLength]-3);
-				
-					ringBuffer[writeIdx].updateFrame	= rx_bufferDec[d_frameType];
-				
-					if(	ringBuffer[writeIdx].updateFrame == ENCODER_CHANGE_FRAME ||
-						ringBuffer[writeIdx].updateFrame == ENCODER_DOUBLE_FRAME ||
-						ringBuffer[writeIdx].updateFrame == ENCODER_VUMETER_FRAME ||
-						ringBuffer[writeIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
-						ringBuffer[writeIdx].updateN		=	rx_bufferDec[d_nRing];
-						ringBuffer[writeIdx].updateO		=	rx_bufferDec[d_orientation];
-						ringBuffer[writeIdx].updateState	=	rx_bufferDec[d_ringStateH] << 8 | rx_bufferDec[d_ringStateL];
-					}else if(	ringBuffer[writeIdx].updateFrame == DIGITAL1_CHANGE_FRAME ||
-					ringBuffer[writeIdx].updateFrame == DIGITAL2_CHANGE_FRAME){
-						ringBuffer[writeIdx].updateN		=	rx_bufferDec[d_nDigital];
-						ringBuffer[writeIdx].updateState	=	rx_bufferDec[d_digitalState];
+				if(receivingLEDdata){
+					if(messageSize != (frameSize+1)){
+						failsPerSecond++;
+						SendToMain(CHECKSUM_ERROR);
+						return;
 					}
-					//ringBuffer[writeIdx].updateValue		=	rx_bufferDec[d_currentValue];
-					//ringBuffer[writeIdx].updateMin			=	rx_bufferDec[d_minVal];
-					//ringBuffer[writeIdx].updateMax			=	rx_bufferDec[d_maxVal];
-					ringBuffer[writeIdx].updateR			=	rx_bufferDec[d_R];
-					ringBuffer[writeIdx].updateG			=	rx_bufferDec[d_G];
-					ringBuffer[writeIdx].updateB			=	rx_bufferDec[d_B];
 
-					if(++writeIdx >= RING_BUFFER_LENGTH)	writeIdx = 0;
-				
-					if(!receivingBank) receivingLEDdata = false;
-				}else{
-					SendToMain(CHECKSUM_ERROR);
+					// checksum to encoded frame, from 2nd byte, and length is total length without length and checksum bytes (msb and lsb)
+					checkSumCalc = (2019 + checkSum((const uint8_t *)rx_bufferEnc, messageSize-1))&0x00FF;
+					checkSumRecv = rx_bufferEnc[messageSize-1];
+
+
+					// SerialUSB.println("END_OF_FRAME_BYTE");
+					// SerialUSB.print("Checksum calc: ");SerialUSB.print(checkSumCalc);SerialUSB.print(" Checksum rcv: ");SerialUSB.println(checkSumRecv);
+
+					if(checkSumCalc==checkSumRecv){
+						SendToMain(ACK_CMD);
+					
+						uint8_t *messageBody = (uint8_t *)&rx_bufferEnc[0];
+					
+						ringBuffer[writeIdx].updateFrame	= messageBody[d_frameType];
+					
+						if(	ringBuffer[writeIdx].updateFrame == ENCODER_CHANGE_FRAME ||
+							ringBuffer[writeIdx].updateFrame == ENCODER_DOUBLE_FRAME ||
+							ringBuffer[writeIdx].updateFrame == ENCODER_VUMETER_FRAME ||
+							ringBuffer[writeIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
+
+							ringBuffer[writeIdx].updateN		=	messageBody[d_nRing];
+							ringBuffer[writeIdx].updateO		=	messageBody[d_orientation];
+							ringBuffer[writeIdx].updateState	=	messageBody[d_ringStateH] << 8 | messageBody[d_ringStateL];
+
+						}else if(	ringBuffer[writeIdx].updateFrame == DIGITAL1_CHANGE_FRAME ||
+									ringBuffer[writeIdx].updateFrame == DIGITAL2_CHANGE_FRAME){
+
+							ringBuffer[writeIdx].updateN		=	messageBody[d_nDigital];
+							ringBuffer[writeIdx].updateState	=	messageBody[d_digitalState];
+						}
+						
+						ringBuffer[writeIdx].updateR			=	messageBody[d_R];
+						ringBuffer[writeIdx].updateG			=	messageBody[d_G];
+						ringBuffer[writeIdx].updateB			=	messageBody[d_B];
+
+						if(++writeIdx >= RING_BUFFER_LENGTH)	
+							writeIdx = 0;
+					
+						if(!receivingBank) 
+							receivingLEDdata = false;
+					}else{
+						failsPerSecond++;
+						//SerialUSB.println("Checksum error");
+						SendToMain(CHECKSUM_ERROR);
+					}
+				}else if (receivingMIDI){
+					// if (messageSize == MIDI_FRAME_SIZE){
+					// 	MIDI.sendControlChange( rx_bufferEnc[MIDIFrame::status], rx_bufferEnc[MIDIFrame::data1], rx_bufferEnc[MIDIFrame::data2]);
+					// }
+
+					// receivingMIDI = false;
+				}else if (receivingInit){
+					// INIT VALUES BYTES						
+					if (messageSize == CONFIG_FRAME_SIZE){
+						rxArrayIndex = 0;
+						rcvdInitValues = true;
+						receivingInit = false;
+
+						SendToMain(ACK_CMD);
+					}
+				}else if (receivingBrightness){
+					// CHANGE BRIGHTNESS COMMAND - BYTE 2 - NEW BRIGHTNESS
+					receivingBrightness = false;
+					currentBrightness = rcvByte;
+					changeBrightnessFlag = true;
 				}
-				//msgCount++;
-			}else if(receivingLEDdata)	{	rx_bufferEnc[rxArrayIndex++] = rcvByte;	} // DATA BYTES OF A FRAME
-		}
-		
-		
+			}
+	    }else{
+			rx_bufferEnc[rxArrayIndex++] = rcvByte;	
+		}	
 	}
 }
 

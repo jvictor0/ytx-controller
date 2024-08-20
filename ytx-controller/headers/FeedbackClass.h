@@ -97,16 +97,20 @@ const uint8_t PROGMEM gamma8[] = {		// From adafruit NeoPixel library
   182,184,186,188,191,193,195,197,199,202,204,206,209,211,213,215,		// 224
   218,220,223,225,227,230,232,235,237,240,242,245,247,250,252,255 };	// 240
 
- typedef enum MsgFrameDec {
-  d_frameType = 0, d_nRing, d_orientation, d_ringStateH, d_ringStateL, d_R, d_G, d_B, d_ENDOFFRAME, 
-  d_nDig = d_nRing, d_digitalState = d_ringStateH
+enum MsgFrameDec{
+	d_frameType, d_nRing, d_orientation, d_ringStateH, d_ringStateL, d_R, d_G, d_B, 
+	frameSize,
+	d_nDigital = d_nRing, d_digitalState = d_ringStateH
 };
+
+
 typedef enum MsgFrameEnc {
   e_fill1 = 0, e_frameType, e_nRing, e_orientation, e_ringStateH, e_ringStateL, e_R, e_G, e_fill2, e_B, 
   e_checkSum_MSB, e_checkSum_LSB, e_ENDOFFRAME,
   e_nDigital = e_nRing, e_digitalState = e_ringStateH
 };
 
+#define d_ENDOFFRAME	frameSize
 #define DEC_FRAME_SIZE 	d_ENDOFFRAME+1
 #define ENC_FRAME_SIZE	e_ENDOFFRAME+1
 #define READ_INDEX		0

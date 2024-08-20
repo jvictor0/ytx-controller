@@ -132,7 +132,7 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
 
 void FeedbackClass::InitFb(){
   // POWER MANAGEMENT - READ FROM POWER PIN, IF POWER SUPPLY IS PRESENT AND SET LED BRIGHTNESS ACCORDINGLY
-  feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
+  // feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
   delay(10);
     
   if(digitalRead(externalVoltagePin)){
@@ -150,24 +150,23 @@ void FeedbackClass::InitFb(){
 }
 
 void FeedbackClass::InitAuxController(bool resetHappened){
-  bool okToContinue = false;
-  byte initFrameIndex = 0;
-
   // SEND INITIAL VALUES AND LED BRIGHTNESS TO SAMD11
-  #define INIT_FRAME_SIZE 7
-  byte initFrameArray[INIT_FRAME_SIZE] = {INIT_VALUES, 
-                                          nEncoders,
-                                          nIndependent,   // CHANGE TO AMOUNT OF ANALOG WITH FEEDBACK
-                                          amountOfDigitalInConfig[0],
-                                          amountOfDigitalInConfig[1],
-                                          currentBrightness,
-                                          resetHappened ? 0 : config->board.rainbowOn};
-  do{
-    SendCommand(initFrameArray[initFrameIndex++]); 
+  byte initFrameArray[] = { nEncoders,
+                            nIndependent,   // CHANGE TO AMOUNT OF ANALOG WITH FEEDBACK
+                            amountOfDigitalInConfig[0],
+                            amountOfDigitalInConfig[1],
+                            currentBrightness,
+                            resetHappened ? 0 : config->board.rainbowOn};
 
-    if(initFrameIndex == INIT_FRAME_SIZE) okToContinue = true;
+  Serial.write9bit(INIT_VALUES);
 
-  }while(!okToContinue);
+  for (int i = 0; i < sizeof(initFrameArray); i++) {
+    Serial.write(initFrameArray[i]);   // FRAME BODY
+  }
+
+  Serial.write9bit(END_OF_FRAME_BYTE);
+
+  Serial.flush();
 }
 
 void FeedbackClass::Update() {
@@ -181,7 +180,7 @@ void FeedbackClass::Update() {
   if(waitingMoreData || fbShowInProgress || fbItemsToSend == 0) return;
 
   if(!sendingFbData){
-    SendCommand(BURST_INIT);
+    Serial.write9bit(BURST_INIT);
     sendingFbData = true;
   } 
 
@@ -341,7 +340,9 @@ void FeedbackClass::Update() {
     fbMessagesSent++;
   }
 
-  Serial.write(BURST_END);    // Signal end of burst
+  Serial.write9bit(BURST_END);    // Signal end of burst
+  Serial.flush();
+
   sendingFbData = false;      // Flag end of data send
   
     // if(fbMessagesSent == MSG_BUFFER_AUX){
@@ -858,7 +859,7 @@ void FeedbackClass::FillFrameWithDigitalData(byte updateIndex){
   //sendSerialBufferDec[msgLength] = TX_BYTES;   // INIT SERIAL FRAME WITH CONSTANT DATA
   sendSerialBufferDec[d_frameType] = (indexChanged < amountOfDigitalInConfig[0]) ?  DIGITAL1_CHANGE_FRAME : 
                                                                                     DIGITAL2_CHANGE_FRAME;   
-  sendSerialBufferDec[d_nDig] = indexChanged;
+  sendSerialBufferDec[d_nDigital] = indexChanged;
   sendSerialBufferDec[d_orientation] = 0;
   sendSerialBufferDec[d_digitalState] = (isShifter || newValue || lowI || valueToIntensity) ? 1 : 0;
   sendSerialBufferDec[d_ringStateL] = 0;
@@ -995,10 +996,10 @@ void FeedbackClass::SendFeedbackData(){
   bool okToContinue = false;
   uint8_t cmd = 0;
   static uint32_t ackNotReceivedCount = 0;
-  uint8_t encodedFrameSize = midi::encodeSysEx(sendSerialBufferDec, sendSerialBufferEnc, d_ENDOFFRAME);
+  // uint8_t encodedFrameSize = midi::encodeSysEx(sendSerialBufferDec, sendSerialBufferEnc, d_ENDOFFRAME);
   
   // Adds checksum bytes to encoded frame
-  AddCheckSum();
+  // AddCheckSum();
 
   #ifdef DEBUG_FB_FRAME
     SERIALPRINT(F("FRAME WITHOUT ENCODING:\n"));
@@ -1011,20 +1012,25 @@ void FeedbackClass::SendFeedbackData(){
   do{
     if(!fbShowInProgress){
       waitingForAck = true;
-
       cmd = 0;
-      Serial.write(NEW_FRAME_BYTE);             // SEND FRAME HEADER
 
-      Serial.write(e_ENDOFFRAME+1);             // NEW FRAME SIZE - SIZE FOR ENCODED FRAME
+      uint8_t dataSize = MsgFrameDec::frameSize+2;
+      
+      uint16_t sum = 2019 + checkSum(sendSerialBufferDec, MsgFrameDec::frameSize);
 
-      for (int i = 0; i < e_ENDOFFRAME; i++) {
-        Serial.write(sendSerialBufferEnc[i]);   // FRAME BODY
+      Serial.write9bit(NEW_FRAME_BYTE);             // SEND FRAME HEADER
+
+      for (int i = 0; i < MsgFrameDec::frameSize; i++) {
+        Serial.write(sendSerialBufferDec[i]);   // FRAME BODY
       }
-      Serial.write(END_OF_FRAME_BYTE);          // SEND END OF FRAME BYTE
+
+      // Serial.write(dataSize);        // NEW FRAME SIZE - SIZE FOR ENCODED FRAME
+
+      Serial.write(sum&0x00FF);
+
+      Serial.write9bit(END_OF_FRAME_BYTE);          // SEND END OF FRAME BYTE
       
       Serial.flush();    
-      
-      
       
       antMicrosAck = micros();
 

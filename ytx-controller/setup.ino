@@ -33,9 +33,9 @@ SOFTWARE.
 #include "headers/Defines.h"
 
 void setup() {
-  SPI.begin();              // TO ENCODERS AND DIGITAL
+  SPI.begin();                         // TO ENCODERS AND DIGITAL
   
-  Serial.begin(2000000);    // FEEDBACK -> SAMD11
+  Serial.begin(2000000,SERIAL_9O2);    // FEEDBACK -> SAMD11
   Serial.setReceptionCallback(AuxControllerReception_Handler);
 
   // LAST RESET CAUSE
@@ -347,12 +347,12 @@ void setup() {
     // SERIALPRINTLN("Waiting for rainbow...");
     // Initialize brigthness and power configuration
     feedbackHw.InitFb();
-    
+
     // Wait for rainbow animation to end 
     while(waitingForRainbow){
       delay(1);
     }
-    
+
     // Set all initial values for feedback to show
     feedbackHw.SetBankChangeFeedback(FB_BANK_CHANGED);
 

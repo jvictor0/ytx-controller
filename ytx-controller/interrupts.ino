@@ -15,27 +15,26 @@ void MIDIpull_Handler(void) {
 
 void AuxControllerReception_Handler()
 {
-  byte cmd = Serial.read();
-  // SERIALPRINT("IRQ:"); SERIALPRINTLNF(cmd, HEX);
-  if(cmd == SHOW_IN_PROGRESS){
-    fbShowInProgress = true;
-    antMicrosAuxShow = micros();
-    // SERIALPRINTLN("SHOW IN PROGRESS");
-    // Serial.read();
-  }else if(cmd == SHOW_END){
-    fbShowInProgress = false;
-    // SERIALPRINTLN("SHOW ENDED");
-    // Serial.read();
-  }else if(cmd == ACK_CMD){
-    waitingForAck = false;
-    // SERIALPRINTLN("SHOW ENDED");
-    // Serial.read();
-  }else if(cmd == RESET_HAPPENED){
-    feedbackHw.InitAuxController(true); // Flag reset so it doesn't do a rainbow
-    // Serial.read();
-  }else if(cmd == END_OF_RAINBOW){
-    waitingForRainbow = false;
-    // SERIALPRINTLN("END OF RAINBOW RECEIVED!");
-    // Serial.read();
+  uint16_t rcvWord = Serial.read();
+  bool isCommand = (rcvWord&0x100) ? true : false;
+  uint8_t rcvByte = (uint8_t)(rcvWord&0x00FF);
+  // SerialUSB.print("rcvWord: ");SerialUSB.println(rcvWord);
+  // SerialUSB.print("rcvByte: ");SerialUSB.println(rcvByte);
+  if(isCommand){
+    if(rcvByte == SHOW_IN_PROGRESS){
+      fbShowInProgress = true;
+      antMicrosAuxShow = micros();
+      // SerialUSB.println("SHOW_IN_PROGRESS");
+    }else if(rcvByte == SHOW_END){
+      fbShowInProgress = false;
+      // SerialUSB.println("SHOW_END");
+    }else if(rcvByte == ACK_CMD){
+      waitingForAck = false;
+      // SerialUSB.println("ACK_CMD");
+    }else if(rcvByte == RESET_HAPPENED){
+
+    }else if(rcvByte == END_OF_RAINBOW){
+      waitingForRainbow = false;
+    }
   }
 }

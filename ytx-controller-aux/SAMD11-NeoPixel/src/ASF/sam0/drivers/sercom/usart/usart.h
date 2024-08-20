@@ -1056,7 +1056,7 @@ static inline void usart_get_config_defaults(
 	config->transfer_mode    = USART_TRANSFER_ASYNCHRONOUSLY;
 	config->parity           = USART_PARITY_NONE;
 	config->stopbits         = USART_STOPBITS_1;
-	config->character_size   = USART_CHARACTER_SIZE_8BIT;
+	config->character_size   = USART_CHARACTER_SIZE_9BIT;
 	config->baudrate         = 9600;
 	config->receiver_enable  = true;
 	config->transmitter_enable = true;

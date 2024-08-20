@@ -32,7 +32,7 @@ SOFTWARE.
 
 void loop() { 
   antMicrosLoop = micros();
-  
+
   // Update status LED
   UpdateStatusLED();
 

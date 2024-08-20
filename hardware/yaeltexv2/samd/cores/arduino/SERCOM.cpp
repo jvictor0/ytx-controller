@@ -164,7 +164,7 @@ bool SERCOM::isDataRegisterEmptyUART()
   return sercom->USART.INTFLAG.bit.DRE;
 }
 
-uint8_t SERCOM::readDataUART()
+uint16_t SERCOM::readDataUART()
 {
   return sercom->USART.DATA.bit.DATA;
 }

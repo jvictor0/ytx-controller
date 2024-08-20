@@ -36,6 +36,7 @@
 #define SHOW_END                0xFA
 #define CMD_RAINBOW_START		0xFB
 #define RESET_HAPPENED			0xFC
+#define NEW_MIDI_FRAME_BYTE		0xFD
 #define END_OF_FRAME_BYTE       0xFF
 
 #define LED_BLINK_TICKS			ONE_SEC_TICKS
@@ -80,22 +81,29 @@ volatile uint8_t tickShowEnd = SHOW_END_REFRESH_TICKS;
 enum MsgFrameEnc{
 	//msgLength = 0, frameType, nRing, orientation,ringStateH, ringStateL, currentValue,
 	e_msgLength = 0, e_fill1, e_frameType, e_nRing, e_orientation, e_ringStateH, e_ringStateL, e_R, e_G,
-	e_fill2, e_B, e_checkSum_MSB, e_checkSum_LSB,
+	e_fill2,
 	e_ENDOFFRAME,
 	e_nDigital = e_nRing, e_digitalState = e_ringStateH
 };
 enum MsgFrameDec{
-	//msgLength = 0, frameType, nRing, orientation,ringStateH, ringStateL, currentValue,
-	d_frameType, d_nRing, d_orientation, d_ringStateH, d_ringStateL, d_R, d_G, d_B,
+	d_frameType, d_nRing, d_orientation, d_ringStateH, d_ringStateL, d_R, d_G, d_B, 
+	frameSize, e_checkSum_MSB, e_checkSum_LSB,
 	d_nDigital = d_nRing, d_digitalState = d_ringStateH
 };
 
-enum InitFrame{
-	nEncoders, nAnalog, nDigitals1, nDigitals2, nBrightness, nRainbow, INIT_ENDOFFRAME
-};
 enum LedStrips{
 	ENCODER1_STRIP, ENCODER2_STRIP, DIGITAL1_STRIP, DIGITAL2_STRIP, FB_STRIP, LAST_STRIP
 };
+
+
+enum configFrame{
+	nEncoders, nAnalog, nDigitals1, nDigitals2, nBrightness, nRainbow, CONFIG_FRAME_SIZE
+};
+
+enum MIDIFrame{
+	status, data1, data2, MIDI_FRAME_SIZE
+};
+
 //! [rx_buffer_var]
 #define MAX_RX_BUFFER_LENGTH_ENC   e_ENDOFFRAME+1
 #define MAX_RX_BUFFER_LENGTH_DEC   d_B+1
