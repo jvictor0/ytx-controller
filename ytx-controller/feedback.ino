@@ -165,8 +165,6 @@ void FeedbackClass::InitAuxController(bool resetHappened){
   }
 
   Serial.write9bit(END_OF_FRAME_BYTE);
-
-  Serial.flush();
 }
 
 void FeedbackClass::Update() {
@@ -180,8 +178,8 @@ void FeedbackClass::Update() {
   if(waitingMoreData || fbShowInProgress || fbItemsToSend == 0) return;
 
   if(!sendingFbData){
-    Serial.write9bit(BURST_INIT);
     sendingFbData = true;
+    Serial.write9bit(BURST_INIT);
   } 
 
   while (fbItemsToSend && fbMessagesSent < MSG_BUFFER_AUX) {    
@@ -341,7 +339,6 @@ void FeedbackClass::Update() {
   }
 
   Serial.write9bit(BURST_END);    // Signal end of burst
-  Serial.flush();
 
   sendingFbData = false;      // Flag end of data send
   
@@ -713,7 +710,7 @@ void FeedbackClass::FillFrameWithEncoderData(byte updateIndex){
         || encoderSwitchChanged) {
     encFbData[currentBank][indexChanged].encRingStatePrev = encFbData[currentBank][indexChanged].encRingState;    // not being used
     
-    sendSerialBufferDec[d_frameType] = (fbUpdateType == FB_ENCODER      ? ENCODER_CHANGE_FRAME        :
+    feedbackFrameBuffer[FeedbackFrame_Type] = (fbUpdateType == FB_ENCODER      ? ENCODER_CHANGE_FRAME        :
                                         fbUpdateType == FB_ENC_2CC      ? ENCODER_DOUBLE_FRAME        : 
                                         fbUpdateType == FB_ENC_VUMETER  ? ENCODER_VUMETER_FRAME       : 
                                         fbUpdateType == FB_ENC_SWITCH   ? ENCODER_SWITCH_CHANGE_FRAME : 255);   
@@ -740,14 +737,13 @@ void FeedbackClass::FillFrameWithEncoderData(byte updateIndex){
     
     uint8_t brightness = encoderHw.GetEncoderBrightness(indexChanged);
 
-    sendSerialBufferDec[d_nRing] = indexChanged;
-    sendSerialBufferDec[d_orientation] = newOrientation;
-    sendSerialBufferDec[d_ringStateH] = encFbData[currentBank][indexChanged].encRingState >> 8;
-    sendSerialBufferDec[d_ringStateL] = encFbData[currentBank][indexChanged].encRingState & 0xff;
-    sendSerialBufferDec[d_R] = colorR*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
-    sendSerialBufferDec[d_G] = colorG*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
-    sendSerialBufferDec[d_B] = colorB*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
-    sendSerialBufferDec[d_ENDOFFRAME] = END_OF_FRAME_BYTE;
+    feedbackFrameBuffer[FeedbackFrame_nRing] = indexChanged;
+    feedbackFrameBuffer[FeedbackFrame_Orientation] = newOrientation;
+    feedbackFrameBuffer[FeedbackFrame_RingStateH] = encFbData[currentBank][indexChanged].encRingState >> 8;
+    feedbackFrameBuffer[FeedbackFrame_RingStateL] = encFbData[currentBank][indexChanged].encRingState & 0xff;
+    feedbackFrameBuffer[FeedbackFrame_R] = colorR*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
+    feedbackFrameBuffer[FeedbackFrame_G] = colorG*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
+    feedbackFrameBuffer[FeedbackFrame_B] = colorB*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
     feedbackDataToSend = true;
   }
 }
@@ -856,17 +852,16 @@ void FeedbackClass::FillFrameWithDigitalData(byte updateIndex){
 
   uint8_t brightness = digitalHw.GetDigitalButtonBrightness(indexChanged);
 
-  //sendSerialBufferDec[msgLength] = TX_BYTES;   // INIT SERIAL FRAME WITH CONSTANT DATA
-  sendSerialBufferDec[d_frameType] = (indexChanged < amountOfDigitalInConfig[0]) ?  DIGITAL1_CHANGE_FRAME : 
+  //feedbackFrameBuffer[msgLength] = TX_BYTES;   // INIT SERIAL FRAME WITH CONSTANT DATA
+  feedbackFrameBuffer[FeedbackFrame_Type] = (indexChanged < amountOfDigitalInConfig[0]) ?  DIGITAL1_CHANGE_FRAME : 
                                                                                     DIGITAL2_CHANGE_FRAME;   
-  sendSerialBufferDec[d_nDigital] = indexChanged;
-  sendSerialBufferDec[d_orientation] = 0;
-  sendSerialBufferDec[d_digitalState] = (isShifter || newValue || lowI || valueToIntensity) ? 1 : 0;
-  sendSerialBufferDec[d_ringStateL] = 0;
-  sendSerialBufferDec[d_R] = colorR*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
-  sendSerialBufferDec[d_G] = colorG*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
-  sendSerialBufferDec[d_B] = colorB*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
-  sendSerialBufferDec[d_ENDOFFRAME] = END_OF_FRAME_BYTE;
+  feedbackFrameBuffer[FeedbackFrame_nDigital] = indexChanged;
+  feedbackFrameBuffer[FeedbackFrame_Orientation] = 0;
+  feedbackFrameBuffer[FeedbackFrame_DigitalState] = (isShifter || newValue || lowI || valueToIntensity) ? 1 : 0;
+  feedbackFrameBuffer[FeedbackFrame_RingStateL] = 0;
+  feedbackFrameBuffer[FeedbackFrame_R] = colorR*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
+  feedbackFrameBuffer[FeedbackFrame_G] = colorG*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
+  feedbackFrameBuffer[FeedbackFrame_B] = colorB*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;
   feedbackDataToSend = true;
 }
 
@@ -982,12 +977,12 @@ void FeedbackClass::SendDataIfReady(){
 }
 
 void FeedbackClass::AddCheckSum(){ 
-  uint16_t sum = 2019 - checkSum(sendSerialBufferEnc, e_B+1);
+  // uint16_t sum = 2019 - checkSum(sendSerialBufferEnc, e_B+1);
   
-  sum &= 0x3FFF;    // 14 bit checksum
+  // sum &= 0x3FFF;    // 14 bit checksum
   
-  sendSerialBufferEnc[e_checkSum_MSB] = (sum >> 7) & 0x7F;
-  sendSerialBufferEnc[e_checkSum_LSB] = sum & 0x7F;
+  // sendSerialBufferEnc[e_checkSum_MSB] = (sum >> 7) & 0x7F;
+  // sendSerialBufferEnc[e_checkSum_LSB] = sum & 0x7F;
 }
 
 // #define DEBUG_FB_FRAME
@@ -996,15 +991,15 @@ void FeedbackClass::SendFeedbackData(){
   bool okToContinue = false;
   uint8_t cmd = 0;
   static uint32_t ackNotReceivedCount = 0;
-  // uint8_t encodedFrameSize = midi::encodeSysEx(sendSerialBufferDec, sendSerialBufferEnc, d_ENDOFFRAME);
+  // uint8_t encodedFrameSize = midi::encodeSysEx(feedbackFrameBuffer, sendSerialBufferEnc, d_ENDOFFRAME);
   
   // Adds checksum bytes to encoded frame
   // AddCheckSum();
 
   #ifdef DEBUG_FB_FRAME
     SERIALPRINT(F("FRAME WITHOUT ENCODING:\n"));
-    for(int i = 0; i <= d_B; i++){
-      SERIALPRINT(i); SERIALPRINT(F(": "));SERIALPRINT(sendSerialBufferDec[i]); SERIALPRINT(F("\t"));
+    for(int i = 0; i <= FeedbackFrame_B; i++){
+      SERIALPRINT(i); SERIALPRINT(F(": "));SERIALPRINT(feedbackFrameBuffer[i]); SERIALPRINT(F("\t"));
     } 
     SERIALPRINTLN();
   #endif
@@ -1014,23 +1009,17 @@ void FeedbackClass::SendFeedbackData(){
       waitingForAck = true;
       cmd = 0;
 
-      uint8_t dataSize = MsgFrameDec::frameSize+2;
-      
-      uint16_t sum = 2019 + checkSum(sendSerialBufferDec, MsgFrameDec::frameSize);
+      uint16_t sum = 2019 + checkSum(feedbackFrameBuffer, FeedbackFrame_Size);
 
       Serial.write9bit(NEW_FRAME_BYTE);             // SEND FRAME HEADER
 
-      for (int i = 0; i < MsgFrameDec::frameSize; i++) {
-        Serial.write(sendSerialBufferDec[i]);   // FRAME BODY
+      for (int i = 0; i < FeedbackFrame_Size; i++) {
+        Serial.write(feedbackFrameBuffer[i]);   // FRAME BODY
       }
-
-      // Serial.write(dataSize);        // NEW FRAME SIZE - SIZE FOR ENCODED FRAME
 
       Serial.write(sum&0x00FF);
 
-      Serial.write9bit(END_OF_FRAME_BYTE);          // SEND END OF FRAME BYTE
-      
-      Serial.flush();    
+      Serial.write9bit(END_OF_FRAME_BYTE);          // SEND END OF FRAME BYTE  
       
       antMicrosAck = micros();
 
@@ -1043,8 +1032,8 @@ void FeedbackClass::SendFeedbackData(){
         tries++;
         // SERIALPRINT(micros() - antMicrosAck);
         // SERIALPRINTLN(" micros");  // SERIALPRINT(++ackNotReceivedCount); SERIALPRINT(" times");                  
-        // SERIALPRINT("\t");                                  SERIALPRINT(sendSerialBufferDec[d_frameType]);
-        // SERIALPRINT(", #");                                 SERIALPRINT(sendSerialBufferDec[d_nRing]);
+        // SERIALPRINT("\t");                                  SERIALPRINT(feedbackFrameBuffer[FeedbackFrame_Type]);
+        // SERIALPRINT(", #");                                 SERIALPRINT(feedbackFrameBuffer[FeedbackFrame_nRing]);
         // SERIALPRINT("\t read idx: ");                       SERIALPRINT(feedbackUpdateReadIdx);
         // SERIALPRINT("\t write idx: ");                      SERIALPRINTLN(feedbackUpdateWriteIdx);
       }               
@@ -1052,7 +1041,6 @@ void FeedbackClass::SendFeedbackData(){
       //delayMicros
     }
   }while(!okToContinue && tries < 20);
-
 }
 
 void FeedbackClass::SendCommand(uint8_t cmd){

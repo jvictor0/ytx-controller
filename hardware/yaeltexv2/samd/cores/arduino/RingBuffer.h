@@ -33,13 +33,13 @@ template <int N>
 class RingBufferN
 {
   public:
-    uint16_t _aucBuffer[N] ;
+    uint8_t _aucBuffer[N] ;
     volatile int _iHead ;
     volatile int _iTail ;
 
   public:
     RingBufferN( void ) ;
-    void store_char( uint16_t c ) ;
+    void store_char( uint8_t c ) ;
     void clear();
     int read_char();
     int available();
@@ -62,7 +62,7 @@ RingBufferN<N>::RingBufferN( void )
 }
 
 template <int N>
-void RingBufferN<N>::store_char( uint16_t c )
+void RingBufferN<N>::store_char( uint8_t c )
 {
   int i = nextIndex(_iHead);
 
@@ -90,7 +90,7 @@ int RingBufferN<N>::read_char()
   if(_iTail == _iHead)
     return -1;
 
-  uint16_t value = _aucBuffer[_iTail];
+  uint8_t value = _aucBuffer[_iTail];
   _iTail = nextIndex(_iTail);
 
   return value;

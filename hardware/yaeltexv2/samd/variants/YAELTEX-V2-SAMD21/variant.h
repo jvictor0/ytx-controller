@@ -41,6 +41,7 @@
 #ifdef __cplusplus
 #include "SERCOM.h"
 #include "Uart.h"
+#include "customUart/customUart.h"
 #endif // __cplusplus
 
 #ifdef __cplusplus
@@ -193,7 +194,7 @@ extern SERCOM sercom3;
 extern SERCOM sercom4;
 extern SERCOM sercom5;
 
-extern Uart Serial;
+extern customUart Serial;
 extern Uart Serial1;
 
 #endif

@@ -97,22 +97,13 @@ const uint8_t PROGMEM gamma8[] = {		// From adafruit NeoPixel library
   182,184,186,188,191,193,195,197,199,202,204,206,209,211,213,215,		// 224
   218,220,223,225,227,230,232,235,237,240,242,245,247,250,252,255 };	// 240
 
-enum MsgFrameDec{
-	d_frameType, d_nRing, d_orientation, d_ringStateH, d_ringStateL, d_R, d_G, d_B, 
-	frameSize,
-	d_nDigital = d_nRing, d_digitalState = d_ringStateH
+typedef enum FeedbackFrame{
+	FeedbackFrame_Type, FeedbackFrame_nRing, FeedbackFrame_Orientation, FeedbackFrame_RingStateH, FeedbackFrame_RingStateL, 
+	FeedbackFrame_R, FeedbackFrame_G, FeedbackFrame_B, 
+	FeedbackFrame_Size,
+	FeedbackFrame_nDigital = FeedbackFrame_nRing, FeedbackFrame_DigitalState = FeedbackFrame_RingStateH
 };
 
-
-typedef enum MsgFrameEnc {
-  e_fill1 = 0, e_frameType, e_nRing, e_orientation, e_ringStateH, e_ringStateL, e_R, e_G, e_fill2, e_B, 
-  e_checkSum_MSB, e_checkSum_LSB, e_ENDOFFRAME,
-  e_nDigital = e_nRing, e_digitalState = e_ringStateH
-};
-
-#define d_ENDOFFRAME	frameSize
-#define DEC_FRAME_SIZE 	d_ENDOFFRAME+1
-#define ENC_FRAME_SIZE	e_ENDOFFRAME+1
 #define READ_INDEX		0
 #define WRITE_INDEX 	1
 
@@ -196,8 +187,7 @@ private:
 	uint8_t feedbackUpdateWriteIdx;
 	
 
-	uint8_t sendSerialBufferDec[DEC_FRAME_SIZE] = {};
-	uint8_t sendSerialBufferEnc[ENC_FRAME_SIZE] = {};
+	uint8_t feedbackFrameBuffer[FeedbackFrame_Size];
  	
  	bool waitingMoreData;
     uint32_t antMillisWaitMoreData;

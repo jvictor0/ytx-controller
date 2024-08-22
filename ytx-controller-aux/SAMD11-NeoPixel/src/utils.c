@@ -1,7 +1,8 @@
-#include "ytxHeader.h"
+#include "utils.h"
 
 //CRC-8 - algoritmo basato sulle formule di CRC-8 di Dallas/Maxim
 //codice pubblicato sotto licenza GNU GPL 3.0
+
 uint8_t CRC8(const uint8_t *data, uint8_t len)
 {
 	uint8_t crc = 0x00;
@@ -27,4 +28,8 @@ uint16_t checkSum(const uint8_t *data, uint8_t len)
 		sum ^= data[i];
 
 	return sum;
+}
+
+long mapl(long x, long in_min, long in_max, long out_min, long out_max){
+	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }

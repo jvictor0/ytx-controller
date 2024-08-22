@@ -595,6 +595,36 @@
     <Folder Include="src\NeoPixel\" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="src\feedback.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\feedback.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\interrupts.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\main-controller-comms.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\main-controller-comms.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\setup.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\setup.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\utils.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\utils.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\variables.c">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\defines.h">
       <SubType>compile</SubType>
     </Compile>
@@ -604,7 +634,10 @@
     <Compile Include="src\NeoPixel\NeoPixels.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\ytxHeader.h">
+    <Compile Include="src\types.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\variables.h">
       <SubType>compile</SubType>
     </Compile>
     <None Include="src\ASF\common2\services\delay\delay.h">

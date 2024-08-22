@@ -1,0 +1,304 @@
+/*
+ * UpdateFeedback.c
+ *
+ * Created: 22/8/2024 17:22:24
+ *  Author: Ingenieria
+ */ 
+
+#include <NeoPixels.h>
+#include "variables.h"
+
+extern FeedbackFrameData FeedbackFramesBuffer[FEEDBACK_BUFFER_LENGTH];
+
+void feedbackBegin(bool rainbowOn){
+		if(numEncoders){
+		if(numEncoders>16){
+			pixelsBegin(ENCODER1_STRIP, NUM_LEDS_ENCODER*16, ENC1_STRIP_PIN, NEO_GRB + NEO_KHZ800);
+			pixelsBegin(ENCODER2_STRIP, NUM_LEDS_ENCODER*(numEncoders-16), ENC2_STRIP_PIN, NEO_GRB + NEO_KHZ800);
+		}else{
+			pixelsBegin(ENCODER1_STRIP, NUM_LEDS_ENCODER*numEncoders, ENC1_STRIP_PIN, NEO_GRB + NEO_KHZ800);
+		}
+	}
+	if(numDigitals1){
+		pixelsBegin(DIGITAL1_STRIP, numDigitals1, DIG1_STRIP_PIN, NEO_GRB + NEO_KHZ800);
+	}
+	if(numDigitals2){
+		pixelsBegin(DIGITAL2_STRIP, numDigitals2, DIG2_STRIP_PIN, NEO_GRB + NEO_KHZ800);
+	}
+	if(numAnalogFb){
+		pixelsBegin(FB_STRIP, numAnalogFb, FB_STRIP_PIN, NEO_GRB + NEO_KHZ800);
+	}
+	
+	for(int s = 0; s < MAX_STRIPS; s++){
+		if(begun[s]){
+			setBrightness(s, 255);
+		}
+	}
+	setAll(NP_OFF,NP_OFF,NP_OFF);
+	showAll();
+	uint16_t totalLEDs = 8*(numEncoders + (numDigitals1 + numDigitals2)/2);
+	
+	
+	if(rainbowOn && totalLEDs){
+		uint16_t wait = 0;
+		if(totalLEDs < 128){
+			wait = 512/totalLEDs;
+		}else if(totalLEDs >= 128 && totalLEDs < 256){
+			wait = 1024/totalLEDs;
+		}else{
+			wait = 1400/totalLEDs;
+		}
+		rainbowAll(wait);
+	}
+	turnAllOffFlag = true;
+}
+
+void feedbackDataUpdate(uint8_t nStrip, uint8_t nToChange, bool vertical,
+uint16_t newState, uint8_t intR, uint8_t intG, uint8_t intB) {
+	//uint8_t brightnessMult = 1;
+	//uint8_t minMaxDif = abs(max-min);
+	int8_t lastLedOn = 0;
+	
+	if(nStrip == ENCODER_CHANGE_FRAME){		// ROTARY CHANGE
+		bool ledOnOrOff = false;
+		bool ledForSwitch = false;
+		
+		for (int i = 0; i < 16; i++) {
+			ledOnOrOff = newState&(1<<i);		// Get LED state
+			
+			if(vertical){									// Encoder is vertical
+				ledOnOrOff &= ((ENCODER_MASK_V>>i)&1);			// get LED state
+				ledForSwitch = ((ENCODER_SWITCH_V_ON>>i)&1);	// is it a switch LED or a ring LED
+			}
+			else{											// Encoder is horizontal
+				ledOnOrOff &= ((ENCODER_MASK_H>>i)&1);			// get LED state
+				ledForSwitch = ((ENCODER_SWITCH_H_ON>>i)&1);	// is it a switch LED or a ring LED
+			}
+			
+			if (ledOnOrOff && !ledForSwitch) {				// If LED is for ring, and its state is ON
+				if(nToChange < N_ENCODERS_STRIP_1){					// Is it an encoder on the first strip or second?
+					setPixelColor(	ENCODER1_STRIP,					// N strip
+					NUM_LEDS_ENCODER*nToChange + i,	// N led
+					intR, intG, intB);				// R, G, B
+					
+					// BASED ON FEEDBACK METHOD, calculate brightness multiplier for adjacent LEDs based on value
+					// ONLY FOR FILL FEEDBACK METHOD, calculate brightness multiplier based on value
+					//if(!vertical && i != 13){
+					//if(minMaxDif > 48){
+					//brightnessMult = (minMaxDif/13) + 1 - abs(newValue - min)%(minMaxDif/13);
+					//}
+					//setPixelColor(	ENCODER1_STRIP,						// N strip
+					//NUM_LEDS_ENCODER*nToChange + i + 1,	// N led +1
+					//intR/brightnessMult,				// R
+					//intG/brightnessMult,				// G
+					//intB/brightnessMult);				// B
+					//}
+					}else{		// ENCODER STRIP 2
+					setPixelColor(	ENCODER2_STRIP,										// N strip
+					NUM_LEDS_ENCODER*(nToChange-N_ENCODERS_STRIP_1) + i,// N led
+					intR, intG, intB);									// R, G, B
+				}
+				lastLedOn = i;
+				} else if(ledForSwitch){
+				// IF IT IS A LED FOR THE SWITCH, DO NOTHING
+				} else {											// Ring LED, state OFF
+				if(nToChange < N_ENCODERS_STRIP_1){					// ENCODER STRIP 1
+					setPixelColor(	ENCODER1_STRIP,						// N strip
+					NUM_LEDS_ENCODER*nToChange + i,		// N led
+					NP_OFF,	NP_OFF, NP_OFF);			// R, G, B
+					//if(!vertical && i != 13 && lastLedOn >= 0){
+					//if(minMaxDif > 48){
+					//brightnessMult = (minMaxDif/13) + 1 - abs(newValue - min)%(minMaxDif/13);
+					//}
+					//setPixelColor(ENCODER1_STRIP, 16*nToChange + lastLedOn + 1 , intR/brightnessMult, intG/brightnessMult, intB/brightnessMult); // Draw new pixel
+					//}
+					}else{															// ENCODER STRIP 2
+					setPixelColor(	ENCODER2_STRIP,										// N strip
+					NUM_LEDS_ENCODER*(nToChange-N_ENCODERS_STRIP_1) + i,// N led
+					NP_OFF, NP_OFF, NP_OFF);							// R, G, B
+				}
+			}
+		}
+		}else if(nStrip == ENCODER_DOUBLE_FRAME){		// ROTARY 2CC CHANGE
+		bool ledOnOrOff = false;
+		bool ledForSwitch = false;
+		
+		for (int i = 0; i < 16; i++) {
+			ledOnOrOff = newState&(1<<i);		// Get LED state
+			
+			if(vertical){									// Encoder is vertical
+				ledOnOrOff &= ((ENCODER_MASK_V>>i)&1);			// get LED state
+				ledForSwitch = ((ENCODER_SWITCH_V_ON>>i)&1);	// is it a switch LED or a ring LED
+			}
+			else{											// Encoder is horizontal
+				ledOnOrOff &= ((ENCODER_MASK_H>>i)&1);			// get LED state
+				ledForSwitch = ((ENCODER_SWITCH_H_ON>>i)&1);	// is it a switch LED or a ring LED
+			}
+			
+			if (ledOnOrOff && !ledForSwitch) {				// If LED is for ring, and its state is ON
+				if(nToChange < N_ENCODERS_STRIP_1){					// Is it an encoder on the first strip or second?
+					setPixelColor(	ENCODER1_STRIP,							// N strip
+					NUM_LEDS_ENCODER*nToChange + i,			// N led
+					intR, intG, intB);						// R, G, B
+					}else{		// ENCODER STRIP 2
+					setPixelColor(	ENCODER2_STRIP,													// N strip
+					NUM_LEDS_ENCODER*(nToChange-N_ENCODERS_STRIP_1) + i,			// N led
+					intR, intG, intB);												// R, G, B
+				}
+				lastLedOn = i;
+			}
+		}
+		}else if(nStrip == ENCODER_VUMETER_FRAME){		// ROTARY CHANGE
+		bool ledOnOrOff = false;
+		bool ledForSwitch = false;
+		
+		for (int i = 0; i < 16; i++) {
+			ledOnOrOff = newState&(1<<i);		// Get LED state
+			
+			if(vertical){									// Encoder is vertical
+				ledOnOrOff &= ((ENCODER_MASK_V>>i)&1);			// get LED state
+				ledForSwitch = ((ENCODER_SWITCH_V_ON>>i)&1);	// is it a switch LED or a ring LED
+				if((i >= 13 && i <= 15) || i >= 0 && i <= 4){
+					intR = 9; intG = 88; intB = 103;
+					}else if(i >= 5 && i <= 7){
+					intR = 100; intG = 100; intB = 0;
+					}else if(i >= 8 && i <= 9){
+					intR = 200; intG = 0; intB = 0;
+				}
+			}
+			else{											// Encoder is horizontal
+				ledOnOrOff &= ((ENCODER_MASK_H>>i)&1);			// get LED state
+				ledForSwitch = ((ENCODER_SWITCH_H_ON>>i)&1);	// is it a switch LED or a ring LED
+				if(i >= 1 && i <= 8){
+					intR = 9; intG = 88; intB = 103;
+					}else if(i >= 9 && i <= 11){
+					intR = 100; intG = 100; intB = 0;
+					}else if(i >= 12 && i <= 13){
+					intR = 200; intG = 0; intB = 0;
+				}
+			}
+			
+			if (ledOnOrOff && !ledForSwitch) {				// If LED is for ring, and its state is ON
+				if(nToChange < N_ENCODERS_STRIP_1){					// Is it an encoder on the first strip or second?
+					setPixelColor(	ENCODER1_STRIP,					// N strip
+					NUM_LEDS_ENCODER*nToChange + i,	// N led
+					intR, intG, intB);				// R, G, B
+					}else{		// ENCODER STRIP 2
+					setPixelColor(	ENCODER2_STRIP,										// N strip
+					NUM_LEDS_ENCODER*(nToChange-N_ENCODERS_STRIP_1) + i,// N led
+					intR, intG, intB);									// R, G, B
+				}
+				lastLedOn = i;
+				} else if(ledForSwitch){
+				// IF IT IS A LED FOR THE SWITCH, DO NOTHING
+				} else {											// Ring LED, state OFF
+				if(nToChange < N_ENCODERS_STRIP_1){					// ENCODER STRIP 1
+					setPixelColor(	ENCODER1_STRIP,						// N strip
+					NUM_LEDS_ENCODER*nToChange + i,		// N led
+					NP_OFF,	NP_OFF, NP_OFF);			// R, G, B
+					//if(!vertical && i != 13 && lastLedOn >= 0){
+					//if(minMaxDif > 48){
+					//brightnessMult = (minMaxDif/13) + 1 - abs(newValue - min)%(minMaxDif/13);
+					//}
+					//setPixelColor(ENCODER1_STRIP, 16*nToChange + lastLedOn + 1 , intR/brightnessMult, intG/brightnessMult, intB/brightnessMult); // Draw new pixel
+					//}
+					}else{															// ENCODER STRIP 2
+					setPixelColor(	ENCODER2_STRIP,										// N strip
+					NUM_LEDS_ENCODER*(nToChange-N_ENCODERS_STRIP_1) + i,// N led
+					NP_OFF, NP_OFF, NP_OFF);							// R, G, B
+				}
+			}
+		}
+	}
+	else if(nStrip == ENCODER_SWITCH_CHANGE_FRAME){		// SWITCH CHANGE
+		bool ledOnOrOff = 0;
+		bool ledForRing = false;
+		for (int i = 0; i < NUM_LEDS_ENCODER; i++) {
+			ledOnOrOff = newState&(1<<i);
+			if(vertical){									// Encoder is vertical
+				ledOnOrOff &= ((ENCODER_SWITCH_V_ON>>i)&1);		// Get LED state masked
+				ledForRing = ((ENCODER_MASK_V>>i)&1);			// Check if we are at a switch LED or a ring LED
+			}
+			else{											// Encoder is horizontal
+				ledOnOrOff &= ((ENCODER_SWITCH_H_ON>>i)&1);		// Get LED state masked
+				ledForRing = ((ENCODER_MASK_H>>i)&1);			// Check if we are at a switch LED or a ring LED
+			}
+			
+			if (ledOnOrOff && !ledForRing) {			// If it is a SWITCH LED and it's supposed to be ON
+				if(nToChange < N_ENCODERS_STRIP_1){				// Encoder STRIP 1
+					setPixelColor(	ENCODER1_STRIP,					// N strip
+					NUM_LEDS_ENCODER*nToChange + i, // N led
+					intR, intG, intB);				// R, G, B
+					}else{																	// Encoder STRIP 2
+					setPixelColor(	ENCODER2_STRIP,											// N strip
+					NUM_LEDS_ENCODER*(nToChange-N_ENCODERS_STRIP_1) + i,	// N LED
+					intR, intG, intB);										// R, G, B
+				}
+				} else if(ledForRing){
+				// IF IT IS A LED FOR THE RING, DO NOTHING
+				} else {											// Switch LED, state OFF
+				if(nToChange < N_ENCODERS_STRIP_1){					// Encoder STRIP 1
+					setPixelColor(	ENCODER1_STRIP,						// N strip
+					NUM_LEDS_ENCODER*nToChange + i,		// N led
+					NP_OFF, NP_OFF, NP_OFF);			// Draw new pixel
+					}else{																	// Encoder STRIP 2
+					setPixelColor(	ENCODER2_STRIP,											// N STRIP
+					NUM_LEDS_ENCODER*(nToChange-N_ENCODERS_STRIP_1) + i ,	// N LED
+					NP_OFF, NP_OFF, NP_OFF);								// Draw new pixel
+				}
+			}
+		}
+		}else if(nStrip == DIGITAL1_CHANGE_FRAME){
+		if (newState){
+			setPixelColor(DIGITAL1_STRIP, nToChange, intR, intG, intB); // Draw new pixel
+			}else{
+			setPixelColor(DIGITAL1_STRIP, nToChange, NP_OFF, NP_OFF, NP_OFF); // Draw new pixel
+		}
+		}else if(nStrip == DIGITAL2_CHANGE_FRAME){
+		if (newState){
+			setPixelColor(DIGITAL2_STRIP, (nToChange-numDigitals1), intR, intG, intB); // Draw new pixel
+			}else{
+			setPixelColor(DIGITAL2_STRIP, (nToChange-numDigitals1), NP_OFF, NP_OFF, NP_OFF); // Draw new pixel
+		}
+	}
+}
+
+void feedbackShow(){
+	if(whichStripToShow >> ENCODER1_STRIP){
+		pixelsShow(ENCODER1_STRIP);
+	}
+	if(whichStripToShow >> ENCODER2_STRIP){
+		pixelsShow(ENCODER2_STRIP);
+	}
+	if(whichStripToShow >> DIGITAL1_STRIP){
+		pixelsShow(DIGITAL1_STRIP);
+	}
+	if(whichStripToShow >> DIGITAL2_STRIP){
+		pixelsShow(DIGITAL2_STRIP);
+	}
+	if(whichStripToShow >> FB_STRIP){
+		pixelsShow(FB_STRIP);
+	}
+	whichStripToShow = 0;
+}
+
+void feedbackPrepareToShow(){
+	indexChanged = FeedbackFramesBuffer[readIdx].updateN;
+
+	if(FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_CHANGE_FRAME	||
+	   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_VUMETER_FRAME ||
+	   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_DOUBLE_FRAME	||
+	   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
+		if(indexChanged < N_ENCODERS_STRIP_1){
+			whichStripToShow |= (1<<ENCODER1_STRIP);
+		}else{
+			whichStripToShow |= (1<<ENCODER2_STRIP);
+		}
+	}else if (FeedbackFramesBuffer[readIdx].updateFrame == DIGITAL1_CHANGE_FRAME){
+		whichStripToShow |= (1<<DIGITAL1_STRIP);
+	}else if (FeedbackFramesBuffer[readIdx].updateFrame == DIGITAL2_CHANGE_FRAME){
+		whichStripToShow |= (1<<DIGITAL2_STRIP);
+	}else if (FeedbackFramesBuffer[readIdx].updateFrame == ANALOG_CHANGE_FRAME){
+		whichStripToShow |= (1<<FB_STRIP);
+	}
+}

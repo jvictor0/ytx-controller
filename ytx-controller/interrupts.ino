@@ -13,8 +13,8 @@ void MIDIpull_Handler(void) {
   }
 }
 
-void AuxControllerReception_Handler()
-{
+
+void AuxControllerReception_Handler(){
   uint16_t rcvWord = Serial.read();
   bool isCommand = (rcvWord&0x100) ? true : false;
   uint8_t rcvByte = (uint8_t)(rcvWord&0x00FF);
