@@ -12,22 +12,6 @@
 #include "types.h"
 #include "defines.h"
 
-extern uint8_t numStripsOn;
-extern uint8_t numEncoders;
-extern uint8_t numDigitals1;
-extern uint8_t numDigitals2;
-extern uint8_t numAnalogFb;
-extern uint8_t currentBrightness;
-
-extern uint32_t failsPerSecond;
-extern uint32_t framesPerSecond;
-
-extern uint16_t indexChanged;
-extern uint8_t whichStripToShow;
-
-extern volatile uint8_t tickShow;
-extern volatile uint8_t tickShowEnd;
-
 extern volatile uint8_t receivedBytes;
 extern volatile bool rcvdInitValues;
 extern volatile bool receivingInit;

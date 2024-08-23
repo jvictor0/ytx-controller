@@ -18,8 +18,10 @@
 #include "feedback.h"
 #include "main-controller-comms.h"
 
-volatile uint8_t ReceptionBuffer[FeedbackFrame_Size+CHECKSUM_BYTES+1];
-volatile FeedbackFrameData FeedbackFramesBuffer[FEEDBACK_BUFFER_LENGTH];
+extern uint32_t millis();
+
+uint32_t antMillisShowBegin;
+uint32_t antMillisShowEnd;
 
 int main (void)
 {
@@ -32,46 +34,22 @@ int main (void)
 		delay(100);	
 	}
 	
-	
 	port_pin_set_output_level(LED_YTX_PIN, LED_0_ACTIVE);
-	
-	while(!rcvdInitValues);
+
+	feedbackBegin();	
 
 	port_pin_set_output_level(LED_YTX_PIN, LED_0_INACTIVE);
-
-	numEncoders = ReceptionBuffer[nEncoders];
-	numDigitals1 = ReceptionBuffer[nDigitals1];
-	numDigitals2 = ReceptionBuffer[nDigitals2];
-	numAnalogFb = ReceptionBuffer[nAnalog];
-	currentBrightness = ReceptionBuffer[nBrightness];
-	
-	bool rainbowOn = ReceptionBuffer[nRainbow];
-
-	feedbackBegin(rainbowOn);	
 
 	delay_ms(50);
 	
 	SendToMain(END_OF_RAINBOW);
 
-	while (1) {		
-		while(readIdx != writeIdx){ // If there is data to update
-			// Update LEDs based on 
-			feedbackDataUpdate(	FeedbackFramesBuffer[readIdx].updateFrame,
-						FeedbackFramesBuffer[readIdx].updateN,
-						//FeedbackFramesBuffer[readIdx].updateValue,
-						//FeedbackFramesBuffer[readIdx].updateMin, 
-						//FeedbackFramesBuffer[readIdx].updateMax,
-						FeedbackFramesBuffer[readIdx].updateO, 
-						FeedbackFramesBuffer[readIdx].updateState, 
-						FeedbackFramesBuffer[readIdx].updateR,
-						FeedbackFramesBuffer[readIdx].updateG,
-						FeedbackFramesBuffer[readIdx].updateB	);
-			
-			feedbackPrepareToShow();
-			
-			if(++readIdx >= FEEDBACK_BUFFER_LENGTH)	
-				readIdx = 0;
+	antMillisShowBegin = millis();
+	antMillisShowEnd = millis();
 
+	while (1) {		
+		if(feedbackDataAvailable()){
+			feedbackDataUpdate();
 			showNow = true;
 		}
 		
@@ -87,16 +65,6 @@ int main (void)
 			timeToShow = false;
 		}
 		
-		if(changeBrightnessFlag){
-			changeBrightnessFlag = false;
-			for(int s = 0; s < MAX_STRIPS; s++){
-				if(begun[s]){
-					setBrightness(s, currentBrightness);
-					pixelsShow(s);
-				}
-			}
-		}
-		
 		if(sendShowEnd){
 			SendToMain(SHOW_END);
 			sendShowEnd = false;
@@ -107,6 +75,7 @@ int main (void)
 			setAll(NP_OFF,NP_OFF,NP_OFF);
 			showAll();
 		}
+
 		if(turnAllOnFlag){
 			turnAllOnFlag = false;
 			setAll(NP_ON*2, NP_OFF, NP_OFF);
@@ -121,19 +90,21 @@ int main (void)
 			setAll(NP_ON, NP_ON, NP_ON);
 			showAll();
 		}
+
 		if(rainbowStart){
 			rainbowStart = false;
-			uint16_t totalLEDs = 8*(numEncoders + (numDigitals1 + numDigitals2)/2);
-			
-			uint16_t wait = 0;
-			if(totalLEDs < 128){
-				wait = 512/totalLEDs;
-			}else if(totalLEDs >= 128 && totalLEDs < 256){
-				wait = 1024/totalLEDs;
-			}else{
-				wait = 1400/totalLEDs;
-			}
-			rainbowAll(wait);
+			feedbackRainbow();
+		}
+
+		if(millis()-antMillisShowBegin > LED_SHOW_TICKS){
+			antMillisShowBegin = millis();
+			timeToShow = true;
+		}
+		if(millis()-antMillisShowEnd > SHOW_END_REFRESH_TICKS){
+			antMillisShowEnd = millis();
+
+			if(!receivingFeedbackData && !receivingBank && !timeToShow)
+				sendShowEnd = true;
 		}
 	}
 }

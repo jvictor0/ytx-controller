@@ -20,24 +20,25 @@
 
 #include "main-controller-comms.h"
 
-extern uint8_t ReceptionBuffer[FeedbackFrame_Size+CHECKSUM_BYTES+1];
+
 extern FeedbackFrameData FeedbackFramesBuffer[FEEDBACK_BUFFER_LENGTH];
+
+
+volatile uint32_t millisTicks = 0;
 
 void SysTick_Handler(void)
 {
-	if(rcvdInitValues){
-		if( --tickShow == 0){
-			//if(!receivingFeedbackData && !receivingBank) SendToMaster(SHOW_END);
-			tickShow = LED_SHOW_TICKS;
-			timeToShow = true;
-		}
-		if(--tickShowEnd == 0){
-			if(!receivingFeedbackData && !receivingBank && !timeToShow)
-			sendShowEnd = true;
-			tickShowEnd = SHOW_END_REFRESH_TICKS;
-		}
-	}	
+	millisTicks++;	
 }
+
+uint32_t millis(){
+	return millisTicks;
+}
+
+uint32_t failsPerSecond = 0;
+uint32_t framesPerSecond = 0;
+
+volatile uint8_t ReceptionBuffer[FeedbackFrame_Size+CHECKSUM_BYTES+1];
 
 void MainControllerReception_Handler(void){
 	if(SERCOM2->USART.INTFLAG.bit.RXC){					// if RX interrupt flag is set
@@ -61,9 +62,6 @@ void MainControllerReception_Handler(void){
 				turnAllOnFlag = true;
 			}else if (rcvByte == CMD_RAINBOW_START){		// START RAINBOW
 				rainbowStart = true;
-			}else if (rcvByte == CHANGE_BRIGHTNESS && !receivingBrightness){
-				// CHANGE BRIGHTNESS COMMAND
-				receivingBrightness = true;
 			}else if (rcvByte == BURST_INIT && !receivingBank){
 				// SerialUSB.println("BANK INIT");
 				// BANK INIT COMMAND
@@ -94,10 +92,6 @@ void MainControllerReception_Handler(void){
 					// checksum to encoded frame, from 2nd byte, and length is total length without length and checksum bytes (msb and lsb)
 					uint16_t checkSumCalc = (2019 + checkSum((const uint8_t *)ReceptionBuffer, FeedbackFrame_Size))&0x00FF;
 					uint16_t checkSumRecv = ReceptionBuffer[receivedBytes-CHECKSUM_BYTES];
-
-
-					// SerialUSB.println("END_OF_FRAME_BYTE");
-					// SerialUSB.print("Checksum calc: ");SerialUSB.print(checkSumCalc);SerialUSB.print(" Checksum rcv: ");SerialUSB.println(checkSumRecv);
 
 					if(checkSumCalc==checkSumRecv){
 						SendToMain(ACK_CMD);
@@ -145,11 +139,6 @@ void MainControllerReception_Handler(void){
 
 						SendToMain(ACK_CMD);
 					}
-				}else if (receivingBrightness){
-					// CHANGE BRIGHTNESS COMMAND - BYTE 2 - NEW BRIGHTNESS
-					receivingBrightness = false;
-					currentBrightness = rcvByte;
-					changeBrightnessFlag = true;
 				}
 			}
 		//not a command byte -> write to reception buffer

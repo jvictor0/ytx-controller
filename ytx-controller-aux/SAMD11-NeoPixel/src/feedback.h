@@ -9,9 +9,10 @@
 #ifndef FEEDBACK_H_
 #define FEEDBACK_H_
 
-void feedbackBegin(bool rainbowOn);
+void feedbackBegin();
+void feedbackRainbow();
 void feedbackShow();
-void feedbackPrepareToShow();
-void feedbackDataUpdate(uint8_t nStrip, uint8_t nToChange, bool vertical, uint16_t newState, uint8_t R, uint8_t G, uint8_t B);
+bool feedbackDataAvailable();
+void feedbackDataUpdate();
 
 #endif /* FEEDBACK_H_ */
