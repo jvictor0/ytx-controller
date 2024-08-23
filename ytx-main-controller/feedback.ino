@@ -132,7 +132,7 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
 
 void FeedbackClass::InitFb(){
   // POWER MANAGEMENT - READ FROM POWER PIN, IF POWER SUPPLY IS PRESENT AND SET LED BRIGHTNESS ACCORDINGLY
-  // feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
+  feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
   delay(10);
     
   if(digitalRead(externalVoltagePin)){
@@ -1046,12 +1046,9 @@ void FeedbackClass::SendFeedbackData(){
 void FeedbackClass::SendCommand(uint8_t cmd){
 //  SERIALPRINT(F("Command sent: "));
 //  SERIALPRINTLNF(cmd, HEX);
-  Serial.write(cmd);
-  Serial.flush();
+  Serial.write9bit(cmd);
 }
 void FeedbackClass::SendResetToBootloader(){
-  
-  Serial.flush();
 }
 
 void * FeedbackClass::GetEncoderFBPtr(){

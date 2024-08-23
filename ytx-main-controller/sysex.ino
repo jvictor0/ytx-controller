@@ -231,7 +231,6 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
           if(testSysex){
             SERIALPRINTLN(F("REQUEST: BOOTLOADER MODE"));
           }
-          feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
           SelfReset(RESET_TO_BOOTLOADER);
         }else if(message[ytxIOStructure::REQUEST_ID] == ytxIOSpecialRequests::fwVersion){
           if(testSysex){
@@ -286,10 +285,6 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
           if(testSysex){
             SERIALPRINTLN(F("REQUEST: REBOOT"));
           } 
-           
-          feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
-          // delay(5);
-
           SendAck();
           SelfReset(RESET_TO_CONTROLLER);
         }else if(message[ytxIOStructure::REQUEST_ID] == ytxIOSpecialRequests::enableTesting){                

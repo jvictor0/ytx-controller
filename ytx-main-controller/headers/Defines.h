@@ -43,14 +43,14 @@ SOFTWARE.
 
 // #define DISABLE_ENCODER_BANKS
 // #define DISABLE_DIGITAL_BANKS
-#define DISABLE_ANALOG_BANKS
+// #define DISABLE_ANALOG_BANKS
 
 #if !defined(INIT_CONFIG)
 #define USE_KWHAT_COUNT_BUFFER
 #endif
 
 #define FW_VERSION_MAJOR      0
-#define FW_VERSION_MINOR      23
+#define FW_VERSION_MINOR      24
 
 #define HW_VERSION_MAJOR      1
 #define HW_VERSION_MINOR      0

@@ -280,6 +280,9 @@ void SelfReset(bool toBootloader) {
   if(cdcEnabled){
     SERIALPRINTLN(F("Rebooting..."));
   }
+
+  feedbackHw.SendCommand(CMD_ALL_LEDS_OFF);
+  delay(5);
   
   if(toBootloader){
     BOOTLOADER_ENABLE_DATA = ENABLE_MAGIC_TRICK;
