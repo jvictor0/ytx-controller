@@ -28,7 +28,7 @@
 
 extern uint32_t EndPoints[];
 
-#if defined(KILOMUX)
+#if defined(KILOMUX_APP)
 	extern bool cdcEnabled;
 	extern uint32_t cdcMagicData;
 #else
@@ -116,7 +116,7 @@ PluggableUSB_& PluggableUSB()
 
 PluggableUSB_::PluggableUSB_()
 {
-   	#if defined(KILOMUX)
+   	#if defined(KILOMUX_APP)
 		if (PM->RCAUSE.bit.POR){
 	   		// On power-on initialize, always cdc off
 	   		cdcEnabled = false;

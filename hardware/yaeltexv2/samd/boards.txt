@@ -49,7 +49,7 @@ kilomuxv2-main.menu.linker.kilomuxv2-main-app=Application
 kilomuxv2-main.menu.linker.kilomuxv2-main-app.build.name=app
 kilomuxv2-main.menu.linker.kilomuxv2-main-app.upload.maximum_size=229376
 kilomuxv2-main.menu.linker.kilomuxv2-main-app.build.ldscript=linker_scripts/gcc/flash_app_with_bootloader.ld
-kilomuxv2-main.menu.linker.kilomuxv2-main-app.build.extra_flags=-DKILOMUX -D__SAMD21G18A__ {build.usb_flags}
+kilomuxv2-main.menu.linker.kilomuxv2-main-app.build.extra_flags=-DKILOMUX_APP -D__SAMD21G18A__ {build.usb_flags}
 
 ## Kilomux V2 MAIN (Bootloader)
 ## --------------------------

@@ -194,7 +194,12 @@ extern SERCOM sercom3;
 extern SERCOM sercom4;
 extern SERCOM sercom5;
 
-extern customUart Serial;
+#if defined(KILOMUX_APP)
+  extern customUart Serial;
+#else
+  extern Uart Serial;
+#endif
+  
 extern Uart Serial1;
 
 #endif
