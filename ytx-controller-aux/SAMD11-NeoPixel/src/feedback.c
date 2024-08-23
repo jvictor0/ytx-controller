@@ -1,9 +1,35 @@
 /*
- * UpdateFeedback.c
- *
- * Created: 22/8/2024 17:22:24
- *  Author: Ingenieria
- */ 
+
+Author/s: Franco Grassano - Franco Zaccra
+
+MIT License
+
+Copyright (c) 2024 - Yaeltex
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+*/
+
+//TODO : add encoders orientation data on initial frame, add checksum and error control(unify with NEW_FRAME_BYTE/END_OF_FRAME_BYTE mechanism)
+//TODO : reduce frames data to minimal bitstruct form(implement encoder rings on 13bits?)
+//TODO : implement reduce frame to digitals?
+//TODO : unify digital1 and digital2 frames?
 
 #include <NeoPixels.h>
 #include "variables.h"
