@@ -231,41 +231,50 @@ void AnalogInputs::IrqHandler(){
 
   switch(samplerState){
     case CONFIGURE_CONVERSION:{
-        uint8_t selectionPin[] = {_S0,_S1,_S2,_S3};
-        for(int i=0;i<4;i++){
-          bool state = MuxMapping[extChannelIndex]&(1<<i);
-          digitalWrite(selectionPin[i],state);
+        const uint8_t selectionPin[] = {_S0,_S1,_S2,_S3};
+
+        for(int i=0;i<sizeof(selectionPin);i++){
+          if(bitRead(MuxMapping[extChannelIndex], i)){
+            PORT->Group[g_APinDescription[selectionPin[i]].ulPort].OUTSET.reg = (1ul << g_APinDescription[selectionPin[i]].ulPin);
+          }else{
+            PORT->Group[g_APinDescription[selectionPin[i]].ulPort].OUTCLR.reg = (1ul << g_APinDescription[selectionPin[i]].ulPin);
+          }
         }
+
         samplerState = ACQUIRE_CONVERSION;
+        samplerInputIndex = intChannelIndex*16 + extChannelIndex;
     }break;
 
     default:
     case ACQUIRE_CONVERSION:{
       // On conversion done
       aHwData[samplerInputIndex].analogRawValue = ADC->RESULT.reg;
-
-      if(samplerInputIndex==nAnalog-1){
+      
+      if(samplerInputIndex == nAnalog-1){
         intChannelIndex = 0;
         extChannelIndex = 0;
         computeSampling = true;
         samplerState = CONFIGURE_CONVERSION;
         return;
       }else{
-        if(++intChannelIndex>=NUM_MUX){
+        intChannelIndex++;
+        samplerInputIndex = intChannelIndex*16 + extChannelIndex;
+
+        if(samplerInputIndex >= nAnalog){
           intChannelIndex=0;
 
-          if(++extChannelIndex>=16){
+          extChannelIndex++;
+          if(extChannelIndex>=16){
             extChannelIndex = 0;
           }
           samplerState = CONFIGURE_CONVERSION;
         }
       }
+
     }break;
   }
 
   if(samplerState==ACQUIRE_CONVERSION){  
-    samplerInputIndex = intChannelIndex*16 + extChannelIndex;
-
     uint8_t internalChannels[NUM_MUX] = {A4,A3,A1,A2};
 
     int ulPin = internalChannels[intChannelIndex];
