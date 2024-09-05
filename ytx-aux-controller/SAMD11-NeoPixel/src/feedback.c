@@ -56,8 +56,6 @@ void feedbackBegin(){
 	numEncoders = ReceptionBuffer[nEncoders];
 	numDigitals1 = ReceptionBuffer[nDigitals1];
 	numDigitals2 = ReceptionBuffer[nDigitals2];
-	numAnalogFb = ReceptionBuffer[nAnalog];
-	currentBrightness = ReceptionBuffer[nBrightness];
 	
 	bool rainbowOn = ReceptionBuffer[nRainbow];
 
@@ -75,11 +73,9 @@ void feedbackBegin(){
 	if(numDigitals2){
 		pixelsBegin(DIGITAL2_STRIP, numDigitals2, DIG2_STRIP_PIN, NEO_GRB + NEO_KHZ800);
 	}
-	if(numAnalogFb){
-		pixelsBegin(FB_STRIP, numAnalogFb, FB_STRIP_PIN, NEO_GRB + NEO_KHZ800);
-	}
 	
-	for(int s = 0; s < MAX_STRIPS; s++){
+	
+	for(int s = 0; s < LED_STRIP_COUNT; s++){
 		if(begun[s]){
 			setBrightness(s, 255);
 		}
@@ -346,8 +342,6 @@ void feedbackDataUpdate()
 			whichStripToShow |= (1<<DIGITAL1_STRIP);
 		}else if (FeedbackFramesBuffer[readIdx].updateFrame == DIGITAL2_CHANGE_FRAME){
 			whichStripToShow |= (1<<DIGITAL2_STRIP);
-		}else if (FeedbackFramesBuffer[readIdx].updateFrame == ANALOG_CHANGE_FRAME){
-			whichStripToShow |= (1<<FB_STRIP);
 		}
 
 		if(++readIdx >= FEEDBACK_BUFFER_LENGTH)	
@@ -356,20 +350,11 @@ void feedbackDataUpdate()
 }
 
 void feedbackShow(){
-	if(whichStripToShow >> ENCODER1_STRIP){
-		pixelsShow(ENCODER1_STRIP);
+	for (int i = 0; i < LED_STRIP_COUNT; i++){
+		if(whichStripToShow&(1<<i)){
+			pixelsShow(i);
+		}
 	}
-	if(whichStripToShow >> ENCODER2_STRIP){
-		pixelsShow(ENCODER2_STRIP);
-	}
-	if(whichStripToShow >> DIGITAL1_STRIP){
-		pixelsShow(DIGITAL1_STRIP);
-	}
-	if(whichStripToShow >> DIGITAL2_STRIP){
-		pixelsShow(DIGITAL2_STRIP);
-	}
-	if(whichStripToShow >> FB_STRIP){
-		pixelsShow(FB_STRIP);
-	}
+
 	whichStripToShow = 0;
 }
