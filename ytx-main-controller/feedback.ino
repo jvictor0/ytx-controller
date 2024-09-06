@@ -151,12 +151,10 @@ void FeedbackClass::InitFb(){
 
 void FeedbackClass::InitAuxController(bool resetHappened){
   // SEND INITIAL VALUES AND LED BRIGHTNESS TO SAMD11
-  byte initFrameArray[] = { nEncoders,
-                            nIndependent,   // CHANGE TO AMOUNT OF ANALOG WITH FEEDBACK
-                            amountOfDigitalInConfig[0],
-                            amountOfDigitalInConfig[1],
-                            currentBrightness,
-                            resetHappened ? 0 : config->board.rainbowOn};
+  bool makeRainbowAnimation = resetHappened ? 0 : config->board.rainbowOn;
+  byte initFrameArray[] = { nEncoders, amountOfDigitalInConfig[0], amountOfDigitalInConfig[1]};
+                            // currentBrightness,
+                            // resetHappened ? 0 : config->board.rainbowOn};
 
   Serial.write9bit(INIT_VALUES);
 
@@ -165,6 +163,26 @@ void FeedbackClass::InitAuxController(bool resetHappened){
   }
 
   Serial.write9bit(END_OF_FRAME_BYTE);
+
+  waitingForAck = true;
+  while(waitingForAck);
+
+  if(makeRainbowAnimation){
+    Serial.write9bit(CHANGE_BRIGHTNESS);
+    Serial.write(currentBrightness);
+    waitingForAck = true;
+    while(waitingForAck);
+
+    Serial.write9bit(CMD_RAINBOW_START);
+    // Wait for rainbow animation to end
+    waitingForAck = true; 
+    while(waitingForRainbow);
+
+    Serial.write9bit(CHANGE_BRIGHTNESS);
+    Serial.write(255);
+    waitingForAck = true;
+    while(waitingForAck);
+  }
 }
 
 void FeedbackClass::Update() {

@@ -68,9 +68,7 @@ int main (void)
 
 	port_pin_set_output_level(LED_YTX_PIN, LED_0_INACTIVE);
 
-	delay_ms(50);
-	
-	SendToMain(END_OF_RAINBOW);
+	SendToMain(ACK_CMD);
 
 	antMillisShowBegin = millis();
 	antMillisShowEnd = millis();
@@ -122,12 +120,20 @@ int main (void)
 		if(rainbowStart){
 			rainbowStart = false;
 			feedbackRainbow();
+			SendToMain(END_OF_RAINBOW);
+		}
+
+		if(changeBrightnessFlag){
+			changeBrightnessFlag = false;
+			feedbackSetBrightness(currentBrightness);
+			SendToMain(ACK_CMD);
 		}
 
 		if(millis()-antMillisShowBegin > LED_SHOW_TICKS){
 			antMillisShowBegin = millis();
 			timeToShow = true;
 		}
+
 		if(millis()-antMillisShowEnd > SHOW_END_REFRESH_TICKS){
 			antMillisShowEnd = millis();
 

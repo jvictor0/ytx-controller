@@ -34,5 +34,6 @@ void feedbackRainbow();
 void feedbackShow();
 bool feedbackDataAvailable();
 void feedbackDataUpdate();
+void feedbackSetBrightness(uint8_t brightness);
 
 #endif /* FEEDBACK_H_ */

@@ -348,11 +348,6 @@ void setup() {
     // Initialize brigthness and power configuration
     feedbackHw.InitFb();
 
-    // Wait for rainbow animation to end 
-    while(waitingForRainbow){
-      delay(1);
-    }
-
     // Set all initial values for feedback to show
     feedbackHw.SetBankChangeFeedback(FB_BANK_CHANGED);
 

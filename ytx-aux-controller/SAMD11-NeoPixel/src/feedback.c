@@ -43,8 +43,7 @@ uint8_t numStripsOn = 0;
 uint8_t numEncoders = 0;
 uint8_t numDigitals1 = 0;
 uint8_t numDigitals2 = 0;
-uint8_t numAnalogFb = 0;
-uint8_t currentBrightness = 0;
+
 uint8_t whichStripToShow = 0;
 
 uint16_t indexChanged = 0;
@@ -56,8 +55,6 @@ void feedbackBegin(){
 	numEncoders = ReceptionBuffer[nEncoders];
 	numDigitals1 = ReceptionBuffer[nDigitals1];
 	numDigitals2 = ReceptionBuffer[nDigitals2];
-	
-	bool rainbowOn = ReceptionBuffer[nRainbow];
 
 		if(numEncoders){
 		if(numEncoders>16){
@@ -74,35 +71,44 @@ void feedbackBegin(){
 		pixelsBegin(DIGITAL2_STRIP, numDigitals2, DIG2_STRIP_PIN, NEO_GRB + NEO_KHZ800);
 	}
 	
-	
-	for(int s = 0; s < LED_STRIP_COUNT; s++){
-		if(begun[s]){
-			setBrightness(s, 255);
-		}
-	}
 	setAll(NP_OFF,NP_OFF,NP_OFF);
 	showAll();
+}
 
-	if(rainbowOn){
-		feedbackRainbow();
+void feedbackShow(){
+	for (int i = 0; i < LED_STRIP_COUNT; i++){
+		if(whichStripToShow&(1<<i)){
+			pixelsShow(i);
+		}
 	}
 
-	turnAllOffFlag = true;
+	whichStripToShow = 0;
+}
+
+void feedbackSetBrightness(uint8_t brightness){
+	for (int i=0; i < LED_STRIP_COUNT; i++){
+		setBrightness(i, brightness);
+	}
 }
 
 void feedbackRainbow(){
 	uint16_t totalLEDs = 8*(numEncoders + (numDigitals1 + numDigitals2)/2);
-	
-	uint16_t wait = 0;
-	if(totalLEDs < 128){
-		wait = 512/totalLEDs;
-	}else if(totalLEDs >= 128 && totalLEDs < 256){
-		wait = 1024/totalLEDs;
-	}else{
-		wait = 1400/totalLEDs;
+
+	if(totalLEDs>0){	
+		uint16_t wait = 0;
+		if(totalLEDs < 128){
+			wait = 512/totalLEDs;
+		}else if(totalLEDs >= 128 && totalLEDs < 256){
+			wait = 1024/totalLEDs;
+		}else{
+			wait = 1400/totalLEDs;
+		}
+		rainbowAll(wait);
 	}
-	rainbowAll(wait);
 }
+
+
+
 
 bool feedbackDataAvailable(){
 	return (readIdx != writeIdx);
@@ -347,14 +353,4 @@ void feedbackDataUpdate()
 		if(++readIdx >= FEEDBACK_BUFFER_LENGTH)	
 			readIdx = 0;
 	}
-}
-
-void feedbackShow(){
-	for (int i = 0; i < LED_STRIP_COUNT; i++){
-		if(whichStripToShow&(1<<i)){
-			pixelsShow(i);
-		}
-	}
-
-	whichStripToShow = 0;
 }

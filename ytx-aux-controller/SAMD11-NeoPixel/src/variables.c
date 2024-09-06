@@ -37,6 +37,7 @@ volatile bool updateBank = false;
 
 volatile uint8_t readIdx = 0;
 volatile uint8_t writeIdx = 0;
+volatile uint8_t currentBrightness = 255;
 volatile bool turnAllOffFlag = false;
 volatile bool turnAllOnFlag = false;
 volatile bool rainbowStart = false;

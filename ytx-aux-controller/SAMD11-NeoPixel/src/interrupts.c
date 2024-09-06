@@ -76,6 +76,9 @@ void MainControllerReception_Handler(void){
 				turnAllOnFlag = true;
 			}else if (rcvByte == CMD_RAINBOW_START){		// START RAINBOW
 				rainbowStart = true;
+			}else if (rcvByte == CHANGE_BRIGHTNESS && !receivingBrightness)	{
+				// CHANGE BRIGHTNESS COMMAND
+				receivingBrightness = true;
 			}else if (rcvByte == BURST_INIT && !receivingBank){
 				// SerialUSB.println("BANK INIT");
 				// BANK INIT COMMAND
@@ -108,8 +111,6 @@ void MainControllerReception_Handler(void){
 					uint16_t checkSumRecv = ReceptionBuffer[receivedBytes-CHECKSUM_BYTES];
 
 					if(checkSumCalc==checkSumRecv){
-						SendToMain(ACK_CMD);
-					
 						uint8_t *messageBody = (uint8_t *)&ReceptionBuffer[0];
 					
 						FeedbackFramesBuffer[writeIdx].updateFrame	= messageBody[FeedbackFrame_Type];
@@ -139,6 +140,8 @@ void MainControllerReception_Handler(void){
 					
 						if(!receivingBank) 
 							receivingFeedbackData = false;
+						
+						SendToMain(ACK_CMD);
 					}else{
 						failsPerSecond++;
 						//SerialUSB.println("Checksum error");
@@ -150,8 +153,6 @@ void MainControllerReception_Handler(void){
 						receivedBytes = 0;
 						rcvdInitValues = true;
 						receivingInit = false;
-
-						SendToMain(ACK_CMD);
 					}
 				}
 			}
@@ -165,6 +166,13 @@ void MainControllerReception_Handler(void){
 			ReceptionBuffer[receivedBytes] = rcvByte;	
 
 			receivedBytes++;
+
+			if (receivingBrightness){
+				// CHANGE BRIGHTNESS COMMAND - BYTE 2 - NEW BRIGHTNESS
+				receivingBrightness = false;
+				currentBrightness = rcvByte;
+				changeBrightnessFlag = true;
+			}
 		}	
 	}
 }

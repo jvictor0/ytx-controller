@@ -94,7 +94,7 @@ enum LedStrips{
 };
 
 enum configFrame{
-	nEncoders, nAnalog, nDigitals1, nDigitals2, nBrightness, nRainbow, CONFIG_FRAME_SIZE
+	nEncoders, nDigitals1, nDigitals2, CONFIG_FRAME_SIZE
 };
 
 enum FeedbackFrame{
