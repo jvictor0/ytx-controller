@@ -43,6 +43,7 @@ SOFTWARE.
 #define ADC_MAX_COUNT                       4095
 #define ADC_MIN_BUS_COUNT                   18    //minimum opamp voltage swing 15mV --> 0.015v*ADC_MAX_COUNT/3.3v
 #define ADC_MAX_BUS_COUNT                   4076  //maximum opamp voltage swing 3.3v-15mV --> 3.285v*ADC_MAX_COUNT/3.3v
+#define EXTERNAL_MUX_CHANNELS               16
 
 class AnalogInputs{
 
@@ -77,6 +78,7 @@ private:
   void SetPivotValues(uint8_t, uint8_t, uint16_t);
   bool IsNoise(uint16_t, uint16_t, uint16_t , byte, bool);
   void FastADCsetup();
+  void StartConversion();
   void SelAnalog(uint32_t);
   
   int16_t MuxAnalogRead(uint8_t , uint8_t);

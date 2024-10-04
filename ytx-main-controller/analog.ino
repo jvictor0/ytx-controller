@@ -170,11 +170,6 @@ void AnalogInputs::Init(byte maxBanks, byte numberOfAnalog, SPIAdressableBUS* sp
       int spiInput = i - 32;
       aHwData[i].analogRawValue = spiAnalogExpander->analogRead(spiInput)&0x0FFF;
     }
-    else{
-      int mux = i < 16 ? MUX_A :  (i < 32 ? MUX_B : ( i < 48 ? MUX_C : MUX_D)) ;    // Select correct multiplexer for this input
-      int muxChannel = i % NUM_MUX_CHANNELS;        
-      aHwData[i].analogRawValue    = MuxAnalogRead(mux, muxChannel);
-    }
 
     aHwData[i].analogRawValuePrev  = aHwData[i].analogRawValue;
     aHwData[i].analogDirection     = ANALOG_INCREASING;
@@ -208,84 +203,75 @@ void AnalogInputs::Init(byte maxBanks, byte numberOfAnalog, SPIAdressableBUS* sp
 
   computeSampling = false;
 
-  ADC->INTENSET.reg = ADC_INTENSET_RESRDY;
-
-  NVIC_SetPriority(ADC_IRQn, 3); //set priority of the interrupt - higher number -> lower priority
-  NVIC_EnableIRQ(ADC_IRQn); // enable ADC interrupts
-
-  // Start conversion
-  ADC->SWTRIG.bit.START = 1;
+  StartConversion();
 }
 
 
 void AnalogInputs::IrqHandler(){
-  typedef enum FSM_Analog_Sampler {
-    CONFIGURE_CONVERSION,
-    ACQUIRE_CONVERSION,
-  };
-
-  static uint8_t extChannelIndex = 0; 
+  static uint8_t extChannelIndex = 0;
   static uint8_t intChannelIndex = 0;
   static uint8_t samplerInputIndex = 0;
-  static uint8_t samplerState = CONFIGURE_CONVERSION;
+  static uint8_t sampledChannelsCount = 0;
 
-  switch(samplerState){
-    case CONFIGURE_CONVERSION:{
-        const uint8_t selectionPin[] = {_S0,_S1,_S2,_S3};
+  bool configureExternalMux = false;
 
-        for(int i=0;i<sizeof(selectionPin);i++){
-          if(bitRead(MuxMapping[extChannelIndex], i)){
-            PORT->Group[g_APinDescription[selectionPin[i]].ulPort].OUTSET.reg = (1ul << g_APinDescription[selectionPin[i]].ulPin);
-          }else{
-            PORT->Group[g_APinDescription[selectionPin[i]].ulPort].OUTCLR.reg = (1ul << g_APinDescription[selectionPin[i]].ulPin);
-          }
-        }
+  ADC->INTFLAG.reg = ADC_INTFLAG_RESRDY; //clear INTFLAG
 
-        samplerState = ACQUIRE_CONVERSION;
-        samplerInputIndex = intChannelIndex*16 + extChannelIndex;
-    }break;
+  aHwData[samplerInputIndex].analogRawValue = ADC->RESULT.reg;
 
-    default:
-    case ACQUIRE_CONVERSION:{
-      // On conversion done
-      aHwData[samplerInputIndex].analogRawValue = ADC->RESULT.reg;
-      
-      if(samplerInputIndex == nAnalog-1){
-        intChannelIndex = 0;
+  if(++sampledChannelsCount >= nAnalog){
+    sampledChannelsCount = 0;
+    intChannelIndex = 0;
+    extChannelIndex = 0;
+    computeSampling = true;
+    configureExternalMux = true;
+  }
+
+  if(!computeSampling){
+    // Calculate next index
+    intChannelIndex++;
+
+    samplerInputIndex = intChannelIndex*EXTERNAL_MUX_CHANNELS + extChannelIndex;
+
+    // Index out of range -> reset internal channel
+    if(samplerInputIndex >= nAnalog){ //
+      intChannelIndex=0;
+
+      extChannelIndex++;
+      if(extChannelIndex>=EXTERNAL_MUX_CHANNELS){
         extChannelIndex = 0;
-        computeSampling = true;
-        samplerState = CONFIGURE_CONVERSION;
-        return;
-      }else{
-        intChannelIndex++;
-        samplerInputIndex = intChannelIndex*16 + extChannelIndex;
-
-        if(samplerInputIndex >= nAnalog){
-          intChannelIndex=0;
-
-          extChannelIndex++;
-          if(extChannelIndex>=16){
-            extChannelIndex = 0;
-          }
-          samplerState = CONFIGURE_CONVERSION;
-        }
       }
-
-    }break;
+      configureExternalMux = true;
+    }
   }
 
-  if(samplerState==ACQUIRE_CONVERSION){  
-    uint8_t internalChannels[NUM_MUX] = {A4,A3,A1,A2};
+  if(configureExternalMux){
+    const uint8_t selectionPin[] = {_S0,_S1,_S2,_S3};
 
-    int ulPin = internalChannels[intChannelIndex];
-    // Select internal channel on ulPin
-    ADC->INPUTCTRL.bit.MUXPOS = g_APinDescription[ulPin].ulADCChannelNumber; 
-    // Wait for synchronization
-    while( ADC->STATUS.bit.SYNCBUSY == 1 ); 
+    for(int i=0;i<sizeof(selectionPin);i++){
+      if(bitRead(MuxMapping[extChannelIndex], i)){
+        PORT->Group[g_APinDescription[selectionPin[i]].ulPort].OUTSET.reg = (1ul << g_APinDescription[selectionPin[i]].ulPin);
+      }else{
+        PORT->Group[g_APinDescription[selectionPin[i]].ulPort].OUTCLR.reg = (1ul << g_APinDescription[selectionPin[i]].ulPin);
+      }
+    }
   }
 
-  // Start conversion
-  ADC->SWTRIG.bit.START = 1;    
+  uint8_t internalChannels[NUM_MUX] = {A4,A3,A1,A2};
+
+  int ulPin = internalChannels[intChannelIndex];
+  // Select internal channel on ulPin
+  ADC->INPUTCTRL.bit.MUXPOS = g_APinDescription[ulPin].ulADCChannelNumber; 
+  // Wait for synchronization
+  while( ADC->STATUS.bit.SYNCBUSY == 1 ); 
+
+  //Ajust
+  samplerInputIndex = intChannelIndex*EXTERNAL_MUX_CHANNELS + extChannelIndex;
+
+  if(!computeSampling){
+    // Start conversion
+    ADC->SWTRIG.bit.START = 1;
+  }
 }
 
 
@@ -750,20 +736,13 @@ void AnalogInputs::Read(){
       }
     }
 
-    if(priorityMode){
-      if(!(++initMuxRead % analogMuxesWithElements)){
-        initMuxRead = 0;
-      }
-      lastMuxRead = initMuxRead+1;
-    }else{
-      initMuxRead = 0;
-      lastMuxRead = analogMuxesWithElements;
-    }
-
-    // Start conversion
-    ADC->SWTRIG.bit.START = 1; 
-    // SerialUSB.print("R: ");SerialUSB.println(micros()-antMillisAnalogCompute);
+    StartConversion();
   }
+}
+
+void AnalogInputs::StartConversion(){
+  // Start conversion
+  ADC->SWTRIG.bit.START = 1;
 }
 
 void AnalogInputs::SendMessage(uint8_t aInput){
@@ -1245,13 +1224,18 @@ uint32_t AnalogInputs::AnalogReadFast(byte ADCpin) {
 void AnalogInputs::FastADCsetup() {
   ADC->CTRLA.bit.ENABLE = 0;                     // Disable ADC
   while( ADC->STATUS.bit.SYNCBUSY == 1 );        // Wait for synchronization
-  ADC->CTRLB.reg = ADC_CTRLB_PRESCALER_DIV128 |   // Divide Clock by 64.
+  ADC->CTRLB.reg = ADC_CTRLB_PRESCALER_DIV256 |   // Divide Clock by 64.
                    ADC_CTRLB_RESSEL_12BIT;       // Result on 16 bits
   ADC->AVGCTRL.reg = ADC_AVGCTRL_SAMPLENUM_1 |   // 1 sample
                      ADC_AVGCTRL_ADJRES(0x00ul); // Adjusting result by 0
   ADC->SAMPCTRL.reg = 0x00;                      // Sampling Time Length = 0
   ADC->CTRLA.bit.ENABLE = 1;                     // Enable ADC
   while( ADC->STATUS.bit.SYNCBUSY == 1 );        // Wait for synchronization
+
+  ADC->INTENSET.reg = ADC_INTENSET_RESRDY;
+
+  NVIC_SetPriority(ADC_IRQn, 3); //set priority of the interrupt - higher number -> lower priority
+  NVIC_EnableIRQ(ADC_IRQn); // enable ADC interrupts
 }
 
 

@@ -1,8 +1,5 @@
 void ADC_Handler(void) {
-  if (ADC->INTFLAG.bit.RESRDY) {
-    ADC->INTFLAG.bit.RESRDY = 1; // Limpia la bandera de interrupción
-    analogHw.IrqHandler();
-  }
+  analogHw.IrqHandler();
 }
 
 void MIDIpull_Handler(void) {
