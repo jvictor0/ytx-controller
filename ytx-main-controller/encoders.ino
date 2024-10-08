@@ -243,20 +243,22 @@ void EncoderInputs::InitRotaryModule(SPIAdressableBUS *bus, uint8_t moduleNo){
   switch(moduleType){
     case EncoderModuleTypes::E41H:
     case EncoderModuleTypes::E41V:{
-        encodersModule[moduleNo] = (void*)(new SPIEndlessPot);
-        ((SPIEndlessPot*)(encodersModule[moduleNo]))->begin(bus, address, nextAddress);
+        SPIEndlessPot *newModule = new SPIEndlessPot;
+        newModule->begin(bus, address, nextAddress);
 
         SPIEndlessPotParameters parameters;
         parameters.sampleInterval = 1000;
         parameters.hysteresis = 50;
         parameters.expFilter = 0.25;
         //SET CONFIG MODULE DATA 
-        ((SPIEndlessPot*)(encodersModule[moduleNo]))->configure(&parameters);
+        newModule->configure(&parameters);
+        encodersModule[moduleNo] = (void*)newModule;
       } break;
     case EncoderModuleTypes::E41H_D:
     case EncoderModuleTypes::E41V_D:{
-        encodersModule[moduleNo] = (void*)(new SPIGPIOExpander);
-        ((SPIGPIOExpander*)(encodersModule[moduleNo]))->begin(bus, address, nextAddress);
+        SPIGPIOExpander *newModule = new SPIGPIOExpander;
+        newModule->begin(bus, address, nextAddress);
+        encodersModule[moduleNo] = (void*)newModule;
 
         ReadModule(moduleNo);
         for (int e = 0; e < 4; e++){
