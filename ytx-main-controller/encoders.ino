@@ -226,20 +226,15 @@ void EncoderInputs::InitRotaryModule(SPIAdressableBUS *bus, uint8_t moduleNo){
     if(moduleType==EncoderModuleTypes::E41H || moduleType==EncoderModuleTypes::E41V){
       address = lastYTXmodule % 16;
       lastYTXmodule++;
-
-      if(nextModuleType==moduleType)
-        nextAddress = lastYTXmodule % 16;
-      else
-        nextAddress = lastMCPmodule % 8; 
     }else{
       address = lastMCPmodule % 8;
       lastMCPmodule++;
-
-      if(nextModuleType==moduleType)
-        nextAddress = lastMCPmodule % 8;
-      else
-        nextAddress = lastYTXmodule % 16;
     }
+
+    if(nextModuleType==EncoderModuleTypes::E41H || nextModuleType==EncoderModuleTypes::E41V)
+      nextAddress = lastYTXmodule % 16;
+    else
+      nextAddress = lastMCPmodule % 8;
   }
 
   encMData[moduleNo].state = 0;
