@@ -800,22 +800,24 @@ void UpdateMidiBuffer(byte fbType, byte msgType, byte channel, uint16_t param, u
               midiMsgBuf7[idx].value = value;
               midiMsgBuf7[idx].banksToUpdate = midiMsgBuf7[idx].banksPresent;
 
+              bool thereAreShiftedEncoders = false;
               // If encoder is shifted to a different bank, config won't match, with this, we keep it in the buffer
-              if(fbType == FB_ENCODER && encoderHw.EncoderShiftedBufferMatch(idx)){   
-                // now check if in this bank we need to update feedback
-              }else{  
-                if((midiMsgBuf7[idx].banksToUpdate >> currentBank) & 0x1){
-                  // Reset bank flag
+             if(fbType == FB_ENCODER) thereAreShiftedEncoders = encoderHw.EncoderShiftedBufferMatch(idx);
+
+              if((midiMsgBuf7[idx].banksToUpdate >> currentBank) & 0x1){
+                // Reset bank flag
+                if(thereAreShiftedEncoders == false){   // if there aren't shifted encoders, currentBank is updated
                   midiMsgBuf7[idx].banksToUpdate &= ~(1 << currentBank);
-                  // SERIALPRINTLN(F("Message in 7 bit buffer"));
-                  SearchMsgInConfigAndUpdate( midiMsgBuf7[idx].type,
-                                              midiMsgBuf7[idx].message,
-                                              channel,                      // Send channel, and not channel in midi rx list to allow color switcher
-                                              midiMsgBuf7[idx].parameter,
-                                              midiMsgBuf7[idx].value,
-                                              midiMsgBuf7[idx].port);
                 }
+                // SERIALPRINTLN(F("Message in 7 bit buffer"));
+                SearchMsgInConfigAndUpdate( midiMsgBuf7[idx].type,
+                                            midiMsgBuf7[idx].message,
+                                            channel,                      // Send channel, and not channel in midi rx list to allow color switcher
+                                            midiMsgBuf7[idx].parameter,
+                                            midiMsgBuf7[idx].value,
+                                            midiMsgBuf7[idx].port);
               }
+              
             }
           }
         }
@@ -891,7 +893,9 @@ void SearchMsgInConfigAndUpdate(byte fbType, byte msgType, byte channel, uint16_
                 if(encoderHw.GetEncoderValue(encNo) != value || 
                     encoder[encNo].rotBehaviour.hwMode != rotaryModes::rot_absolute ||
                     !(encoder[encNo].rotaryFeedback.source & feedbackSource::fb_src_local)){   // If it isn't local, update feedback to any value
+                  
                   encoderHw.SetEncoderValue(currentBank, encNo, value);
+                                    
                   // SERIALPRINTLN(F("Encoder match!"));
                 }
               }

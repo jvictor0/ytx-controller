@@ -664,7 +664,7 @@ void EncoderInputs::SwitchAction(uint8_t moduleNo, uint8_t encNo, int8_t clicks,
       
       // Scan for changes present in buffer
       ScanMidiBufferAndUpdate(nextBank, QSTB_LOAD, encNo);
-      
+
       // UPDATE FEEDBACK FOR NEW BANK
       feedbackHw.SetChangeEncoderFeedback(FB_ENCODER, 
                                           encNo, 
@@ -1821,6 +1821,11 @@ void EncoderInputs::SetEncoderValue(uint8_t bank, uint8_t encNo, uint16_t value)
     invert = true;
   }
 
+  // If bank is shifted, get current bank for the individual encoder
+  if(IsBankShifted(encNo)){
+    bank = eHwData[encNo].thisEncoderBank;
+  }
+
   if      (value > (invert ? minValue : maxValue))  eBankData[bank][encNo].encoderValue = (invert ? minValue : maxValue);
   else if (value < (invert ? maxValue : minValue))  eBankData[bank][encNo].encoderValue = (invert ? maxValue : minValue);
   else{
@@ -2113,6 +2118,7 @@ uint8_t EncoderInputs::GetThisEncoderBank(uint8_t encNo){
 bool EncoderInputs::EncoderShiftedBufferMatch(uint16_t bufferIndex){
   for(int encNo = 0; encNo < nEncoders; encNo++){
     if(IsBankShifted(encNo)){
+      
       // First check if we should update value and feedback in shifted bank
       bool valueUpdated = QSTBUpdateValue(eHwData[encNo].thisEncoderBank, 
                                           encNo,
@@ -2123,11 +2129,11 @@ bool EncoderInputs::EncoderShiftedBufferMatch(uint16_t bufferIndex){
                                           midiMsgBuf7[bufferIndex].port);
       if(valueUpdated) midiMsgBuf7[bufferIndex].banksToUpdate &= ~(1 << eHwData[encNo].thisEncoderBank);
 
-      // Then check if message is present in currentBank, so it is kept in buffer and it can be updated when encoder returns to current bank
-      if((midiMsgBuf7[bufferIndex].banksToUpdate >> currentBank) & 0x1){
-        return true;    // If message is present in currentBank 
-      }
     }
+  }
+  // Then check if message is present in currentBank, so it is kept in buffer and it can be updated when encoder returns to current bank
+  if((midiMsgBuf7[bufferIndex].banksToUpdate >> currentBank) & 0x1){
+    return true;    // If message is present in currentBank 
   }
   return false;
 }
