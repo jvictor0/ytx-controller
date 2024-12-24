@@ -50,6 +50,7 @@ void SPIEndlessPot::configure(SPIEndlessPotParameters *parameters){
 }
 
 uint16_t SPIEndlessPot::readModule() {
+    static uint16_t lastValidSwitchState = 0x000F;
     uint16_t data;
     uint16_t localChecksum;
     uint16_t transactionChecksum;
@@ -59,9 +60,10 @@ uint16_t SPIEndlessPot::readModule() {
     transactionChecksum = (data>>12)&0x000F;
 
     if(transactionChecksum==localChecksum){
+      lastValidSwitchState = (data>>8)&0x000F;
       return data&0x0FFF;
     }else{
-      return 0;
+      return (lastValidSwitchState<<8)&0x0F00;
     }
 
     return data;
