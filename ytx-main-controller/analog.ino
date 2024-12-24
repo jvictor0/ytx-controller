@@ -1224,11 +1224,11 @@ uint32_t AnalogInputs::AnalogReadFast(byte ADCpin) {
 void AnalogInputs::FastADCsetup() {
   ADC->CTRLA.bit.ENABLE = 0;                     // Disable ADC
   while( ADC->STATUS.bit.SYNCBUSY == 1 );        // Wait for synchronization
-  ADC->CTRLB.reg = ADC_CTRLB_PRESCALER_DIV256 |   // Divide Clock by 64.
+  ADC->CTRLB.reg = ADC_CTRLB_PRESCALER_DIV256 |  // Divide Clock by 256.
                    ADC_CTRLB_RESSEL_12BIT;       // Result on 16 bits
   ADC->AVGCTRL.reg = ADC_AVGCTRL_SAMPLENUM_1 |   // 1 sample
                      ADC_AVGCTRL_ADJRES(0x00ul); // Adjusting result by 0
-  ADC->SAMPCTRL.reg = 0x00;                      // Sampling Time Length = 0
+  ADC->SAMPCTRL.reg = 0;                         // Sampling Time Length = 0
   ADC->CTRLA.bit.ENABLE = 1;                     // Enable ADC
   while( ADC->STATUS.bit.SYNCBUSY == 1 );        // Wait for synchronization
 
