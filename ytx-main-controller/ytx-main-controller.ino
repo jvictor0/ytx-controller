@@ -200,23 +200,30 @@ bool powerAdapterConnected = false;
 
   #include <midi_UsbTransport.h>
 
-  static const unsigned sUsbTransportBufferSize = 1024;
+  static const unsigned sUsbTransportBufferSize = 1024; //TODO: 256 and 512 doesnt work with kilowhat web. mod size power off 2
   typedef midi::UsbTransport<sUsbTransportBufferSize> UsbTransport;
 
   UsbTransport sUsbTransport;
 
-  struct MySettings : public midi::DefaultSettings
+  struct USBSettings : public midi::DefaultSettings
   {
     static const bool Use1ByteParsing = false;
-    static const unsigned SysExMaxSize = 1024; // Accept SysEx messages.
+    static const unsigned SysExMaxSize = 256; // Accept SysEx messages.
     static const bool UseRunningStatus = false; // My devices seem to be ok with it.
   };
 
   // USB instance
-  MIDI_CREATE_CUSTOM_INSTANCE(UsbTransport, sUsbTransport, MIDI, MySettings);
+  MIDI_CREATE_CUSTOM_INSTANCE(UsbTransport, sUsbTransport, MIDI, USBSettings);
+
+  struct DINSettings : public midi::DefaultSettings
+  {
+    static const bool Use1ByteParsing = false;
+    static const unsigned SysExMaxSize = 1; // Accept SysEx messages.
+    static const bool UseRunningStatus = false; // My devices seem to be ok with it.
+  };
 
   // Create a 'MIDI' object using MySettings bound to Serial1.
-  MIDI_CREATE_CUSTOM_INSTANCE(HardwareSerial, Serial1, MIDIHW, MySettings);
+  MIDI_CREATE_CUSTOM_INSTANCE(HardwareSerial, Serial1, MIDIHW, DINSettings);
 
   #endif
 #else // No USB available, fallback to Serial

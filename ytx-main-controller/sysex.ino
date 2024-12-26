@@ -34,7 +34,7 @@ void handleSystemExclusiveUSB(byte *message, unsigned size){
 }
 void handleSystemExclusiveHW(byte *message, unsigned size){
   // SERIALPRINT(F("SysEx arrived via HW"));
-  handleSystemExclusive(message, size, MIDI_HW);
+  // handleSystemExclusive(message, size, MIDI_HW);
 }
 
 void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
