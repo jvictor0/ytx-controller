@@ -73,7 +73,7 @@ SOFTWARE.
 #define SHOW_END_REFRESH_TICKS	100
 #define ACK_TIMEOUT_TICKS		5
 #define NP_OFF					0
-#define NP_ON					48
+#define NP_ON					10
 
 #define ENCODER_CHANGE_FRAME			0x00
 #define ENCODER_DOUBLE_FRAME      		0x01
