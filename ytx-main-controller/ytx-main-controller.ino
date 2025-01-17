@@ -208,7 +208,7 @@ bool powerAdapterConnected = false;
   struct USBSettings : public midi::DefaultSettings
   {
     static const bool Use1ByteParsing = false;
-    static const unsigned SysExMaxSize = 256; // Accept SysEx messages.
+    static const unsigned SysExMaxSize = 512; // Accept SysEx messages.
     static const bool UseRunningStatus = false; // My devices seem to be ok with it.
   };
 
