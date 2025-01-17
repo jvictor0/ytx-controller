@@ -130,7 +130,7 @@ void handleProgramChangeUSB(byte channel, byte number){
   rcvdDigitalMsgType = digitalMessageTypes::digital_msg_pc;
   rcvdAnalogMsgType = analogMessageTypes::analog_msg_pc;
 
-  ProcessMidi(msgType, channel, 0, number, MIDI_USB);
+  ProcessMidi(msgType, channel, number, 0, MIDI_USB);
 }
 
 /*
@@ -225,7 +225,7 @@ void handleProgramChangeHW(byte channel, byte number){
   rcvdDigitalMsgType = digitalMessageTypes::digital_msg_pc;
   rcvdAnalogMsgType = analogMessageTypes::analog_msg_pc;
 
-  ProcessMidi(msgType, channel, 0, number, MIDI_HW);
+  ProcessMidi(msgType, channel, number, 0, MIDI_HW);
 }
 
 /*
