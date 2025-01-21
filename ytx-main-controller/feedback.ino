@@ -428,7 +428,7 @@ void FeedbackClass::FillFrameWithEncoderData(byte updateIndex){
   isFb2cc = (fbUpdateType == FB_ENC_2CC);
   
   // Get config info for this encoder
-  if(fbUpdateType == FB_ENC_SWITCH || isRotaryShifted || isFb2cc){ // If encoder is shifted
+  if(fbUpdateType == FB_ENC_SWITCH || isRotaryShifted || (isFb2cc && encoder[indexChanged].rotaryFeedback.message != rotaryMessageTypes::rotary_msg_vu_cc)){ // If encoder is shifted
     minValue = encoder[indexChanged].switchConfig.parameter[switch_minValue_MSB]<<7 | encoder[indexChanged].switchConfig.parameter[switch_minValue_LSB];
     maxValue = encoder[indexChanged].switchConfig.parameter[switch_maxValue_MSB]<<7 | encoder[indexChanged].switchConfig.parameter[switch_maxValue_LSB];
     msgType = encoder[indexChanged].switchConfig.message;
