@@ -34,7 +34,7 @@ void handleSystemExclusiveUSB(byte *message, unsigned size){
 }
 void handleSystemExclusiveHW(byte *message, unsigned size){
   // SERIALPRINT(F("SysEx arrived via HW"));
-  // handleSystemExclusive(message, size, MIDI_HW);
+  handleSystemExclusive(message, size, MIDI_HW);
 }
 
 void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
@@ -63,7 +63,7 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
     { 
       int8_t error = 0;
       
-      if(message[ytxIOStructure::MESSAGE_TYPE] == ytxIOMessageTypes::configurationMessages)
+      if(message[ytxIOStructure::MESSAGE_TYPE] == ytxIOMessageTypes::configurationMessages  && midiSrc == MIDI_USB)
       {
          // SERIALPRINT(F("CONFIG OK"));
           void *destination;

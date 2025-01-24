@@ -218,7 +218,7 @@ bool powerAdapterConnected = false;
   struct DINSettings : public midi::DefaultSettings
   {
     static const bool Use1ByteParsing = false;
-    static const unsigned SysExMaxSize = 1; // Accept SysEx messages.
+    static const unsigned SysExMaxSize = 512; // Accept SysEx messages.
     static const bool UseRunningStatus = false; // My devices seem to be ok with it.
   };
 
