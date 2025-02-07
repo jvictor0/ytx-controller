@@ -140,7 +140,7 @@ SECTIONS
 
 	__etext = .;
 
-	.data : AT (__etext)
+	.data : 
 	{
 		__data_start__ = .;
 		*(vtable)
@@ -172,7 +172,15 @@ SECTIONS
 		/* All data end */
 		__data_end__ = .;
 
-	} > RAM
+    } > RAM AT> FLASH
+
+    .metadata_section :
+    {
+        . = ALIGN(4);  /* Alinear a 4 bytes */
+        __metadata_position__ = .;
+        KEEP(*(.metadata_section))
+        . = ALIGN(4);
+    } > FLASH
 
 	.bss :
 	{

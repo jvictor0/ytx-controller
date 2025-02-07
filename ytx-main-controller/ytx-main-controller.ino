@@ -57,6 +57,12 @@ SOFTWARE.
 
 uint32_t __attribute__ ((section (".noinit"))) cdcMagicData ; //previusly add "noinit" section to linker
 
+const uint8_t __attribute__((section(".metadata_section"), used))  bin_metadata_signature[] = "ytx";
+const uint8_t __attribute__((section(".metadata_section"), used))  bin_metadata_target_id = SystemModuleTypes::MAIN_CONTROLLER;
+const uint8_t __attribute__((section(".metadata_section"), used))  bin_metadata_target_group = ModuleGroupTypes::SYSTEM_GROUP;
+const uint8_t __attribute__((section(".metadata_section"), used))  bin_metadata_version_minor = FW_VERSION_MINOR;
+const uint8_t __attribute__((section(".metadata_section"), used))  bin_metadata_version_major = FW_VERSION_MAJOR;
+
 //----------------------------------------------------------------------------------------------------
 // GENERAL VARIABLES AND HW DEFINITION
 //----------------------------------------------------------------------------------------------------

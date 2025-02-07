@@ -30,6 +30,19 @@ SOFTWARE.
 #define MODULES_H
 #include <stdint.h>
 
+enum ModuleGroupTypes{
+    SYSTEM_GROUP,
+    ENCODER_GROUP,
+    DIGITAL_GROUP,
+    ANALOG_GROUP,
+    DISPLAY_GROUP
+};
+
+enum SystemModuleTypes{
+    MAIN_CONTROLLER,
+    AUX_CONTROLLER,
+    ANALOG_EXPANDER
+};
 
 enum EncoderModuleTypes{
 	ENCODER_NONE,
