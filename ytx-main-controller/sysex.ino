@@ -204,7 +204,7 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
                     waitingAckAfterGet = true;
 
                     if(testSysex){
-                      PrintSysex(ytxIOStructure::SECTION_LSB + sysexSize, sysexBlock);
+                      PrintSysex(ytxIOStructure::SECTION_LSB + sysexSize, sysexBlock[1]);
                     }
                 }else
                   error = ytxIOStatus::wishError;
