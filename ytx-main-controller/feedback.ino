@@ -354,23 +354,19 @@ void FeedbackClass::Update() {
     }
     
     fbMessagesSent++;
+
   }
 
   Serial.write9bit(BURST_END);    // Signal end of burst
 
-  sendingFbData = false;      // Flag end of data send
-  
-    // if(fbMessagesSent == MSG_BUFFER_AUX){
-    //                  // SEND BANK END if burst mode was enabled
-       
-    //   SERIALPRINT(fbMessagesSent); SERIALPRINTLN(" END B");
+  // Wait for ACK from aux controller after the burst is complete
+  // This is the only ACK we wait for in pipelined mode
+  //
+  waitingForAck = true;
+  antMicrosAck = micros();
+  while(waitingForAck && ((micros() - antMicrosAck) < 5000));  // 5ms timeout for burst ACK
 
-    // }
-    // else if((feedbackUpdateWriteIdx == feedbackUpdateReadIdx)){
-    //        // SEND BANK END if burst mode was enabled
-    //   SERIALPRINT(fbMessagesSent); SERIALPRINTLN(" END A");
-    //   // SERIALPRINTLN("BURST_END");
-    // }
+  sendingFbData = false;      // Flag end of data send
     
   fbMessagesSent = 0;         // Restart message counter
 
@@ -590,9 +586,18 @@ void FeedbackClass::FillFrameWithEncoderData(byte updateIndex){
           colorG = pgm_read_byte(&gamma8[pgm_read_byte(&colorRangeTable[colorIndex][G_INDEX])]);
           colorB = pgm_read_byte(&gamma8[pgm_read_byte(&colorRangeTable[colorIndex][B_INDEX])]);
         }else{
-          colorR = pgm_read_byte(&gamma8[encoder[indexChanged].rotaryFeedback.color[R_INDEX]]);
-          colorG = pgm_read_byte(&gamma8[encoder[indexChanged].rotaryFeedback.color[G_INDEX]]);
-          colorB = pgm_read_byte(&gamma8[encoder[indexChanged].rotaryFeedback.color[B_INDEX]]);
+          // Check if raw color mode (set by SetEncoderRingLedColorDirect, skip gamma)
+          //
+          if(encFbData[currentBank][indexChanged].colorIndexRotary == 0xFF){
+            colorR = encoder[indexChanged].rotaryFeedback.color[R_INDEX];
+            colorG = encoder[indexChanged].rotaryFeedback.color[G_INDEX];
+            colorB = encoder[indexChanged].rotaryFeedback.color[B_INDEX];
+          }
+          else{
+            colorR = pgm_read_byte(&gamma8[encoder[indexChanged].rotaryFeedback.color[R_INDEX]]);
+            colorG = pgm_read_byte(&gamma8[encoder[indexChanged].rotaryFeedback.color[G_INDEX]]);
+            colorB = pgm_read_byte(&gamma8[encoder[indexChanged].rotaryFeedback.color[B_INDEX]]);
+          }
         }
       }
     }else{
@@ -692,9 +697,18 @@ void FeedbackClass::FillFrameWithEncoderData(byte updateIndex){
     }else{   // No color range, no special feature, might be normal encoder switch or shifter button
       if(encoderSwitchState || (newValue == maxValue) || (newValue && isShifter) || valueToIntensity){      // ON
         encFbData[currentBank][indexChanged].encRingState |= (newOrientation ? ENCODER_SWITCH_V_ON : ENCODER_SWITCH_H_ON);
-        colorR = pgm_read_byte(&gamma8[encoder[indexChanged].switchFeedback.color[R_INDEX]]);
-        colorG = pgm_read_byte(&gamma8[encoder[indexChanged].switchFeedback.color[G_INDEX]]);
-        colorB = pgm_read_byte(&gamma8[encoder[indexChanged].switchFeedback.color[B_INDEX]]);    
+        // Check if raw color mode (set by SetEncoderSwitchLedColorDirect, skip gamma)
+        //
+        if(encFbData[currentBank][indexChanged].colorIndexSwitch == 0xFF){
+          colorR = encoder[indexChanged].switchFeedback.color[R_INDEX];
+          colorG = encoder[indexChanged].switchFeedback.color[G_INDEX];
+          colorB = encoder[indexChanged].switchFeedback.color[B_INDEX];
+        }
+        else{
+          colorR = pgm_read_byte(&gamma8[encoder[indexChanged].switchFeedback.color[R_INDEX]]);
+          colorG = pgm_read_byte(&gamma8[encoder[indexChanged].switchFeedback.color[G_INDEX]]);
+          colorB = pgm_read_byte(&gamma8[encoder[indexChanged].switchFeedback.color[B_INDEX]]);
+        }
       }else if((newValue == minValue && !valueToIntensity) || (isShifter && !newValue)){    // SHIFTER, OFF
         encFbData[currentBank][indexChanged].encRingState |= (newOrientation ? ENCODER_SWITCH_V_ON : ENCODER_SWITCH_H_ON);    // If it's a bank shifter, switch LED's are on
         if(lowI || isShifter){
@@ -824,9 +838,18 @@ void FeedbackClass::FillFrameWithDigitalData(byte updateIndex){
   }else{     
     // FIXED COLOR
     if(newValue == maxValue || (newValue && isShifter) || valueToIntensity){
-      colorR = pgm_read_byte(&gamma8[digital[indexChanged].feedback.color[R_INDEX]]);
-      colorG = pgm_read_byte(&gamma8[digital[indexChanged].feedback.color[G_INDEX]]);
-      colorB = pgm_read_byte(&gamma8[digital[indexChanged].feedback.color[B_INDEX]]); 
+      // Check if raw color mode (set by SetDigitalLedColorDirect, skip gamma)
+      //
+      if(digFbData[currentBank][indexChanged].colorIndexPrev == 0xFF){
+        colorR = digital[indexChanged].feedback.color[R_INDEX];
+        colorG = digital[indexChanged].feedback.color[G_INDEX];
+        colorB = digital[indexChanged].feedback.color[B_INDEX];
+      }
+      else{
+        colorR = pgm_read_byte(&gamma8[digital[indexChanged].feedback.color[R_INDEX]]);
+        colorG = pgm_read_byte(&gamma8[digital[indexChanged].feedback.color[G_INDEX]]);
+        colorB = pgm_read_byte(&gamma8[digital[indexChanged].feedback.color[B_INDEX]]);
+      }
       if (invert) newValue = minValue;
     }else if((newValue == minValue && !valueToIntensity) || (isShifter && !newValue)){
       if(lowI || isShifter){
@@ -1005,14 +1028,9 @@ void FeedbackClass::AddCheckSum(){
 
 // #define DEBUG_FB_FRAME
 void FeedbackClass::SendFeedbackData(){
-  uint8_t tries = 0;
-  bool okToContinue = false;
-  uint8_t cmd = 0;
-  static uint32_t ackNotReceivedCount = 0;
-  // uint8_t encodedFrameSize = midi::encodeSysEx(feedbackFrameBuffer, sendSerialBufferEnc, d_ENDOFFRAME);
-  
-  // Adds checksum bytes to encoded frame
-  // AddCheckSum();
+  // In pipelined mode, just send the frame without waiting for ACK
+  // The ACK will be checked after BURST_END is sent
+  //
 
   #ifdef DEBUG_FB_FRAME
     SERIALPRINT(F("FRAME WITHOUT ENCODING:\n"));
@@ -1022,43 +1040,21 @@ void FeedbackClass::SendFeedbackData(){
     SERIALPRINTLN();
   #endif
   
-  do{
-    if(!fbShowInProgress){
-      waitingForAck = true;
-      cmd = 0;
+  if(!fbShowInProgress)
+  {
+    uint16_t sum = 2019 + checkSum(feedbackFrameBuffer, FeedbackFrame_Size);
 
-      uint16_t sum = 2019 + checkSum(feedbackFrameBuffer, FeedbackFrame_Size);
+    Serial.write9bit(NEW_FRAME_BYTE);             // SEND FRAME HEADER
 
-      Serial.write9bit(NEW_FRAME_BYTE);             // SEND FRAME HEADER
-
-      for (int i = 0; i < FeedbackFrame_Size; i++) {
-        Serial.write(feedbackFrameBuffer[i]);   // FRAME BODY
-      }
-
-      Serial.write(sum&0x00FF);
-
-      Serial.write9bit(END_OF_FRAME_BYTE);          // SEND END OF FRAME BYTE  
-      
-      antMicrosAck = micros();
-
-      // Wait for fb microcontroller to acknowledge message reception, or try again
-      while(waitingForAck && ((micros() - antMicrosAck) < 300));      
-
-      if(!waitingForAck) 
-        okToContinue = true;
-      else{
-        tries++;
-        // SERIALPRINT(micros() - antMicrosAck);
-        // SERIALPRINTLN(" micros");  // SERIALPRINT(++ackNotReceivedCount); SERIALPRINT(" times");                  
-        // SERIALPRINT("\t");                                  SERIALPRINT(feedbackFrameBuffer[FeedbackFrame_Type]);
-        // SERIALPRINT(", #");                                 SERIALPRINT(feedbackFrameBuffer[FeedbackFrame_nRing]);
-        // SERIALPRINT("\t read idx: ");                       SERIALPRINT(feedbackUpdateReadIdx);
-        // SERIALPRINT("\t write idx: ");                      SERIALPRINTLN(feedbackUpdateWriteIdx);
-      }               
-    }else{
-      //delayMicros
+    for (int i = 0; i < FeedbackFrame_Size; i++)
+    {
+      Serial.write(feedbackFrameBuffer[i]);       // FRAME BODY
     }
-  }while(!okToContinue && tries < 20);
+
+    Serial.write(sum&0x00FF);
+
+    Serial.write9bit(END_OF_FRAME_BYTE);          // SEND END OF FRAME BYTE  
+  }
 }
 
 void FeedbackClass::SendCommand(uint8_t cmd){
@@ -1066,6 +1062,100 @@ void FeedbackClass::SendCommand(uint8_t cmd){
 //  SERIALPRINTLNF(cmd, HEX);
   Serial.write9bit(cmd);
 }
+
+// Directly set a digital LED to a specific RGB color
+// RGB values are expected to be 7-bit (0-127), will be scaled to 8-bit
+// Bypasses gamma correction for linear color control
+//
+void FeedbackClass::SetDigitalLedColorDirect(uint16_t digitalIndex, uint8_t r, uint8_t g, uint8_t b)
+{
+  if (!begun) return;
+  if (digitalIndex >= nDigitals) return;
+
+  // Scale 7-bit to 8-bit and apply inverse gamma so final result is linear
+  // gamma8[x] crushes low values, so we find the index that gives us our target
+  // For simplicity, just scale up more aggressively: 7-bit * 2 = 8-bit
+  // Then store directly without going through gamma (set raw values in color[])
+  //
+  digital[digitalIndex].feedback.color[R_INDEX] = r << 1;
+  digital[digitalIndex].feedback.color[G_INDEX] = g << 1;
+  digital[digitalIndex].feedback.color[B_INDEX] = b << 1;
+
+  // Disable valueToColor so our fixed color is used
+  //
+  digital[digitalIndex].feedback.valueToColor = 0;
+  
+  // Mark this digital as using raw color (skip gamma in FillFrameWithDigitalData)
+  //
+  digFbData[currentBank][digitalIndex].colorIndexPrev = 0xFF;
+
+  // Queue the feedback update through the normal path
+  //
+  uint8_t maxVal = digital[digitalIndex].actionConfig.parameter[digital_maxLSB];
+  SetChangeDigitalFeedback(digitalIndex, maxVal, true, NO_SHIFTER, NO_BANK_UPDATE, true);
+}
+
+// Directly set an encoder switch (pushbutton) LED to a specific RGB color
+// RGB values are expected to be 7-bit (0-127), will be scaled to 8-bit
+// Bypasses gamma correction for linear color control
+//
+void FeedbackClass::SetEncoderSwitchLedColorDirect(uint8_t encIndex, uint8_t r, uint8_t g, uint8_t b)
+{
+  if (!begun) return;
+  if (encIndex >= nEncoders) return;
+
+  // Scale 7-bit to 8-bit
+  //
+  encoder[encIndex].switchFeedback.color[R_INDEX] = r << 1;
+  encoder[encIndex].switchFeedback.color[G_INDEX] = g << 1;
+  encoder[encIndex].switchFeedback.color[B_INDEX] = b << 1;
+
+  // Disable valueToColor so our fixed color is used
+  //
+  encoder[encIndex].switchFeedback.valueToColor = 0;
+
+  // Mark as raw color mode (skip gamma) using colorIndexSwitch = 0xFF
+  //
+  encFbData[currentBank][encIndex].colorIndexSwitch = 0xFF;
+
+  // Queue the feedback update
+  //
+  uint8_t maxVal = encoder[encIndex].switchConfig.parameter[switch_maxValue_LSB];
+  SetChangeEncoderFeedback(FB_ENC_SWITCH, encIndex, maxVal, 
+                           encoderHw.GetModuleOrientation(encIndex/4), 
+                           NO_SHIFTER, NO_BANK_UPDATE, false, false, true);
+}
+
+// Directly set an encoder ring LED to a specific RGB color
+// RGB values are expected to be 7-bit (0-127), will be scaled to 8-bit
+// Bypasses gamma correction for linear color control
+//
+void FeedbackClass::SetEncoderRingLedColorDirect(uint8_t encIndex, uint8_t r, uint8_t g, uint8_t b)
+{
+  if (!begun) return;
+  if (encIndex >= nEncoders) return;
+
+  // Scale 7-bit to 8-bit
+  //
+  encoder[encIndex].rotaryFeedback.color[R_INDEX] = r << 1;
+  encoder[encIndex].rotaryFeedback.color[G_INDEX] = g << 1;
+  encoder[encIndex].rotaryFeedback.color[B_INDEX] = b << 1;
+
+  // Disable valueToColor so our fixed color is used
+  //
+  encoder[encIndex].rotaryFeedback.rotaryValueToColor = 0;
+
+  // Mark as raw color mode (skip gamma) using colorIndexRotary = 0xFF
+  //
+  encFbData[currentBank][encIndex].colorIndexRotary = 0xFF;
+
+  // Queue the feedback update - use current encoder value
+  //
+  SetChangeEncoderFeedback(FB_ENCODER, encIndex, encoderHw.GetEncoderValue(encIndex), 
+                           encoderHw.GetModuleOrientation(encIndex/4), 
+                           NO_SHIFTER, NO_BANK_UPDATE, false, false, true);
+}
+
 void FeedbackClass::SendResetToBootloader(){
 }
 

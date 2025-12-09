@@ -87,7 +87,9 @@ enum ytxIOSpecialRequests
   enableProc = 0x17,
   disbleProc = 0x18,
   eraseEEPROM = 0x19,
-  enableTesting = 0x1A
+  enableTesting = 0x1A,
+  setDigitalLedColorByCC = 0x20,
+  dumpControllerState = 0x21
 };
 
 enum ytxIOStatus

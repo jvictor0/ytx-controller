@@ -139,6 +139,9 @@ public:
 	void SetChangeEncoderFeedback(uint8_t, uint8_t, uint16_t, uint8_t, bool, bool, bool colorSwitchMsg = false, bool valToIntensity = false, bool externalFeedback = false);
 	void SetChangeDigitalFeedback(uint16_t, uint16_t, bool, bool, bool, bool externalFeedback = false, bool valToIntensity = false);
 	void SetChangeIndependentFeedback(uint8_t, uint16_t, uint16_t, bool, bool externalFeedback = false);
+	void SetDigitalLedColorDirect(uint16_t digitalIndex, uint8_t r, uint8_t g, uint8_t b);
+	void SetEncoderSwitchLedColorDirect(uint8_t encIndex, uint8_t r, uint8_t g, uint8_t b);
+	void SetEncoderRingLedColorDirect(uint8_t encIndex, uint8_t r, uint8_t g, uint8_t b);
 	void SetBankChangeFeedback(uint8_t);
 	uint8_t GetVumeterValue(uint8_t);
 	bool SendingData();

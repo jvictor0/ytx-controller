@@ -204,7 +204,7 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
                     waitingAckAfterGet = true;
 
                     if(testSysex){
-                      PrintSysex(ytxIOStructure::SECTION_LSB + sysexSize, sysexBlock[1]);
+      //                PrintSysex(ytxIOStructure::SECTION_LSB + sysexSize, sysexBlock[1]);
                     }
                 }else
                   error = ytxIOStatus::wishError;
@@ -294,6 +294,23 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
           
           cdcMagicData = ENABLE_MAGIC_TRICK;
           SelfReset(RESET_TO_CONTROLLER);
+        }else if(message[ytxIOStructure::REQUEST_ID] == ytxIOSpecialRequests::setDigitalLedColorByCC){
+          // Set digital LED colors by MIDI channel/CC number
+          // Format: F0 'y' 't' 'x' <status> <wish> <msgType> <reqId> <channel> <cc0> <r0> <g0> <b0> [<cc1> <r1> <g1> <b1>]... F7
+          // RGB values are 7-bit (0-127)
+          //
+          SetStatusLED(STATUS_BLINK, 2, statusLEDtypes::STATUS_FB_MSG_IN);
+          HandleSetDigitalLedColorByCC(message, size);
+        }else if(message[ytxIOStructure::REQUEST_ID] == ytxIOSpecialRequests::dumpControllerState){
+          // Dump current state of all controllers (encoders, digitals, analogs)
+          // Format: F0 'y' 't' 'x' <status> <wish> <msgType> <reqId=0x21> F7
+          //
+          if(testSysex){
+            SERIALPRINTLN(F("REQUEST: DUMP CONTROLLER STATE"));
+          }
+          SetStatusLED(STATUS_BLINK, 2, statusLEDtypes::STATUS_FB_MSG_OUT);
+          DumpControllerState();
+          SendAck();
         }
 
       }else if(message[ytxIOStructure::MESSAGE_TYPE] == ytxIOMessageTypes::componentInfoMessages){
@@ -461,4 +478,154 @@ void sendSysExYTX(bool port, uint16_t length, const byte* msg, bool inArrayConta
     MIDIHW.sendSysEx(length, msg, inArrayContainsBoundaries);
   }
   MIDIpullTask.start();
+}
+
+// Handle setting digital LED colors by MIDI channel and CC number
+// Message format: F0 'y' 't' 'x' <status> <wish> <msgType> <reqId> <channel> <cc0> <r0> <g0> <b0> [<cc1> <r1> <g1> <b1>]... F7
+// - channel: MIDI channel (0-15)
+// - cc: CC number (0-127)
+// - r, g, b: 7-bit RGB values (0-127)
+// Multiple CC/RGB tuples can be sent in the same channel
+//
+void HandleSetDigitalLedColorByCC(byte* message, unsigned size)
+{
+  // Message offsets for special requests:
+  // [0]=F0 [1]='y' [2]='t' [3]='x' [4]=status [5]=wish [6]=msgType [7]=reqId [8]=channel [9+]=data
+  //
+  const uint8_t CHANNEL_OFFSET = ytxIOStructure::REQUEST_ID + 1;  // = 8
+  const uint8_t CC_DATA_START = CHANNEL_OFFSET + 1;               // = 9
+  const uint8_t BYTES_PER_CC = 4;  // cc, r, g, b
+
+  // Minimum size: F0(1) + header(7) + channel(1) + cc(1) + rgb(3) + F7(1) = 14 bytes
+  //
+  if (size < 14)
+  {
+    if (testSysex)
+    {
+      SERIALPRINTLN(F("SET LED BY CC: Message too short"));
+    }
+    return;
+  }
+
+  uint8_t channel = message[CHANNEL_OFFSET] & 0x0F;
+
+  // Calculate number of CC/RGB tuples in message
+  // size includes F0 and F7
+  // Data runs from CC_DATA_START to size-2 (last byte before F7)
+  // Number of data bytes = (size - 1) - CC_DATA_START
+  //
+  uint16_t dataBytes = (size - 1) - CC_DATA_START;
+  uint16_t numCCs = dataBytes / BYTES_PER_CC;
+
+  if (testSysex)
+  {
+    SERIALPRINT(F("SET LED BY CC: channel="));
+    SERIALPRINT(channel);
+    SERIALPRINT(F(" numCCs="));
+    SERIALPRINTLN(numCCs);
+  }
+
+  // Process each CC/RGB tuple
+  //
+  bool anyNotFound = false;
+
+  for (uint16_t i = 0; i < numCCs; i++)
+  {
+    uint16_t offset = CC_DATA_START + (i * BYTES_PER_CC);
+    uint8_t ccNum = message[offset] & 0x7F;
+    uint8_t r = message[offset + 1] & 0x7F;
+    uint8_t g = message[offset + 2] & 0x7F;
+    uint8_t b = message[offset + 3] & 0x7F;
+
+    if (testSysex)
+    {
+      SERIALPRINT(F("  CC="));
+      SERIALPRINT(ccNum);
+      SERIALPRINT(F(" R="));
+      SERIALPRINT(r);
+      SERIALPRINT(F(" G="));
+      SERIALPRINT(g);
+      SERIALPRINT(F(" B="));
+      SERIALPRINTLN(b);
+    }
+
+    // Find the component that matches this channel/CC
+    // Check: digitals, encoder switches, encoder rotary
+    //
+    bool found = false;
+
+    // Check digital inputs
+    //
+    for (uint16_t digNo = 0; digNo < config->inputs.digitalCount && !found; digNo++)
+    {
+      if (digital[digNo].feedback.channel == channel &&
+          digital[digNo].feedback.parameterLSB == ccNum &&
+          digital[digNo].feedback.message == digitalMessageTypes::digital_msg_cc)
+      {
+        if (testSysex)
+        {
+          SERIALPRINT(F("    -> Digital #"));
+          SERIALPRINTLN(digNo);
+        }
+        feedbackHw.SetDigitalLedColorDirect(digNo, r, g, b);
+        found = true;
+      }
+    }
+
+    // Check encoder switches (pushbutton LEDs)
+    //
+    for (uint8_t encNo = 0; encNo < config->inputs.encoderCount && !found; encNo++)
+    {
+      if (encoder[encNo].switchFeedback.channel == channel &&
+          encoder[encNo].switchFeedback.parameterLSB == ccNum &&
+          encoder[encNo].switchFeedback.message == switchMessageTypes::switch_msg_cc)
+      {
+        if (testSysex)
+        {
+          SERIALPRINT(F("    -> Encoder Switch #"));
+          SERIALPRINTLN(encNo);
+        }
+        feedbackHw.SetEncoderSwitchLedColorDirect(encNo, r, g, b);
+        found = true;
+      }
+    }
+
+    // Check encoder rotary (ring LEDs)
+    //
+    for (uint8_t encNo = 0; encNo < config->inputs.encoderCount && !found; encNo++)
+    {
+      if (encoder[encNo].rotaryFeedback.channel == channel &&
+          encoder[encNo].rotaryFeedback.parameterLSB == ccNum &&
+          (encoder[encNo].rotaryFeedback.message == rotaryMessageTypes::rotary_msg_cc ||
+           encoder[encNo].rotaryFeedback.message == rotaryMessageTypes::rotary_msg_vu_cc))
+      {
+        if (testSysex)
+        {
+          SERIALPRINT(F("    -> Encoder Ring #"));
+          SERIALPRINTLN(encNo);
+        }
+        feedbackHw.SetEncoderRingLedColorDirect(encNo, r, g, b);
+        found = true;
+      }
+    }
+
+    if (!found)
+    {
+      anyNotFound = true;
+      if (testSysex)
+      {
+        SERIALPRINT(F("    -> NOT FOUND: ch="));
+        SERIALPRINT(channel);
+        SERIALPRINT(F(" cc="));
+        SERIALPRINTLN(ccNum);
+      }
+    }
+  }
+
+  // Blink red if any CC wasn't found
+  //
+  if (anyNotFound)
+  {
+    SetStatusLED(STATUS_BLINK, 2, statusLEDtypes::STATUS_FB_ERROR);
+  }
 }

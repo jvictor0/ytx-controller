@@ -90,6 +90,9 @@ void MainControllerReception_Handler(void){
 				receivingBank = false;
 				receivingFeedbackData = false;
 				updateBank = true;
+				// ACK the entire burst now that it's complete
+				//
+				SendToMain(ACK_CMD);
 			}else if(rcvByte == NEW_FRAME_BYTE){
 				// SerialUSB.println("NEW_FRAME_BYTE");
 				// FIRST BYTE OF A DATA FRAME
@@ -138,10 +141,15 @@ void MainControllerReception_Handler(void){
 						if(++writeIdx >= FEEDBACK_BUFFER_LENGTH)	
 							writeIdx = 0;
 					
-						if(!receivingBank) 
+						if(!receivingBank)
+						{
 							receivingFeedbackData = false;
-						
-						SendToMain(ACK_CMD);
+							// Only ACK individual frames when not in burst mode
+							//
+							SendToMain(ACK_CMD);
+						}
+						// In burst mode, we don't ACK per-frame - ACK is sent at BURST_END
+						//
 					}else{
 						failsPerSecond++;
 						//SerialUSB.println("Checksum error");
