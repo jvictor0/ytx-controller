@@ -62,6 +62,30 @@ void MainControllerReception_Handler(void){
 	  	bool isCommand = (rcvWord&0x100) ? true : false;
 	  	uint8_t rcvByte = (uint8_t)(rcvWord&0x00FF);
 
+		// When discarding burst after error, ignore data bytes and burst-related commands
+		// until a non-burst command arrives
+		//
+		if(discardingBurst)
+		{
+			if(!isCommand)
+			{
+				// Ignore data bytes while discarding
+				//
+				return;
+			}
+
+			// Ignore burst-related commands while discarding
+			//
+			if(rcvByte == NEW_FRAME_BYTE || rcvByte == END_OF_FRAME_BYTE || rcvByte == BURST_END)
+			{
+				return;
+			}
+
+			// Any other command clears discard mode and is processed normally
+			//
+			discardingBurst = false;
+		}
+
 		if(isCommand){
 
 			if (rcvByte == INIT_VALUES){
@@ -80,10 +104,11 @@ void MainControllerReception_Handler(void){
 				// CHANGE BRIGHTNESS COMMAND
 				receivingBrightness = true;
 			}else if (rcvByte == BURST_INIT && !receivingBank){
-				// SerialUSB.println("BANK INIT");
-				// BANK INIT COMMAND
+				// BURST INIT COMMAND
+				//
 				receivingBank = true;
 				receivingFeedbackData = true;
+				burstFrameIndex = 0;
 			}else if (rcvByte == BURST_END && receivingBank && receivingFeedbackData){
 				// BANK END COMMAND
 				// SerialUSB.println("BANK END COMMAND");
@@ -94,18 +119,30 @@ void MainControllerReception_Handler(void){
 				//
 				SendToMain(ACK_CMD);
 			}else if(rcvByte == NEW_FRAME_BYTE){
-				// SerialUSB.println("NEW_FRAME_BYTE");
 				// FIRST BYTE OF A DATA FRAME
+				//
 				receivedBytes = 0;
 				framesPerSecond++;
-				if(!receivingBank) 
+				if(!receivingBank)
+				{
 					receivingFeedbackData = true;
+				}
 			}else if(rcvByte == END_OF_FRAME_BYTE){
 				// LAST BYTE OF A DATA FRAME
+				//
 				if(receivingFeedbackData){
 					if(receivedBytes != (FeedbackFrame_Size+CHECKSUM_BYTES)){
 						failsPerSecond++;
+						// Send error with frame index (twice for verification)
+						//
 						SendToMain(CHECKSUM_ERROR);
+						SendToMain(burstFrameIndex);
+						SendToMain(burstFrameIndex);
+						// Abort burst and discard remaining data
+						//
+						receivingBank = false;
+						receivingFeedbackData = false;
+						discardingBurst = true;
 						return;
 					}
 
@@ -148,12 +185,24 @@ void MainControllerReception_Handler(void){
 							//
 							SendToMain(ACK_CMD);
 						}
-						// In burst mode, we don't ACK per-frame - ACK is sent at BURST_END
-						//
+						else
+						{
+							// In burst mode, track successful frame count for error reporting
+							//
+							burstFrameIndex++;
+						}
 					}else{
 						failsPerSecond++;
-						//SerialUSB.println("Checksum error");
+						// Checksum mismatch - send error with frame index (twice for verification)
+						//
 						SendToMain(CHECKSUM_ERROR);
+						SendToMain(burstFrameIndex);
+						SendToMain(burstFrameIndex);
+						// Abort burst and discard remaining data
+						//
+						receivingBank = false;
+						receivingFeedbackData = false;
+						discardingBurst = true;
 					}
 				}else if (receivingInit){
 					// INIT VALUES BYTES						

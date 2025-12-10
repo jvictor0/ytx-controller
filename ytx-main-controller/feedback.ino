@@ -43,6 +43,7 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   feedbackUpdateReadIdx = 0;
   fbItemsToSend = 0;
   fbMessagesSent = 0;
+  burstRetryCount = 0;
   waitingMoreData = false;
   antMillisWaitMoreData = 0;
 
@@ -195,181 +196,307 @@ void FeedbackClass::Update() {
 
   if(waitingMoreData || fbShowInProgress || fbItemsToSend == 0) return;
 
-  if(!sendingFbData){
-    sendingFbData = true;
-    Serial.write9bit(BURST_INIT);
-  } 
-
-  while (fbItemsToSend && fbMessagesSent < MSG_BUFFER_AUX) {    
-
-    uint8_t fbUpdateType = feedbackUpdateBuffer[feedbackUpdateReadIdx].type;
-    uint8_t fbUpdateQueueIndex = feedbackUpdateReadIdx;
-    
-    IncreaseBufferIndex(READ_INDEX);
-    // SERIALPRINTLN(fbItemsToSend);
-    
-    switch(fbUpdateType){
-      case FB_ENCODER:
-      case FB_ENC_2CC:
-      case FB_ENC_SWITCH:
-      case FB_ENC_VAL_TO_COLOR:
-      case FB_ENC_VAL_TO_INT:
-      case FB_ENC_SHIFT:
-      case FB_ENC_SW_VAL_TO_INT:
-      case FB_ENC_VUMETER:{
-        FillFrameWithEncoderData(fbUpdateQueueIndex);
-        SendDataIfReady();
-        // SERIALPRINTLN("Encoder feedback update");
-      }break;
-      case FB_DIGITAL:
-      case FB_DIG_VAL_TO_INT:{
-        FillFrameWithDigitalData(fbUpdateQueueIndex);
-        SendDataIfReady();
-        // SERIALPRINTLN("Digital feedback update");
-      }break;
-      case FB_ANALOG:{
-        
-      }break;
-      case FB_INDEPENDENT:{
-        
-      }break;
-      case FB_BANK_CHANGED:{
-        // A bank change consists of several burst of data:
-        // First we update the encoders and encoder switches
-        // Then the DIGITAL 1 port 
-        // Then, if necessary, the DIGITAL 2 port
-        // 9ms para cambiar el banco - 32 encoders, 0 dig, 0 analog - 16/7/2009
-        updatingBankFeedback = true;
-
-        // Update all rotary encoders
-        for(uint8_t n = 0; n < nEncoders; n++){
-          // If it's configured as vumeter encoder, send vumeter feedback first and then value indicator
-          if(encoder[n].rotaryFeedback.message == rotaryMessageTypes::rotary_msg_vu_cc){
-            SetChangeEncoderFeedback(FB_ENC_VUMETER, n, encFbData[currentBank][n].vumeterValue, 
-                                                        encoderHw.GetModuleOrientation(n/4), NO_SHIFTER, BANK_UPDATE);   // HARDCODE: N° of encoders in module / is   
-            SetChangeEncoderFeedback(FB_ENC_2CC, n, encoderHw.GetEncoderValue(n), 
-                                                encoderHw.GetModuleOrientation(n/4), NO_SHIFTER, BANK_UPDATE);   // HARDCODE: N° of encoders in module / is 
-          }else{
-            SetChangeEncoderFeedback(FB_ENCODER, n, encoderHw.GetEncoderValue(n), 
-                                                    encoderHw.GetModuleOrientation(n/4), NO_SHIFTER, BANK_UPDATE);   // HARDCODE: N° of encoders in module / is 
-            // If it's a double CC encoder, update second CC after first
-            if(encoder[n].switchConfig.mode == switchModes::switch_mode_2cc){
-              SetChangeEncoderFeedback(FB_ENC_2CC, n, encoderHw.GetEncoderValue2(n), 
-                                                  encoderHw.GetModuleOrientation(n/4), NO_SHIFTER, BANK_UPDATE);   // HARDCODE: N° of encoders in module / is                                                   
-            }            
-          }
-        }
-        // Update all encoder switches that aren't shifters
-        for(uint8_t n = 0; n < nEncoders; n++){
-          bool isShifter = false;
-          // Is it a shifter?
-          if(config->banks.count > 1){
-            for(int bank = 0; bank < config->banks.count; bank++){
-              byte bankShifterIndex = config->banks.shifterId[bank];
-              if(GetHardwareID(ytxIOBLOCK::Encoder, n) == bankShifterIndex){
-                isShifter = true;
-              }
-            }
-          }
-            
-          if(!isShifter)
-            SetChangeEncoderFeedback(FB_ENC_SWITCH, n, encoderHw.GetEncoderSwitchValue(n), 
-                                                           encoderHw.GetModuleOrientation(n/4), NO_SHIFTER, BANK_UPDATE);  // HARDCODE: N° of encoders in module                                                
-        }
-        SetBankChangeFeedback(FB_BANK_DIGITAL1);
-        // feedbackHw.SendCommand(BURST_END);
-        // sendingFbData = false;
-      }break;  
-      case FB_BANK_DIGITAL1:{
-        // Update all digitals that aren't shifters
-        if(amountOfDigitalInConfig[DIGITAL_PORT_2] > 0){   // If there are digitals on the second port
-          for(uint16_t n = 0; n < amountOfDigitalInConfig[DIGITAL_PORT_1]; n++){  
-            bool isShifter = false;
-            // Is it a shifter?
-            if(config->banks.count > 1){
-              for(int bank = 0; bank < config->banks.count; bank++){
-                byte bankShifterIndex = config->banks.shifterId[bank];
-                if(GetHardwareID(ytxIOBLOCK::Digital, n) == bankShifterIndex){
-                  isShifter = true;
-                }
-              }
-            }
-
-            if(!isShifter) {
-              SetChangeDigitalFeedback(n, digitalHw.GetDigitalValue(n), digitalHw.GetDigitalState(n), NO_SHIFTER, BANK_UPDATE);
-            }
-          }
-          SetBankChangeFeedback(FB_BANK_DIGITAL2);
-        }else{
-          for(uint16_t n = 0; n < nDigitals; n++){
-            bool isShifter = false;
-
-            // Is it a shifter?
-            if(config->banks.count > 1){
-              for(int bank = 0; bank < config->banks.count; bank++){
-                byte bankShifterIndex = config->banks.shifterId[bank];
-                if(GetHardwareID(ytxIOBLOCK::Digital, n) == bankShifterIndex){
-                  isShifter = true;
-                }
-              }
-            }
-
-            if(!isShifter) {
-              SetChangeDigitalFeedback(n, digitalHw.GetDigitalValue(n), digitalHw.GetDigitalState(n), NO_SHIFTER, BANK_UPDATE);
-            }
-          }
-          if(!nDigitals) SendDataIfReady();
-
-          // Set shifters feedback
-          SetShifterFeedback();
-        }
-        // if(bankUpdateFirstTime){
-        //   // SetBankChangeFeedback(FB_BANK_CHANGED);        // Double update banks
-        //   bankUpdateFirstTime = false;
-        // }
-        updatingBankFeedback = false;
-      }break;
-      case FB_BANK_DIGITAL2:{  
-        for(uint16_t n = amountOfDigitalInConfig[DIGITAL_PORT_1]; n < nDigitals; n++){
-          bool isShifter = false;
-          if(config->banks.count > 1){
-            for(int bank = 0; bank < config->banks.count; bank++){
-              byte bankShifterIndex = config->banks.shifterId[bank];
-              if(GetHardwareID(ytxIOBLOCK::Digital, n) == bankShifterIndex){
-                isShifter = true;
-              }
-            }
-          }
-
-          if(!isShifter) {
-            SetChangeDigitalFeedback(n, digitalHw.GetDigitalValue(n), digitalHw.GetDigitalState(n), NO_SHIFTER, BANK_UPDATE);
-          }
-        }
-        
-        SetShifterFeedback();
-
-        updatingBankFeedback = false;
-      }break;
-      default: break;
-    }
-    
-    fbMessagesSent++;
-
-  }
-
-  Serial.write9bit(BURST_END);    // Signal end of burst
-
-  // Wait for ACK from aux controller after the burst is complete
-  // This is the only ACK we wait for in pipelined mode
+  // Retry loop for burst with checksum errors
   //
-  waitingForAck = true;
-  antMicrosAck = micros();
-  while(waitingForAck && ((micros() - antMicrosAck) < 5000));  // 5ms timeout for burst ACK
+  bool burstComplete = false;
 
-  sendingFbData = false;      // Flag end of data send
-    
-  fbMessagesSent = 0;         // Restart message counter
+  while(!burstComplete)
+  {
+    if(!sendingFbData)
+    {
+      sendingFbData = true;
+      burstErrorOccurred = false;
+      Serial.write9bit(BURST_INIT);
+    }
 
+    // Use local send index - don't advance the actual queue until we know the result
+    //
+    uint8_t sendIdx = feedbackUpdateReadIdx;
+    uint16_t itemsRemaining = fbItemsToSend;
+
+    while(itemsRemaining && fbMessagesSent < MSG_BUFFER_AUX)
+    {
+      uint8_t fbUpdateType = feedbackUpdateBuffer[sendIdx].type;
+      uint8_t fbUpdateQueueIndex = sendIdx;
+
+      // Advance local send index (ring buffer wraparound)
+      //
+      if(++sendIdx >= FEEDBACK_UPDATE_BUFFER_SIZE)
+      {
+        sendIdx = 0;
+      }
+      itemsRemaining--;
+
+      switch(fbUpdateType)
+      {
+        case FB_ENCODER:
+        case FB_ENC_2CC:
+        case FB_ENC_SWITCH:
+        case FB_ENC_VAL_TO_COLOR:
+        case FB_ENC_VAL_TO_INT:
+        case FB_ENC_SHIFT:
+        case FB_ENC_SW_VAL_TO_INT:
+        case FB_ENC_VUMETER:
+        {
+          FillFrameWithEncoderData(fbUpdateQueueIndex);
+          SendDataIfReady();
+        }
+        break;
+        case FB_DIGITAL:
+        case FB_DIG_VAL_TO_INT:
+        {
+          FillFrameWithDigitalData(fbUpdateQueueIndex);
+          SendDataIfReady();
+        }
+        break;
+        case FB_ANALOG:
+        {
+        }
+        break;
+        case FB_INDEPENDENT:
+        {
+        }
+        break;
+        case FB_BANK_CHANGED:
+        {
+          // A bank change consists of several burst of data:
+          // First we update the encoders and encoder switches
+          // Then the DIGITAL 1 port
+          // Then, if necessary, the DIGITAL 2 port
+          //
+          updatingBankFeedback = true;
+
+          // Update all rotary encoders
+          //
+          for(uint8_t n = 0; n < nEncoders; n++)
+          {
+            // If it's configured as vumeter encoder, send vumeter feedback first and then value indicator
+            //
+            if(encoder[n].rotaryFeedback.message == rotaryMessageTypes::rotary_msg_vu_cc)
+            {
+              SetChangeEncoderFeedback(FB_ENC_VUMETER, n, encFbData[currentBank][n].vumeterValue,
+                                       encoderHw.GetModuleOrientation(n/4), NO_SHIFTER, BANK_UPDATE);
+              SetChangeEncoderFeedback(FB_ENC_2CC, n, encoderHw.GetEncoderValue(n),
+                                       encoderHw.GetModuleOrientation(n/4), NO_SHIFTER, BANK_UPDATE);
+            }
+            else
+            {
+              SetChangeEncoderFeedback(FB_ENCODER, n, encoderHw.GetEncoderValue(n),
+                                       encoderHw.GetModuleOrientation(n/4), NO_SHIFTER, BANK_UPDATE);
+              // If it's a double CC encoder, update second CC after first
+              //
+              if(encoder[n].switchConfig.mode == switchModes::switch_mode_2cc)
+              {
+                SetChangeEncoderFeedback(FB_ENC_2CC, n, encoderHw.GetEncoderValue2(n),
+                                         encoderHw.GetModuleOrientation(n/4), NO_SHIFTER, BANK_UPDATE);
+              }
+            }
+          }
+
+          // Update all encoder switches that aren't shifters
+          //
+          for(uint8_t n = 0; n < nEncoders; n++)
+          {
+            bool isShifter = false;
+            // Is it a shifter?
+            //
+            if(config->banks.count > 1)
+            {
+              for(int bank = 0; bank < config->banks.count; bank++)
+              {
+                byte bankShifterIndex = config->banks.shifterId[bank];
+                if(GetHardwareID(ytxIOBLOCK::Encoder, n) == bankShifterIndex)
+                {
+                  isShifter = true;
+                }
+              }
+            }
+
+            if(!isShifter)
+            {
+              SetChangeEncoderFeedback(FB_ENC_SWITCH, n, encoderHw.GetEncoderSwitchValue(n),
+                                       encoderHw.GetModuleOrientation(n/4), NO_SHIFTER, BANK_UPDATE);
+            }
+          }
+          SetBankChangeFeedback(FB_BANK_DIGITAL1);
+        }
+        break;
+        case FB_BANK_DIGITAL1:
+        {
+          // Update all digitals that aren't shifters
+          //
+          if(amountOfDigitalInConfig[DIGITAL_PORT_2] > 0)
+          {
+            // If there are digitals on the second port
+            //
+            for(uint16_t n = 0; n < amountOfDigitalInConfig[DIGITAL_PORT_1]; n++)
+            {
+              bool isShifter = false;
+              // Is it a shifter?
+              //
+              if(config->banks.count > 1)
+              {
+                for(int bank = 0; bank < config->banks.count; bank++)
+                {
+                  byte bankShifterIndex = config->banks.shifterId[bank];
+                  if(GetHardwareID(ytxIOBLOCK::Digital, n) == bankShifterIndex)
+                  {
+                    isShifter = true;
+                  }
+                }
+              }
+
+              if(!isShifter)
+              {
+                SetChangeDigitalFeedback(n, digitalHw.GetDigitalValue(n), digitalHw.GetDigitalState(n), NO_SHIFTER, BANK_UPDATE);
+              }
+            }
+            SetBankChangeFeedback(FB_BANK_DIGITAL2);
+          }
+          else
+          {
+            for(uint16_t n = 0; n < nDigitals; n++)
+            {
+              bool isShifter = false;
+
+              // Is it a shifter?
+              //
+              if(config->banks.count > 1)
+              {
+                for(int bank = 0; bank < config->banks.count; bank++)
+                {
+                  byte bankShifterIndex = config->banks.shifterId[bank];
+                  if(GetHardwareID(ytxIOBLOCK::Digital, n) == bankShifterIndex)
+                  {
+                    isShifter = true;
+                  }
+                }
+              }
+
+              if(!isShifter)
+              {
+                SetChangeDigitalFeedback(n, digitalHw.GetDigitalValue(n), digitalHw.GetDigitalState(n), NO_SHIFTER, BANK_UPDATE);
+              }
+            }
+
+            if(!nDigitals)
+            {
+              SendDataIfReady();
+            }
+
+            // Set shifters feedback
+            //
+            SetShifterFeedback();
+          }
+          updatingBankFeedback = false;
+        }
+        break;
+        case FB_BANK_DIGITAL2:
+        {
+          for(uint16_t n = amountOfDigitalInConfig[DIGITAL_PORT_1]; n < nDigitals; n++)
+          {
+            bool isShifter = false;
+            if(config->banks.count > 1)
+            {
+              for(int bank = 0; bank < config->banks.count; bank++)
+              {
+                byte bankShifterIndex = config->banks.shifterId[bank];
+                if(GetHardwareID(ytxIOBLOCK::Digital, n) == bankShifterIndex)
+                {
+                  isShifter = true;
+                }
+              }
+            }
+
+            if(!isShifter)
+            {
+              SetChangeDigitalFeedback(n, digitalHw.GetDigitalValue(n), digitalHw.GetDigitalState(n), NO_SHIFTER, BANK_UPDATE);
+            }
+          }
+
+          SetShifterFeedback();
+          updatingBankFeedback = false;
+        }
+        break;
+        default:
+          break;
+      }
+
+      fbMessagesSent++;
+    }
+
+    Serial.write9bit(BURST_END);    // Signal end of burst
+
+    // Wait for ACK from aux controller after the burst is complete
+    //
+    waitingForAck = true;
+    antMicrosAck = micros();
+    while(waitingForAck && ((micros() - antMicrosAck) < 5000));  // 5ms timeout for burst ACK
+
+    // Determine how many frames succeeded
+    //
+    uint8_t framesSucceeded = 0;
+    bool shouldRetry = false;
+
+    if(burstErrorOccurred)
+    {
+      // Aux reported an error at burstErrorIndex
+      //
+      framesSucceeded = burstErrorIndex;
+      shouldRetry = true;
+    }
+    else if(waitingForAck)
+    {
+      // Timeout - treat as error at index 0 (retry entire burst)
+      //
+      framesSucceeded = 0;
+      shouldRetry = true;
+    }
+    else
+    {
+      // ACK received - all frames succeeded
+      //
+      framesSucceeded = fbMessagesSent;
+      shouldRetry = false;
+    }
+
+    // Advance the queue by the number of successful frames
+    //
+    for(uint8_t i = 0; i < framesSucceeded; i++)
+    {
+      IncreaseBufferIndex(READ_INDEX);
+    }
+
+    fbMessagesSent = 0;
+    sendingFbData = false;
+
+    if(shouldRetry)
+    {
+      burstRetryCount++;
+      if(burstRetryCount >= 20)
+      {
+        // Max retries reached - give up on remaining items, advance past them
+        //
+        while(fbItemsToSend > 0 && fbMessagesSent < MSG_BUFFER_AUX)
+        {
+          IncreaseBufferIndex(READ_INDEX);
+          fbMessagesSent++;
+        }
+        fbMessagesSent = 0;
+        burstRetryCount = 0;
+        burstComplete = true;
+      }
+      // else: loop continues, will retry the remaining items
+      //
+    }
+    else
+    {
+      // Success
+      //
+      burstRetryCount = 0;
+      burstComplete = true;
+    }
+  }
 }
 
 void FeedbackClass::SetShifterFeedback(){

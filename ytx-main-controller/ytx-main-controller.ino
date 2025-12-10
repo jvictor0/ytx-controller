@@ -178,6 +178,15 @@ volatile bool waitingForAck = false;
 volatile bool waitingForRainbow = true;    // At startup, wait for rainbow animation to finish
 uint32_t antMicrosAck = 0;
 
+// Burst error handling variables
+//
+volatile bool burstErrorOccurred = false;
+volatile uint8_t burstErrorIndex = 0;
+volatile bool receivingErrorIndex = false;
+volatile uint8_t errorIndexBytesReceived = 0;
+volatile uint8_t errorIndexByte1 = 0;
+volatile uint8_t errorIndexByte2 = 0;
+
 const uint32_t off = statusLED->Color(0, 0, 0);
 const uint32_t red = statusLED->Color(STATUS_LED_BRIGHTNESS, 0, 0);
 const uint32_t green = statusLED->Color(0, STATUS_LED_BRIGHTNESS, 0);

@@ -47,6 +47,8 @@ extern volatile bool rainbowStart;
 extern volatile bool changeBrightnessFlag;
 extern volatile bool receivingFeedbackData;
 extern volatile bool receivingBank;
+extern volatile bool discardingBurst;
+extern volatile uint8_t burstFrameIndex;
 extern volatile bool showNow;
 extern volatile bool timeToShow;
 extern volatile bool sendShowEnd;

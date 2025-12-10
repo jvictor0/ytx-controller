@@ -15,22 +15,66 @@ void AuxControllerReception_Handler(){
   uint16_t rcvWord = Serial.read();
   bool isCommand = (rcvWord&0x100) ? true : false;
   uint8_t rcvByte = (uint8_t)(rcvWord&0x00FF);
-  // SerialUSB.print("rcvWord: ");SerialUSB.println(rcvWord);
-  // SerialUSB.print("rcvByte: ");SerialUSB.println(rcvByte);
-  if(isCommand){
-    if(rcvByte == SHOW_IN_PROGRESS){
+
+  // If we're receiving error index bytes (data bytes after CHECKSUM_ERROR)
+  //
+  if(receivingErrorIndex && !isCommand)
+  {
+    if(errorIndexBytesReceived == 0)
+    {
+      errorIndexByte1 = rcvByte;
+      errorIndexBytesReceived = 1;
+    }
+    else
+    {
+      errorIndexByte2 = rcvByte;
+      errorIndexBytesReceived = 0;
+      receivingErrorIndex = false;
+
+      // Verify the two bytes match; if not, treat as error at index 0
+      //
+      if(errorIndexByte1 == errorIndexByte2)
+      {
+        burstErrorIndex = errorIndexByte1;
+      }
+      else
+      {
+        burstErrorIndex = 0;
+      }
+
+      burstErrorOccurred = true;
+      waitingForAck = false;
+    }
+    return;
+  }
+
+  if(isCommand)
+  {
+    if(rcvByte == SHOW_IN_PROGRESS)
+    {
       fbShowInProgress = true;
       antMicrosAuxShow = micros();
-      // SerialUSB.println("SHOW_IN_PROGRESS");
-    }else if(rcvByte == SHOW_END){
+    }
+    else if(rcvByte == SHOW_END)
+    {
       fbShowInProgress = false;
-      // SerialUSB.println("SHOW_END");
-    }else if(rcvByte == ACK_CMD){
+    }
+    else if(rcvByte == ACK_CMD)
+    {
       waitingForAck = false;
-      // SerialUSB.println("ACK_CMD");
-    }else if(rcvByte == RESET_HAPPENED){
-
-    }else if(rcvByte == END_OF_RAINBOW){
+    }
+    else if(rcvByte == CHECKSUM_ERROR)
+    {
+      // Start receiving the error index bytes
+      //
+      receivingErrorIndex = true;
+      errorIndexBytesReceived = 0;
+    }
+    else if(rcvByte == RESET_HAPPENED)
+    {
+    }
+    else if(rcvByte == END_OF_RAINBOW)
+    {
       waitingForRainbow = false;
     }
   }
