@@ -757,6 +757,58 @@ void AnalogInputs::SendMessage(uint8_t aInput){
                                  analog[aInput].parameter[analog_minLSB];
   uint16_t maxValue = (is14bit ? analog[aInput].parameter[analog_maxMSB]<<7 : 0) | 
                                  analog[aInput].parameter[analog_maxLSB];
+  bool invert = minValue > maxValue;
+
+  // For split mode dumps, recompute channel/value from current hardware position
+  // so startup and SysEx dumps match runtime split behavior.
+  if(analog[aInput].splitMode == splitModes::splitCenter){
+    uint16_t constrainedValue = constrain(aHwData[aInput].analogRawValue,
+                                          minRawValue + RAW_THRESHOLD,
+                                          maxRawValue - RAW_THRESHOLD);
+
+    uint16_t lower = invert ? maxValue : minValue;
+    uint16_t higher = maxValue * 2 + 1; // default
+    uint16_t dead_space = is14bit ? (SPLIT_DEAD_ZONE << 6) : SPLIT_DEAD_ZONE;
+
+    if(analog[aInput].deadZone == deadZone::dz_off){
+      higher = invert ? (minValue * 2 + 1) :
+                        (maxValue * 2 + 1);
+    }else if(analog[aInput].deadZone == deadZone::dz_on){
+      higher = invert ? (minValue * 2 + 1 + dead_space) :
+                        (maxValue * 2 + 1 + dead_space);
+    }
+
+    uint16_t hwPositionValue = mapl(constrainedValue,
+                                    minRawValue + RAW_THRESHOLD,
+                                    maxRawValue - RAW_THRESHOLD,
+                                    lower,
+                                    higher);
+
+    uint16_t centerValue = ((lower + higher) % 2) ? ((lower + higher + 1) / 2) :
+                                                   ((lower + higher) / 2);
+
+    if(analog[aInput].deadZone == deadZone::dz_off){
+      if(hwPositionValue < centerValue){
+        valueToSend = mapl(hwPositionValue, lower, centerValue - 1, maxValue, minValue);
+        channelToSend = config->midiConfig.splitModeChannel + 1;
+      }else{
+        valueToSend = mapl(hwPositionValue, centerValue, higher, minValue, maxValue);
+      }
+    }else if(analog[aInput].deadZone == deadZone::dz_on){
+      if(hwPositionValue < centerValue - dead_space / 2){
+        valueToSend = mapl(hwPositionValue, lower, centerValue - dead_space / 2 - 1, maxValue, minValue);
+        channelToSend = config->midiConfig.splitModeChannel + 1;
+      }else if(hwPositionValue > centerValue + dead_space / 2){
+        valueToSend = mapl(hwPositionValue, centerValue + dead_space / 2 + 1, higher, minValue, maxValue);
+      }else{
+        // In dead zone, dump a deterministic minimum value.
+        valueToSend = minValue;
+        if(hwPositionValue < centerValue){
+          channelToSend = config->midiConfig.splitModeChannel + 1;
+        }
+      }
+    }
+  }
 
   // Act accordingly to configuration
   switch(analog[aInput].message){
@@ -781,10 +833,32 @@ void AnalogInputs::SendMessage(uint8_t aInput){
       }
     }break;
     case analogMessageTypes::analog_msg_nrpn:{
-      updateValue |= ((uint64_t) 1 << (uint64_t) aInput);
+      if(analog[aInput].midiPort & 0x01){
+        MIDI.sendControlChange(99, (paramToSend >> 7) & 0x7F, channelToSend);
+        MIDI.sendControlChange(98, (paramToSend & 0x7F), channelToSend);
+        MIDI.sendControlChange(6, (valueToSend >> 7) & 0x7F, channelToSend);
+        MIDI.sendControlChange(38, (valueToSend & 0x7F), channelToSend);
+      }
+      if(analog[aInput].midiPort & 0x02){
+        MIDIHW.sendControlChange(99, (paramToSend >> 7) & 0x7F, channelToSend);
+        MIDIHW.sendControlChange(98, (paramToSend & 0x7F), channelToSend);
+        MIDIHW.sendControlChange(6, (valueToSend >> 7) & 0x7F, channelToSend);
+        MIDIHW.sendControlChange(38, (valueToSend & 0x7F), channelToSend);
+      }
     }break;
     case analogMessageTypes::analog_msg_rpn:{
-      updateValue |= ((uint64_t) 1 << (uint64_t) aInput);
+      if(analog[aInput].midiPort & 0x01){
+        MIDI.sendControlChange(101, (paramToSend >> 7) & 0x7F, channelToSend);
+        MIDI.sendControlChange(100, (paramToSend & 0x7F), channelToSend);
+        MIDI.sendControlChange(6, (valueToSend >> 7) & 0x7F, channelToSend);
+        MIDI.sendControlChange(38, (valueToSend & 0x7F), channelToSend);
+      }
+      if(analog[aInput].midiPort & 0x02){
+        MIDIHW.sendControlChange(101, (paramToSend >> 7) & 0x7F, channelToSend);
+        MIDIHW.sendControlChange(100, (paramToSend & 0x7F), channelToSend);
+        MIDIHW.sendControlChange(6, (valueToSend >> 7) & 0x7F, channelToSend);
+        MIDIHW.sendControlChange(38, (valueToSend & 0x7F), channelToSend);
+      }
     }break;
     case analogMessageTypes::analog_msg_pb:{
       int16_t valuePb = mapl(valueToSend, minValue, maxValue,((int16_t) minValue)-8192, ((int16_t) maxValue)-8192);

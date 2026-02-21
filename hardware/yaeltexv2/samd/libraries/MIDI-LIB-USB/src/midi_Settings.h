@@ -77,6 +77,11 @@ struct DefaultSettings
     to receive SysEx, or adjust accordingly.
     */
     static const unsigned SysExMaxSize = 128;
+
+    /*! When enabled, output is limited to Clock + transport real-time messages
+    (Clock, Start, Continue, Stop). All other outgoing message types are dropped.
+    */
+    static const bool OutputClockTransportOnly = false;
 };
 
 END_MIDI_NAMESPACE

@@ -155,10 +155,11 @@ void MainControllerReception_Handler(void){
 					
 						FeedbackFramesBuffer[writeIdx].updateFrame	= messageBody[FeedbackFrame_Type];
 					
-						if(	FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_CHANGE_FRAME ||
-							FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_DOUBLE_FRAME ||
-							FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_VUMETER_FRAME ||
-							FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
+							if(	FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_CHANGE_FRAME ||
+								FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_BLEND_FRAME  ||
+								FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_DOUBLE_FRAME ||
+								FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_VUMETER_FRAME ||
+								FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
 
 							FeedbackFramesBuffer[writeIdx].updateN		=	messageBody[FeedbackFrame_nRing];
 							FeedbackFramesBuffer[writeIdx].updateO		=	messageBody[FeedbackFrame_Orientation];

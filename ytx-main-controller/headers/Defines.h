@@ -412,6 +412,7 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define DIGITAL2_CHANGE_FRAME           0x05
 #define ANALOG_CHANGE_FRAME             0x06
 #define BANK_CHANGE_FRAME               0x07
+#define ENCODER_BLEND_FRAME             0x08
 
 // BRIGHTNESS
 #define BRIGHTNESS_WOP                    25

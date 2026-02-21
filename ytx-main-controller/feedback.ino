@@ -541,6 +541,8 @@ void FeedbackClass::FillFrameWithEncoderData(byte updateIndex){
   uint8_t msgType = 0;
   bool is14bits = false;
   bool onCenterValue = false;
+  bool useSpotBlendFrame = false;
+  uint8_t spotBlendMeta = 0;
   
   uint8_t indexChanged = feedbackUpdateBuffer[updateIndex].indexChanged;
   uint8_t newOrientation = feedbackUpdateBuffer[updateIndex].newOrientation;
@@ -598,25 +600,72 @@ void FeedbackClass::FillFrameWithEncoderData(byte updateIndex){
     if(!rotaryValueToColor && !valueToIntensity){
       switch(rotaryMode){
         case encoderRotaryFeedbackMode::fb_spot: {
-          float fbStep = abs(maxValue-minValue);
-          fbStep =  fbStep/S_SPOT_SIZE;
-          if(fbStep){
-            for(int step = 0; step < S_SPOT_SIZE-1; step++){
-              if((newValue >= lowerValue + step*fbStep) && (newValue <= lowerValue + (step+1)*fbStep)){
-                ringStateIndex = invert ? (S_SPOT_SIZE-1 - step) : step;
-              }else if(newValue > lowerValue + (step+1)*fbStep){
-                ringStateIndex = invert ? 0 : S_SPOT_SIZE-1;
-              }
-            }
-          }else{
-            if(!invert)
-              ringStateIndex = mapl(newValue, lowerValue, higherValue, 0, S_SPOT_SIZE-1);
-            else
-              ringStateIndex = mapl(newValue, lowerValue, higherValue, S_SPOT_SIZE-1, 0);
-          }  
-                                                                           
+          // Spot mode uses 13 ring LEDs: map min/max exactly to first/last LED.
+          const uint8_t ringLedCount = S_SPOT_SIZE - 1;
+          const uint8_t lastRingSlot = ringLedCount - 1;
+
+          uint16_t clampedValue = newValue;
+          if(clampedValue < lowerValue) clampedValue = lowerValue;
+          if(clampedValue > higherValue) clampedValue = higherValue;
+
+          uint8_t primarySlot = 0;
+          uint8_t secondarySlot = 0;
+          uint8_t secondaryWeightQ8 = 0;
+
+          if(higherValue > lowerValue){
+            uint32_t posQ8 = ((uint32_t)(clampedValue - lowerValue) * lastRingSlot * 256UL) / (higherValue - lowerValue);
+            primarySlot = (uint8_t)(posQ8 >> 8);
+            if(primarySlot > lastRingSlot) primarySlot = lastRingSlot;
+            secondaryWeightQ8 = (uint8_t)(posQ8 & 0xFF);
+          }
+
+          secondarySlot = (primarySlot < lastRingSlot) ? (primarySlot + 1) : primarySlot;
+          if(primarySlot == secondarySlot){
+            secondaryWeightQ8 = 0;
+          }
+
+          if(invert){
+            primarySlot = lastRingSlot - primarySlot;
+            secondarySlot = lastRingSlot - secondarySlot;
+          }
+
+          uint8_t primaryStateIndex = primarySlot + 1;
+          uint8_t secondaryStateIndex = secondarySlot + 1;
+
+          uint16_t primaryMask = pgm_read_word(&simpleSpot[newOrientation][primaryStateIndex]);
+          uint16_t secondaryMask = pgm_read_word(&simpleSpot[newOrientation][secondaryStateIndex]);
+
           encFbData[currentBank][indexChanged].encRingState &= newOrientation ? ENCODER_SWITCH_V_ON : ENCODER_SWITCH_H_ON;
-          encFbData[currentBank][indexChanged].encRingState |= pgm_read_word(&simpleSpot[newOrientation][ringStateIndex]);
+          encFbData[currentBank][indexChanged].encRingState |= primaryMask;
+
+          // Encode blend metadata in Orientation byte when between adjacent LEDs.
+          if(secondaryWeightQ8 && (primaryStateIndex != secondaryStateIndex)){
+            uint8_t secondaryWeight6 = (uint8_t)(((uint16_t)secondaryWeightQ8 * 63U + 127U) / 255U);
+            if(secondaryWeight6){
+              uint8_t primaryBit = 0;
+              uint8_t secondaryBit = 0;
+              for(uint8_t bit = 0; bit < 16; bit++){
+                if(primaryMask & ((uint16_t)1 << bit)){
+                  primaryBit = bit;
+                  break;
+                }
+              }
+              for(uint8_t bit = 0; bit < 16; bit++){
+                if(secondaryMask & ((uint16_t)1 << bit)){
+                  secondaryBit = bit;
+                  break;
+                }
+              }
+
+              bool secondaryIsLowerBit = (secondaryBit < primaryBit);
+              spotBlendMeta = (newOrientation & 0x01) |
+                              ((secondaryIsLowerBit ? 1 : 0) << 1) |
+                              ((secondaryWeight6 & 0x3F) << 2);
+
+              encFbData[currentBank][indexChanged].encRingState |= secondaryMask;
+              useSpotBlendFrame = true;
+            }
+          }
         }
         break;
         case encoderRotaryFeedbackMode::fb_fill: {
@@ -874,7 +923,7 @@ void FeedbackClass::FillFrameWithEncoderData(byte updateIndex){
         || encoderSwitchChanged) {
     encFbData[currentBank][indexChanged].encRingStatePrev = encFbData[currentBank][indexChanged].encRingState;    // not being used
     
-    feedbackFrameBuffer[FeedbackFrame_Type] = (fbUpdateType == FB_ENCODER      ? ENCODER_CHANGE_FRAME        :
+    feedbackFrameBuffer[FeedbackFrame_Type] = (fbUpdateType == FB_ENCODER      ? (useSpotBlendFrame ? ENCODER_BLEND_FRAME : ENCODER_CHANGE_FRAME) :
                                         fbUpdateType == FB_ENC_2CC      ? ENCODER_DOUBLE_FRAME        : 
                                         fbUpdateType == FB_ENC_VUMETER  ? ENCODER_VUMETER_FRAME       : 
                                         fbUpdateType == FB_ENC_SWITCH   ? ENCODER_SWITCH_CHANGE_FRAME : 255);   
@@ -902,7 +951,7 @@ void FeedbackClass::FillFrameWithEncoderData(byte updateIndex){
     uint8_t brightness = encoderHw.GetEncoderBrightness(indexChanged);
 
     feedbackFrameBuffer[FeedbackFrame_nRing] = indexChanged;
-    feedbackFrameBuffer[FeedbackFrame_Orientation] = newOrientation;
+    feedbackFrameBuffer[FeedbackFrame_Orientation] = (useSpotBlendFrame && fbUpdateType == FB_ENCODER) ? spotBlendMeta : newOrientation;
     feedbackFrameBuffer[FeedbackFrame_RingStateH] = encFbData[currentBank][indexChanged].encRingState >> 8;
     feedbackFrameBuffer[FeedbackFrame_RingStateL] = encFbData[currentBank][indexChanged].encRingState & 0xff;
     feedbackFrameBuffer[FeedbackFrame_R] = colorR*brightness/MAX_INTENSITY*intensityFactor/MAX_INTENSITY;

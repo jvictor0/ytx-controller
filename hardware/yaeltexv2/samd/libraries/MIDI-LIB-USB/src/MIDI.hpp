@@ -135,6 +135,15 @@ void MidiInterface<SerialPort, Settings>::send(MidiType inType,
                                                DataByte inData2,
                                                Channel inChannel)
 {
+    if (Settings::OutputClockTransportOnly &&
+        inType != Clock &&
+        inType != Start &&
+        inType != Continue &&
+        inType != Stop)
+    {
+        return;
+    }
+
     // Then test if channel is valid
     if (inChannel >= MIDI_CHANNEL_OFF  ||
         inChannel == MIDI_CHANNEL_OMNI ||
@@ -326,6 +335,11 @@ void MidiInterface<SerialPort, Settings>::sendSysEx(unsigned inLength,
                                                     const byte* inArray,
                                                     bool inArrayContainsBoundaries)
 {
+    if (Settings::OutputClockTransportOnly)
+    {
+        return;
+    }
+
     const bool writeBeginEndBytes = !inArrayContainsBoundaries;
 
     if (writeBeginEndBytes)
@@ -357,6 +371,11 @@ void MidiInterface<SerialPort, Settings>::sendSysEx(unsigned inLength,
 template<class SerialPort, class Settings>
 void MidiInterface<SerialPort, Settings>::sendTuneRequest()
 {
+    if (Settings::OutputClockTransportOnly)
+    {
+        return;
+    }
+
     mSerial.write(TuneRequest);
 
     if (Settings::UseRunningStatus)
@@ -388,6 +407,11 @@ void MidiInterface<SerialPort, Settings>::sendTimeCodeQuarterFrame(DataByte inTy
 template<class SerialPort, class Settings>
 void MidiInterface<SerialPort, Settings>::sendTimeCodeQuarterFrame(DataByte inData)
 {
+    if (Settings::OutputClockTransportOnly)
+    {
+        return;
+    }
+
     mSerial.write((byte)TimeCodeQuarterFrame);
     mSerial.write(inData);
 
@@ -403,6 +427,11 @@ void MidiInterface<SerialPort, Settings>::sendTimeCodeQuarterFrame(DataByte inDa
 template<class SerialPort, class Settings>
 void MidiInterface<SerialPort, Settings>::sendSongPosition(unsigned inBeats)
 {
+    if (Settings::OutputClockTransportOnly)
+    {
+        return;
+    }
+
     mSerial.write((byte)SongPosition);
     mSerial.write(inBeats & 0x7f);
     mSerial.write((inBeats >> 7) & 0x7f);
@@ -417,6 +446,11 @@ void MidiInterface<SerialPort, Settings>::sendSongPosition(unsigned inBeats)
 template<class SerialPort, class Settings>
 void MidiInterface<SerialPort, Settings>::sendSongSelect(DataByte inSongNumber)
 {
+    if (Settings::OutputClockTransportOnly)
+    {
+        return;
+    }
+
     mSerial.write((byte)SongSelect);
     mSerial.write(inSongNumber & 0x7f);
 
@@ -435,6 +469,15 @@ void MidiInterface<SerialPort, Settings>::sendSongSelect(DataByte inSongNumber)
 template<class SerialPort, class Settings>
 void MidiInterface<SerialPort, Settings>::sendRealTime(MidiType inType)
 {
+    if (Settings::OutputClockTransportOnly &&
+        inType != Clock &&
+        inType != Start &&
+        inType != Continue &&
+        inType != Stop)
+    {
+        return;
+    }
+
     // Do not invalidate Running Status for real-time messages
     // as they can be interleaved within any message.
 

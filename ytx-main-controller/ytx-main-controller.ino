@@ -235,6 +235,7 @@ bool powerAdapterConnected = false;
     static const bool Use1ByteParsing = false;
     static const unsigned SysExMaxSize = 512; // Accept SysEx messages.
     static const bool UseRunningStatus = false; // My devices seem to be ok with it.
+    static const bool OutputClockTransportOnly = true; // DIN out: allow only Clock/Start/Continue/Stop.
   };
 
   // Create a 'MIDI' object using MySettings bound to Serial1.

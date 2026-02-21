@@ -118,24 +118,55 @@ void feedbackDataUpdate()
 {
 	while(readIdx != writeIdx){ // If there is data to update
 
-		uint8_t frame = FeedbackFramesBuffer[readIdx].updateFrame;
-		uint8_t elementToChange = FeedbackFramesBuffer[readIdx].updateN;
-		bool vertical = FeedbackFramesBuffer[readIdx].updateO;
-		uint16_t newState = FeedbackFramesBuffer[readIdx].updateState;
-		uint8_t intR = FeedbackFramesBuffer[readIdx].updateR;
-		uint8_t intG = FeedbackFramesBuffer[readIdx].updateG;
-		uint8_t intB = FeedbackFramesBuffer[readIdx].updateB;
+			uint8_t frame = FeedbackFramesBuffer[readIdx].updateFrame;
+			uint8_t elementToChange = FeedbackFramesBuffer[readIdx].updateN;
+			uint8_t orientationMeta = FeedbackFramesBuffer[readIdx].updateO;
+			bool isBlendFrame = (frame == ENCODER_BLEND_FRAME);
+			bool vertical = isBlendFrame ? (orientationMeta & 0x01) : orientationMeta;
+			uint16_t newState = FeedbackFramesBuffer[readIdx].updateState;
+			uint8_t intR = FeedbackFramesBuffer[readIdx].updateR;
+			uint8_t intG = FeedbackFramesBuffer[readIdx].updateG;
+			uint8_t intB = FeedbackFramesBuffer[readIdx].updateB;
 							
 		//uint8_t brightnessMult = 1;
 		//uint8_t minMaxDif = abs(max-min);
 		int8_t lastLedOn = 0;
 		
-		if(frame == ENCODER_CHANGE_FRAME){		// ROTARY CHANGE
-			bool ledOnOrOff = false;
-			bool ledForSwitch = false;
-			
-			for (int i = 0; i < 16; i++) {
-				ledOnOrOff = newState&(1<<i);		// Get LED state
+			if(frame == ENCODER_CHANGE_FRAME || frame == ENCODER_BLEND_FRAME){		// ROTARY CHANGE
+				bool ledOnOrOff = false;
+				bool ledForSwitch = false;
+				int8_t lowerRingBit = -1;
+				int8_t upperRingBit = -1;
+				uint8_t secondaryWeight = 0;
+				bool secondaryIsLowerBit = false;
+
+				if(isBlendFrame){
+					secondaryWeight = (orientationMeta >> 2) & 0x3F;
+					secondaryIsLowerBit = (orientationMeta & 0x02) ? true : false;
+
+					// Find the two active ring LEDs (if present) to apply weighted blend.
+					for(int i = 0; i < 16; i++){
+						ledOnOrOff = newState&(1<<i);
+						if(vertical){
+							ledOnOrOff &= ((ENCODER_MASK_V>>i)&1);
+							ledForSwitch = ((ENCODER_SWITCH_V_ON>>i)&1);
+						}else{
+							ledOnOrOff &= ((ENCODER_MASK_H>>i)&1);
+							ledForSwitch = ((ENCODER_SWITCH_H_ON>>i)&1);
+						}
+						if(ledOnOrOff && !ledForSwitch){
+							if(lowerRingBit < 0){
+								lowerRingBit = i;
+							}else{
+								upperRingBit = i;
+								break;
+							}
+						}
+					}
+				}
+				
+				for (int i = 0; i < 16; i++) {
+					ledOnOrOff = newState&(1<<i);		// Get LED state
 				
 				if(vertical){									// Encoder is vertical
 					ledOnOrOff &= ((ENCODER_MASK_V>>i)&1);			// get LED state
@@ -145,14 +176,32 @@ void feedbackDataUpdate()
 					ledOnOrOff &= ((ENCODER_MASK_H>>i)&1);			// get LED state
 					ledForSwitch = ((ENCODER_SWITCH_H_ON>>i)&1);	// is it a switch LED or a ring LED
 				}
-				
-				if (ledOnOrOff && !ledForSwitch) {				// If LED is for ring, and its state is ON
-					if(elementToChange < N_ENCODERS_STRIP_1){					// Is it an encoder on the first strip or second?
-						setPixelColor(	ENCODER1_STRIP,					// N strip
-						NUM_LEDS_ENCODER*elementToChange + i,	// N led
-						intR, intG, intB);				// R, G, B
-						
-						// BASED ON FEEDBACK METHOD, calculate brightness multiplier for adjacent LEDs based on value
+					
+					if (ledOnOrOff && !ledForSwitch) {				// If LED is for ring, and its state is ON
+						uint8_t outR = intR;
+						uint8_t outG = intG;
+						uint8_t outB = intB;
+
+						if(isBlendFrame && lowerRingBit >= 0 && upperRingBit >= 0){
+							bool thisIsSecondary = false;
+							if(i == lowerRingBit){
+								thisIsSecondary = secondaryIsLowerBit;
+							}else if(i == upperRingBit){
+								thisIsSecondary = !secondaryIsLowerBit;
+							}
+
+							uint8_t ledWeight = thisIsSecondary ? secondaryWeight : (63 - secondaryWeight);
+							outR = (uint8_t)(((uint16_t)intR * ledWeight) / 63U);
+							outG = (uint8_t)(((uint16_t)intG * ledWeight) / 63U);
+							outB = (uint8_t)(((uint16_t)intB * ledWeight) / 63U);
+						}
+
+						if(elementToChange < N_ENCODERS_STRIP_1){					// Is it an encoder on the first strip or second?
+							setPixelColor(	ENCODER1_STRIP,					// N strip
+							NUM_LEDS_ENCODER*elementToChange + i,	// N led
+							outR, outG, outB);				// R, G, B
+							
+							// BASED ON FEEDBACK METHOD, calculate brightness multiplier for adjacent LEDs based on value
 						// ONLY FOR FILL FEEDBACK METHOD, calculate brightness multiplier based on value
 						//if(!vertical && i != 13){
 						//if(minMaxDif > 48){
@@ -163,14 +212,14 @@ void feedbackDataUpdate()
 						//intR/brightnessMult,				// R
 						//intG/brightnessMult,				// G
 						//intB/brightnessMult);				// B
-						//}
-						}else{		// ENCODER STRIP 2
-						setPixelColor(	ENCODER2_STRIP,										// N strip
-						NUM_LEDS_ENCODER*(elementToChange-N_ENCODERS_STRIP_1) + i,// N led
-						intR, intG, intB);									// R, G, B
-					}
-					lastLedOn = i;
-					} else if(ledForSwitch){
+							//}
+							}else{		// ENCODER STRIP 2
+							setPixelColor(	ENCODER2_STRIP,										// N strip
+							NUM_LEDS_ENCODER*(elementToChange-N_ENCODERS_STRIP_1) + i,// N led
+							outR, outG, outB);									// R, G, B
+						}
+						lastLedOn = i;
+						} else if(ledForSwitch){
 					// IF IT IS A LED FOR THE SWITCH, DO NOTHING
 					} else {											// Ring LED, state OFF
 					if(elementToChange < N_ENCODERS_STRIP_1){					// ENCODER STRIP 1
@@ -335,10 +384,11 @@ void feedbackDataUpdate()
 
 		indexChanged = FeedbackFramesBuffer[readIdx].updateN;
 
-		if(FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_CHANGE_FRAME	||
-		   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_VUMETER_FRAME ||
-		   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_DOUBLE_FRAME	||
-		   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
+			if(FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_CHANGE_FRAME	||
+			   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_BLEND_FRAME	||
+			   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_VUMETER_FRAME ||
+			   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_DOUBLE_FRAME	||
+			   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
 			if(indexChanged < N_ENCODERS_STRIP_1){
 				whichStripToShow |= (1<<ENCODER1_STRIP);
 			}else{
