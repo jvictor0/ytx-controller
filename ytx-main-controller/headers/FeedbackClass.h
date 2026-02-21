@@ -152,14 +152,30 @@ public:
 	FeedbackClass::digFeedbackData* GetCurrentDigitalFeedbackData(uint8_t bank, uint8_t digNo);
 
 private:
+	typedef struct  __attribute__((packed)){
+		uint8_t type;
+		uint8_t indexChanged;		// MAX INDEX 255 -> 256 DIGITALS
+		uint16_t newValue;
+		uint8_t newOrientation : 1;
+		uint8_t isShifter : 1;
+		uint8_t updatingBank : 1;
+		uint8_t rotaryValueToColor : 1;
+		uint8_t valueToIntensity : 1;
+		uint8_t unused : 3;
+	}feedbackUpdateStruct;
+
 	void AddCheckSum();
 	void SendFeedbackData();
 	void SendDataIfReady();
 	void FillFrameWithEncoderData(byte);
 	void FillFrameWithDigitalData(byte);
+	void ProcessQueuedFeedbackEntry(uint8_t);
 	void SetShifterFeedback();
 	void WaitForMIDI(bool);
 	void IncreaseBufferIndex(bool);
+	void QueueFeedbackUpdate(uint8_t, uint8_t, uint16_t, uint8_t, bool, bool, bool, bool, bool);
+	bool IsCoalescableType(uint8_t);
+	int16_t FindPendingUpdate(uint8_t, uint8_t, bool);
 	
 
 	uint8_t nBanks;
@@ -172,19 +188,11 @@ private:
 	volatile bool feedbackDataToSend;
 	uint8_t fbMessagesSent;
 	uint8_t burstRetryCount;
+	uint16_t burstItemsRemaining;
+	uint8_t burstSendIdx;
+	bool burstInProgress;
+	bool burstAwaitingAck;
 	bool updatingBankFeedback;
-
-	typedef struct  __attribute__((packed)){
-		uint8_t type;
-		uint8_t indexChanged;		// MAX INDEX 255 -> 256 DIGITALS
-		uint16_t newValue;
-		uint8_t newOrientation : 1;
-		uint8_t isShifter : 1;
-		uint8_t updatingBank : 1;
-		uint8_t rotaryValueToColor : 1;
-		uint8_t valueToIntensity : 1;
-		uint8_t unused : 3;
-	}feedbackUpdateStruct;
 	
 	feedbackUpdateStruct feedbackUpdateBuffer[FEEDBACK_UPDATE_BUFFER_SIZE];
 	uint8_t feedbackUpdateReadIdx;
@@ -214,6 +222,4 @@ private:
 };
 
 #endif
-
-
 
