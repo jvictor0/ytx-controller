@@ -238,6 +238,10 @@ void FeedbackClass::Update() {
     waitingForAck = false;
     burstInProgress = false;
     burstAwaitingAck = false;
+    receivingErrorIndex = false;
+    errorIndexBytesReceived = 0;
+    errorIndexByte1 = 0;
+    errorIndexByte2 = 0;
 
     if(shouldRetry){
       burstRetryCount++;
@@ -268,6 +272,11 @@ void FeedbackClass::Update() {
 
     burstInProgress = true;
     burstErrorOccurred = false;
+    burstErrorIndex = 0;
+    receivingErrorIndex = false;
+    errorIndexBytesReceived = 0;
+    errorIndexByte1 = 0;
+    errorIndexByte2 = 0;
     fbMessagesSent = 0;
     burstSendIdx = feedbackUpdateReadIdx;
     burstItemsRemaining = fbItemsToSend;

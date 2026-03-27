@@ -63,7 +63,7 @@ void MainControllerReception_Handler(void){
 	  	uint8_t rcvByte = (uint8_t)(rcvWord&0x00FF);
 
 		// When discarding burst after error, ignore data bytes and burst-related commands
-		// until a non-burst command arrives
+		// until a fresh BURST_INIT or some other non-burst command arrives.
 		//
 		if(discardingBurst)
 		{
@@ -71,6 +71,18 @@ void MainControllerReception_Handler(void){
 			{
 				// Ignore data bytes while discarding
 				//
+				return;
+			}
+
+			// A fresh BURST_INIT is the re-sync point after a burst failure.
+			//
+			if(rcvByte == BURST_INIT)
+			{
+				discardingBurst = false;
+				receivedBytes = 0;
+				receivingBank = true;
+				receivingFeedbackData = true;
+				burstFrameIndex = 0;
 				return;
 			}
 
@@ -103,17 +115,20 @@ void MainControllerReception_Handler(void){
 			}else if (rcvByte == CHANGE_BRIGHTNESS && !receivingBrightness)	{
 				// CHANGE BRIGHTNESS COMMAND
 				receivingBrightness = true;
-			}else if (rcvByte == BURST_INIT && !receivingBank){
+			}else if (rcvByte == BURST_INIT){
 				// BURST INIT COMMAND
 				//
 				receivingBank = true;
 				receivingFeedbackData = true;
+				receivedBytes = 0;
 				burstFrameIndex = 0;
 			}else if (rcvByte == BURST_END && receivingBank && receivingFeedbackData){
 				// BANK END COMMAND
 				// SerialUSB.println("BANK END COMMAND");
 				receivingBank = false;
 				receivingFeedbackData = false;
+				receivedBytes = 0;
+				burstFrameIndex = 0;
 				updateBank = true;
 				// ACK the entire burst now that it's complete
 				//
@@ -136,10 +151,11 @@ void MainControllerReception_Handler(void){
 						// Send error with frame index (twice for verification)
 						//
 						SendToMain(CHECKSUM_ERROR);
-						SendToMain(burstFrameIndex);
-						SendToMain(burstFrameIndex);
+						SendDataToMain(burstFrameIndex);
+						SendDataToMain(burstFrameIndex);
 						// Abort burst and discard remaining data
 						//
+						receivedBytes = 0;
 						receivingBank = false;
 						receivingFeedbackData = false;
 						discardingBurst = true;
@@ -197,10 +213,11 @@ void MainControllerReception_Handler(void){
 						// Checksum mismatch - send error with frame index (twice for verification)
 						//
 						SendToMain(CHECKSUM_ERROR);
-						SendToMain(burstFrameIndex);
-						SendToMain(burstFrameIndex);
+						SendDataToMain(burstFrameIndex);
+						SendDataToMain(burstFrameIndex);
 						// Abort burst and discard remaining data
 						//
+						receivedBytes = 0;
 						receivingBank = false;
 						receivingFeedbackData = false;
 						discardingBurst = true;

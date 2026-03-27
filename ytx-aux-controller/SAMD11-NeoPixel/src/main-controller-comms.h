@@ -32,5 +32,6 @@ SOFTWARE.
 #include <asf.h>
 
 bool SendToMain(uint8_t command);
+bool SendDataToMain(uint8_t data);
 
 #endif /* MAIN_CONTROLLER_COMMS_H_ */

@@ -28,11 +28,19 @@ SOFTWARE.
 
 #include "main-controller-comms.h"
 
-bool SendToMain(uint8_t command){
-	if(SERCOM2->USART.INTFLAG.bit.DRE){
-		SERCOM2->USART.DATA.reg = (((uint16_t)command) + 0x100);
-		return 1;
-	}else{
-		return 0;
+static inline void waitForMainTxReady(void){
+	while(!SERCOM2->USART.INTFLAG.bit.DRE){
 	}
+}
+
+bool SendToMain(uint8_t command){
+	waitForMainTxReady();
+	SERCOM2->USART.DATA.reg = (((uint16_t)command) + 0x100);
+	return 1;
+}
+
+bool SendDataToMain(uint8_t data){
+	waitForMainTxReady();
+	SERCOM2->USART.DATA.reg = (uint16_t)data;
+	return 1;
 }
