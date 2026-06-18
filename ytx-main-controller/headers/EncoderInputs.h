@@ -75,7 +75,7 @@ static const PROGMEM uint8_t quarterStepTable[10][4] = {
     // R_START_2
     {R_START_0 | DIR_CCW,	R_START_1,  		R_START_2,     			R_CW_2 | DIR_CW},
     // R_START_3
-    {R_START_0,    			R_CW_3 | DIR_CW,  	R_CCW_3 | DIR_CW,  		R_START_3},
+    {R_START_0,    			R_CW_3 | DIR_CW,  	R_CCW_3 | DIR_CCW,  	R_START_3},
     // R_CW_1
     {R_START_0 | DIR_CCW,  	R_START_1,     		R_START_2, 				R_CW_2 | DIR_CW},
     // R_CW_2
@@ -175,12 +175,30 @@ public:
 	void SetEncoderShiftValue(uint8_t, uint8_t, uint16_t);
 	void SetEncoder2cc(uint8_t, uint8_t, uint16_t);
 	void SetEncoderSwitchValue(uint8_t, uint8_t, uint16_t);
-	void SetProgramChange(uint8_t,uint8_t,uint8_t);
-	void RefreshData(uint8_t, uint8_t);
-	uint8_t GetModuleOrientation(uint8_t);
-	uint8_t GetModuleType(uint8_t);
-	uint8_t GetThisEncoderBank(uint8_t);
-	uint8_t GetEncoderBrightness(uint8_t);
+		void SetProgramChange(uint8_t,uint8_t,uint8_t);
+		void RefreshData(uint8_t, uint8_t);
+		uint8_t GetModuleOrientation(uint8_t);
+		uint8_t GetModuleType(uint8_t);
+		typedef struct __attribute__((packed)){
+			uint8_t encoder;
+			uint8_t module;
+			uint8_t moduleType;
+			uint8_t pinA;
+			uint8_t pinB;
+			uint8_t lastState;
+			uint16_t samples;
+			uint16_t stateCount[4];
+			uint16_t transitionCount[16];
+			uint16_t invalidTransitions;
+			uint16_t cwTransitions;
+			uint16_t ccwTransitions;
+			uint16_t readMismatches;
+			uint16_t minSampleMicros;
+			uint16_t maxSampleMicros;
+		}encoderDiagnosticData;
+		bool CaptureEncoderDiagnostics(uint8_t, uint16_t, encoderDiagnosticData*);
+		uint8_t GetThisEncoderBank(uint8_t);
+		uint8_t GetEncoderBrightness(uint8_t);
 	uint16_t GetEncoderValue(uint8_t);
 	uint16_t GetEncoderValue2(uint8_t);
 	uint16_t GetEncoderShiftValue(uint8_t);

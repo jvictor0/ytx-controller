@@ -2168,6 +2168,92 @@ bool EncoderInputs::EncodersInMotion(void){
   return (priorityCount > 0);
 }
 
+bool EncoderInputs::CaptureEncoderDiagnostics(uint8_t encNo, uint16_t durationMs, encoderDiagnosticData* out){
+  if(!begun || !out || encNo >= nEncoders) return false;
+
+  memset(out, 0, sizeof(encoderDiagnosticData));
+
+  uint8_t moduleNo = ENC_MODULE_NUMBER(encNo);
+  if(moduleNo >= nModules) return false;
+
+  uint8_t moduleType = GetModuleType(moduleNo);
+  out->encoder = encNo;
+  out->module = moduleNo;
+  out->moduleType = moduleType;
+  out->pinA = defE41module.encPins[encNo%(defE41module.components.nEncoders)][0];
+  out->pinB = defE41module.encPins[encNo%(defE41module.components.nEncoders)][1];
+  out->minSampleMicros = 0x3FFF;
+
+  if(moduleType != EncoderModuleTypes::E41H_D && moduleType != EncoderModuleTypes::E41V_D) return false;
+
+  if(durationMs < 10) durationMs = 10;
+  if(durationMs > 5000) durationMs = 5000;
+
+  bool havePrev = false;
+  uint8_t prevPinState = 0;
+  uint32_t startMillis = millis();
+  uint32_t lastWatchdogReset = startMillis;
+  uint32_t prevMicros = micros();
+
+  while((uint16_t)(millis() - startMillis) < durationMs){
+    uint32_t nowMillis = millis();
+    if(nowMillis - lastWatchdogReset > WATCHDOG_CHECK_MS){
+      Watchdog.reset();
+      lastWatchdogReset = nowMillis;
+    }
+
+    uint32_t nowMicros = micros();
+    uint32_t sampleDelta = nowMicros - prevMicros;
+    prevMicros = nowMicros;
+
+    if(sampleDelta > 0x3FFF) sampleDelta = 0x3FFF;
+    if(sampleDelta && sampleDelta < out->minSampleMicros) out->minSampleMicros = sampleDelta;
+    if(sampleDelta > out->maxSampleMicros) out->maxSampleMicros = sampleDelta;
+
+    ReadModule(moduleNo);
+    uint16_t stateA = encMData[moduleNo].state;
+    ReadModule(moduleNo);
+    uint16_t stateB = encMData[moduleNo].state;
+    if(stateA != stateB && out->readMismatches < 0x3FFF) out->readMismatches++;
+
+    uint8_t pinState = 0;
+    if(stateB & (1 << out->pinA)) pinState |= 2;
+    if(stateB & (1 << out->pinB)) pinState |= 1;
+
+    out->lastState = pinState;
+    if(out->samples < 0x3FFF) out->samples++;
+    if(out->stateCount[pinState] < 0x3FFF) out->stateCount[pinState]++;
+
+    if(havePrev){
+      uint8_t transition = (prevPinState << 2) | pinState;
+      if(out->transitionCount[transition] < 0x3FFF) out->transitionCount[transition]++;
+
+      uint8_t delta = prevPinState ^ pinState;
+      if(delta == 3){
+        if(out->invalidTransitions < 0x3FFF) out->invalidTransitions++;
+      }else if(delta == 1 || delta == 2){
+        bool cw =  (prevPinState == 0 && pinState == 2) ||
+                   (prevPinState == 2 && pinState == 3) ||
+                   (prevPinState == 3 && pinState == 1) ||
+                   (prevPinState == 1 && pinState == 0);
+        bool ccw = (prevPinState == 0 && pinState == 1) ||
+                   (prevPinState == 1 && pinState == 3) ||
+                   (prevPinState == 3 && pinState == 2) ||
+                   (prevPinState == 2 && pinState == 0);
+
+        if(cw && out->cwTransitions < 0x3FFF) out->cwTransitions++;
+        if(ccw && out->ccwTransitions < 0x3FFF) out->ccwTransitions++;
+      }
+    }
+
+    prevPinState = pinState;
+    havePrev = true;
+  }
+
+  if(out->minSampleMicros == 0x3FFF) out->minSampleMicros = 0;
+  return true;
+}
+
 
 void EncoderInputs::AddToPriority(uint8_t nModule){
   if (!priorityCount){

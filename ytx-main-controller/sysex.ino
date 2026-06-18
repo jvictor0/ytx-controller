@@ -28,6 +28,182 @@ SOFTWARE.
 
 #include "headers/sysex.h"
 
+static const uint16_t LED_CC_LOOKUP_INVALID = 0xFFFF;
+static const uint16_t LED_CC_LOOKUP_INDEX_MASK = 0x03FF;
+static const uint8_t LED_CC_TARGET_DIGITAL = 0;
+static const uint8_t LED_CC_TARGET_ENCODER_SWITCH = 1;
+static const uint8_t LED_CC_TARGET_ENCODER_RING = 2;
+
+static uint16_t ledCcLookup[16][128];
+static bool ledCcLookupValid = false;
+static volatile bool encoderDiagnosticPending = false;
+static volatile uint8_t pendingEncoderDiagnosticIndex = 0;
+static volatile uint16_t pendingEncoderDiagnosticDurationMs = 1000;
+
+static uint16_t PackLedCcTarget(uint8_t targetType, uint16_t index)
+{
+  return ((uint16_t)targetType << 10) | (index & LED_CC_LOOKUP_INDEX_MASK);
+}
+
+static void InvalidateLedCcLookup()
+{
+  ledCcLookupValid = false;
+}
+
+static void ClearLedCcLookup()
+{
+  for(uint8_t channel = 0; channel < 16; channel++)
+  {
+    for(uint8_t cc = 0; cc < 128; cc++)
+    {
+      ledCcLookup[channel][cc] = LED_CC_LOOKUP_INVALID;
+    }
+  }
+}
+
+static void AddLedCcLookupEntry(uint8_t channel, uint8_t cc, uint8_t targetType, uint16_t index)
+{
+  channel &= 0x0F;
+  cc &= 0x7F;
+
+  // Preserve the previous first-match behavior when duplicate mappings exist.
+  //
+  if(ledCcLookup[channel][cc] == LED_CC_LOOKUP_INVALID)
+  {
+    ledCcLookup[channel][cc] = PackLedCcTarget(targetType, index);
+  }
+}
+
+static void BuildLedCcLookup()
+{
+  ClearLedCcLookup();
+
+  for(uint16_t digNo = 0; digNo < config->inputs.digitalCount; digNo++)
+  {
+    if(digital[digNo].feedback.message == digitalMessageTypes::digital_msg_cc)
+    {
+      AddLedCcLookupEntry(digital[digNo].feedback.channel,
+                          digital[digNo].feedback.parameterLSB,
+                          LED_CC_TARGET_DIGITAL,
+                          digNo);
+    }
+  }
+
+  for(uint8_t encNo = 0; encNo < config->inputs.encoderCount; encNo++)
+  {
+    if(encoder[encNo].switchFeedback.message == switchMessageTypes::switch_msg_cc)
+    {
+      AddLedCcLookupEntry(encoder[encNo].switchFeedback.channel,
+                          encoder[encNo].switchFeedback.parameterLSB,
+                          LED_CC_TARGET_ENCODER_SWITCH,
+                          encNo);
+    }
+  }
+
+  for(uint8_t encNo = 0; encNo < config->inputs.encoderCount; encNo++)
+  {
+    if(encoder[encNo].rotaryFeedback.message == rotaryMessageTypes::rotary_msg_cc ||
+       encoder[encNo].rotaryFeedback.message == rotaryMessageTypes::rotary_msg_vu_cc)
+    {
+      AddLedCcLookupEntry(encoder[encNo].rotaryFeedback.channel,
+                          encoder[encNo].rotaryFeedback.parameterLSB,
+                          LED_CC_TARGET_ENCODER_RING,
+                          encNo);
+    }
+  }
+
+  ledCcLookupValid = true;
+}
+
+static void Append14(uint8_t *buffer, uint8_t &index, uint16_t value)
+{
+  if(value > 0x3FFF) value = 0x3FFF;
+  buffer[index++] = value & 0x7F;
+  buffer[index++] = (value >> 7) & 0x7F;
+}
+
+static void QueueEncoderDiagnostics(byte *message, unsigned size)
+{
+  uint8_t encoderIndex = 0;
+  uint16_t durationMs = 1000;
+
+  if(size > ytxIOStructure::REQUEST_ID + 1)
+  {
+    encoderIndex = message[ytxIOStructure::REQUEST_ID + 1] & 0x7F;
+  }
+
+  if(size > ytxIOStructure::REQUEST_ID + 3)
+  {
+    durationMs = (uint16_t)(message[ytxIOStructure::REQUEST_ID + 2] & 0x7F) |
+                 ((uint16_t)(message[ytxIOStructure::REQUEST_ID + 3] & 0x7F) << 7);
+  }
+
+  if(durationMs < 10) durationMs = 10;
+  if(durationMs > 5000) durationMs = 5000;
+
+  pendingEncoderDiagnosticIndex = encoderIndex;
+  pendingEncoderDiagnosticDurationMs = durationMs;
+  encoderDiagnosticPending = true;
+}
+
+static void SendEncoderDiagnosticResult(bool ok, const EncoderInputs::encoderDiagnosticData &diagnostic)
+{
+  uint8_t sysexBlock[96];
+  uint8_t index = 0;
+
+  sysexBlock[index++] = 'y';
+  sysexBlock[index++] = 't';
+  sysexBlock[index++] = 'x';
+  sysexBlock[index++] = ok ? validTransaction : statusError;
+  sysexBlock[index++] = SET;
+  sysexBlock[index++] = ytxIOMessageTypes::specialRequests;
+  sysexBlock[index++] = ytxIOSpecialRequests::encoderDiagnostics;
+  sysexBlock[index++] = 1; // response version
+  sysexBlock[index++] = diagnostic.encoder & 0x7F;
+  sysexBlock[index++] = diagnostic.module & 0x7F;
+  sysexBlock[index++] = diagnostic.moduleType & 0x7F;
+  sysexBlock[index++] = diagnostic.pinA & 0x7F;
+  sysexBlock[index++] = diagnostic.pinB & 0x7F;
+  sysexBlock[index++] = diagnostic.lastState & 0x03;
+
+  Append14(sysexBlock, index, diagnostic.samples);
+  Append14(sysexBlock, index, diagnostic.invalidTransitions);
+  Append14(sysexBlock, index, diagnostic.cwTransitions);
+  Append14(sysexBlock, index, diagnostic.ccwTransitions);
+  Append14(sysexBlock, index, diagnostic.readMismatches);
+  Append14(sysexBlock, index, diagnostic.minSampleMicros);
+  Append14(sysexBlock, index, diagnostic.maxSampleMicros);
+
+  for(uint8_t state = 0; state < 4; state++)
+  {
+    Append14(sysexBlock, index, diagnostic.stateCount[state]);
+  }
+
+  for(uint8_t transition = 0; transition < 16; transition++)
+  {
+    Append14(sysexBlock, index, diagnostic.transitionCount[transition]);
+  }
+
+  sendSysExYTX(MIDI_USB, index, sysexBlock, false);
+}
+
+bool RunPendingEncoderDiagnostics()
+{
+  if(!encoderDiagnosticPending) return false;
+
+  noInterrupts();
+  uint8_t encoderIndex = pendingEncoderDiagnosticIndex;
+  uint16_t durationMs = pendingEncoderDiagnosticDurationMs;
+  encoderDiagnosticPending = false;
+  interrupts();
+
+  EncoderInputs::encoderDiagnosticData diagnostic;
+  bool ok = encoderHw.CaptureEncoderDiagnostics(encoderIndex, durationMs, &diagnostic);
+  SendEncoderDiagnosticResult(ok, diagnostic);
+  SetStatusLED(STATUS_BLINK, 2, statusLEDtypes::STATUS_FB_MSG_OUT);
+  return true;
+}
+
 void handleSystemExclusiveUSB(byte *message, unsigned size){
   // SERIALPRINT(F("SysEx arrived via USB"));
   handleSystemExclusive(message, size, MIDI_USB);
@@ -159,6 +335,7 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
                                             message[ytxIOStructure::BLOCK],
                                             section, 
                                             decodedPayload);
+                    InvalidateLedCcLookup();
 
                     if(!newMemReset) {
                       memHost->LoadBankSingleSection( message[ytxIOStructure::BANK], 
@@ -310,6 +487,15 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
           }
           SetStatusLED(STATUS_BLINK, 2, statusLEDtypes::STATUS_FB_MSG_OUT);
           DumpControllerState();
+          SendAck();
+        }else if(message[ytxIOStructure::REQUEST_ID] == ytxIOSpecialRequests::encoderDiagnostics){
+          // Format: F0 'y' 't' 'x' <status> <wish> <msgType> <reqId=0x22> <encoder> <duration LSB> <duration MSB> F7
+          //
+          if(testSysex){
+            SERIALPRINTLN(F("REQUEST: ENCODER DIAGNOSTICS"));
+          }
+          SetStatusLED(STATUS_BLINK, 2, statusLEDtypes::STATUS_FB_MSG_IN);
+          QueueEncoderDiagnostics(message, size);
           SendAck();
         }
 
@@ -528,6 +714,10 @@ void HandleSetDigitalLedColorByCC(byte* message, unsigned size)
   // Process each CC/RGB tuple
   //
   bool anyNotFound = false;
+  if(!ledCcLookupValid)
+  {
+    BuildLedCcLookup();
+  }
 
   for (uint16_t i = 0; i < numCCs; i++)
   {
@@ -549,63 +739,67 @@ void HandleSetDigitalLedColorByCC(byte* message, unsigned size)
       SERIALPRINTLN(b);
     }
 
-    // Find the component that matches this channel/CC
-    // Check: digitals, encoder switches, encoder rotary
-    //
-    bool found = false;
+    uint16_t target = ledCcLookup[channel][ccNum];
+    bool found = target != LED_CC_LOOKUP_INVALID;
 
-    // Check digital inputs
-    //
-    for (uint16_t digNo = 0; digNo < config->inputs.digitalCount && !found; digNo++)
+    if(found)
     {
-      if (digital[digNo].feedback.channel == channel &&
-          digital[digNo].feedback.parameterLSB == ccNum &&
-          digital[digNo].feedback.message == digitalMessageTypes::digital_msg_cc)
-      {
-        if (testSysex)
-        {
-          SERIALPRINT(F("    -> Digital #"));
-          SERIALPRINTLN(digNo);
-        }
-        feedbackHw.SetDigitalLedColorDirect(digNo, r, g, b);
-        found = true;
-      }
-    }
+      uint8_t targetType = target >> 10;
+      uint16_t targetIndex = target & LED_CC_LOOKUP_INDEX_MASK;
 
-    // Check encoder switches (pushbutton LEDs)
-    //
-    for (uint8_t encNo = 0; encNo < config->inputs.encoderCount && !found; encNo++)
-    {
-      if (encoder[encNo].switchFeedback.channel == channel &&
-          encoder[encNo].switchFeedback.parameterLSB == ccNum &&
-          encoder[encNo].switchFeedback.message == switchMessageTypes::switch_msg_cc)
+      switch(targetType)
       {
-        if (testSysex)
-        {
-          SERIALPRINT(F("    -> Encoder Switch #"));
-          SERIALPRINTLN(encNo);
-        }
-        feedbackHw.SetEncoderSwitchLedColorDirect(encNo, r, g, b);
-        found = true;
-      }
-    }
+        case LED_CC_TARGET_DIGITAL:
+          if(targetIndex < config->inputs.digitalCount)
+          {
+            if (testSysex)
+            {
+              SERIALPRINT(F("    -> Digital #"));
+              SERIALPRINTLN(targetIndex);
+            }
+            feedbackHw.SetDigitalLedColorDirect(targetIndex, r, g, b);
+          }
+          else
+          {
+            found = false;
+          }
+          break;
 
-    // Check encoder rotary (ring LEDs)
-    //
-    for (uint8_t encNo = 0; encNo < config->inputs.encoderCount && !found; encNo++)
-    {
-      if (encoder[encNo].rotaryFeedback.channel == channel &&
-          encoder[encNo].rotaryFeedback.parameterLSB == ccNum &&
-          (encoder[encNo].rotaryFeedback.message == rotaryMessageTypes::rotary_msg_cc ||
-           encoder[encNo].rotaryFeedback.message == rotaryMessageTypes::rotary_msg_vu_cc))
-      {
-        if (testSysex)
-        {
-          SERIALPRINT(F("    -> Encoder Ring #"));
-          SERIALPRINTLN(encNo);
-        }
-        feedbackHw.SetEncoderRingLedColorDirect(encNo, r, g, b);
-        found = true;
+        case LED_CC_TARGET_ENCODER_SWITCH:
+          if(targetIndex < config->inputs.encoderCount)
+          {
+            if (testSysex)
+            {
+              SERIALPRINT(F("    -> Encoder Switch #"));
+              SERIALPRINTLN(targetIndex);
+            }
+            feedbackHw.SetEncoderSwitchLedColorDirect(targetIndex, r, g, b);
+          }
+          else
+          {
+            found = false;
+          }
+          break;
+
+        case LED_CC_TARGET_ENCODER_RING:
+          if(targetIndex < config->inputs.encoderCount)
+          {
+            if (testSysex)
+            {
+              SERIALPRINT(F("    -> Encoder Ring #"));
+              SERIALPRINTLN(targetIndex);
+            }
+            feedbackHw.SetEncoderRingLedColorDirect(targetIndex, r, g, b);
+          }
+          else
+          {
+            found = false;
+          }
+          break;
+
+        default:
+          found = false;
+          break;
       }
     }
 

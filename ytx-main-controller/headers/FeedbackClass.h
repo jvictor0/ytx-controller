@@ -176,6 +176,14 @@ private:
 	void QueueFeedbackUpdate(uint8_t, uint8_t, uint16_t, uint8_t, bool, bool, bool, bool, bool);
 	bool IsCoalescableType(uint8_t);
 	int16_t FindPendingUpdate(uint8_t, uint8_t, bool);
+	void ClearCoalesceIndex();
+	void RebuildCoalesceIndex();
+	void RegisterCoalesceSlot(uint8_t);
+	void UnregisterCoalesceSlot(uint8_t);
+	int16_t EncoderCoalesceTypeIndex(uint8_t);
+	int16_t DigitalCoalesceTypeIndex(uint8_t);
+	int16_t BankCoalesceTypeIndex(uint8_t);
+	uint16_t* CoalesceSlotPtr(uint8_t, uint8_t, bool);
 	
 
 	uint8_t nBanks;
@@ -197,6 +205,9 @@ private:
 	feedbackUpdateStruct feedbackUpdateBuffer[FEEDBACK_UPDATE_BUFFER_SIZE];
 	uint8_t feedbackUpdateReadIdx;
 	uint8_t feedbackUpdateWriteIdx;
+	uint16_t *encoderCoalesceSlots;
+	uint16_t *digitalCoalesceSlots;
+	uint16_t bankCoalesceSlots[3];
 	
 
 	uint8_t feedbackFrameBuffer[FeedbackFrame_Size];
@@ -222,4 +233,3 @@ private:
 };
 
 #endif
-

@@ -51,6 +51,8 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   sendingFbData = false;
   waitingMoreData = false;
   antMillisWaitMoreData = 0;
+  encoderCoalesceSlots = NULL;
+  digitalCoalesceSlots = NULL;
 
   for(int f = 0; f < FEEDBACK_UPDATE_BUFFER_SIZE; f++){
     feedbackUpdateBuffer[f].type = 0;
@@ -76,10 +78,13 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   // EN LA SEGUNDA VUELTA DE LOOP, SOLO CUANDO HAY 1 BANCO CONFIGURADO
   if(nDigitals){
     digFbData = (digFeedbackData**) memHost->AllocateRAM(nBanks*sizeof(digFeedbackData*));
+    digitalCoalesceSlots = (uint16_t*) memHost->AllocateRAM(2 * 2 * nDigitals * sizeof(uint16_t));
   }
   if(nEncoders){
     encFbData = (encFeedbackData**) memHost->AllocateRAM(nBanks*sizeof(encFeedbackData*));
+    encoderCoalesceSlots = (uint16_t*) memHost->AllocateRAM(8 * 2 * nEncoders * sizeof(uint16_t));
   }
+  ClearCoalesceIndex();
 
   // Reset to bootloader if there isn't enough RAM
   if(FreeMemory() < nBanks*nEncoders*sizeof(encFeedbackData) + nBanks*nDigitals*sizeof(digFeedbackData) + 800){
@@ -255,6 +260,7 @@ void FeedbackClass::Update() {
         }
         burstRetryCount = 0;
       }
+      RebuildCoalesceIndex();
     }else{
       burstRetryCount = 0;
     }
@@ -295,6 +301,7 @@ void FeedbackClass::Update() {
     }
 
     burstItemsRemaining--;
+    UnregisterCoalesceSlot(fbUpdateQueueIndex);
     ProcessQueuedFeedbackEntry(fbUpdateQueueIndex);
     fbMessagesSent++;
     framesSentNow++;
@@ -1138,45 +1145,117 @@ bool FeedbackClass::IsCoalescableType(uint8_t type){
   }
 }
 
-int16_t FeedbackClass::FindPendingUpdate(uint8_t type, uint8_t indexChanged, bool isShifter){
-  if(!fbItemsToSend){
-    return -1;
+int16_t FeedbackClass::EncoderCoalesceTypeIndex(uint8_t type){
+  switch(type){
+    case FB_ENCODER:            return 0;
+    case FB_ENC_VUMETER:        return 1;
+    case FB_ENC_VAL_TO_COLOR:   return 2;
+    case FB_ENC_VAL_TO_INT:     return 3;
+    case FB_ENC_SWITCH:         return 4;
+    case FB_ENC_2CC:            return 5;
+    case FB_ENC_SHIFT:          return 6;
+    case FB_ENC_SW_VAL_TO_INT:  return 7;
+    default:                    return -1;
+  }
+}
+
+int16_t FeedbackClass::DigitalCoalesceTypeIndex(uint8_t type){
+  switch(type){
+    case FB_DIGITAL:            return 0;
+    case FB_DIG_VAL_TO_INT:     return 1;
+    default:                    return -1;
+  }
+}
+
+int16_t FeedbackClass::BankCoalesceTypeIndex(uint8_t type){
+  switch(type){
+    case FB_BANK_CHANGED:       return 0;
+    case FB_BANK_DIGITAL1:      return 1;
+    case FB_BANK_DIGITAL2:      return 2;
+    default:                    return -1;
+  }
+}
+
+uint16_t* FeedbackClass::CoalesceSlotPtr(uint8_t type, uint8_t indexChanged, bool isShifter){
+  int16_t typeIndex = BankCoalesceTypeIndex(type);
+  if(typeIndex >= 0){
+    return &bankCoalesceSlots[typeIndex];
   }
 
-  uint16_t inFlightFrames = 0;
-  if((burstInProgress || burstAwaitingAck) && fbMessagesSent){
-    inFlightFrames = (fbMessagesSent > fbItemsToSend) ? fbItemsToSend : fbMessagesSent;
+  typeIndex = DigitalCoalesceTypeIndex(type);
+  if(typeIndex >= 0){
+    if(!digitalCoalesceSlots || indexChanged >= nDigitals){
+      return NULL;
+    }
+    return &digitalCoalesceSlots[((typeIndex * 2 + (isShifter ? 1 : 0)) * nDigitals) + indexChanged];
   }
 
-  uint16_t pendingToScan = fbItemsToSend - inFlightFrames;
-  if(!pendingToScan){
-    return -1;
+  typeIndex = EncoderCoalesceTypeIndex(type);
+  if(typeIndex >= 0){
+    if(!encoderCoalesceSlots || indexChanged >= nEncoders){
+      return NULL;
+    }
+    return &encoderCoalesceSlots[((typeIndex * 2 + (isShifter ? 1 : 0)) * nEncoders) + indexChanged];
   }
+
+  return NULL;
+}
+
+void FeedbackClass::ClearCoalesceIndex(){
+  for(uint8_t i = 0; i < 3; i++){
+    bankCoalesceSlots[i] = 0;
+  }
+
+  if(digitalCoalesceSlots){
+    uint16_t total = 2 * 2 * nDigitals;
+    for(uint16_t i = 0; i < total; i++){
+      digitalCoalesceSlots[i] = 0;
+    }
+  }
+
+  if(encoderCoalesceSlots){
+    uint16_t total = 8 * 2 * nEncoders;
+    for(uint16_t i = 0; i < total; i++){
+      encoderCoalesceSlots[i] = 0;
+    }
+  }
+}
+
+void FeedbackClass::RegisterCoalesceSlot(uint8_t slot){
+  uint16_t *slotPtr = CoalesceSlotPtr(feedbackUpdateBuffer[slot].type,
+                                      feedbackUpdateBuffer[slot].indexChanged,
+                                      feedbackUpdateBuffer[slot].isShifter);
+  if(slotPtr){
+    *slotPtr = (uint16_t)slot + 1;
+  }
+}
+
+void FeedbackClass::UnregisterCoalesceSlot(uint8_t slot){
+  uint16_t *slotPtr = CoalesceSlotPtr(feedbackUpdateBuffer[slot].type,
+                                      feedbackUpdateBuffer[slot].indexChanged,
+                                      feedbackUpdateBuffer[slot].isShifter);
+  if(slotPtr && *slotPtr == ((uint16_t)slot + 1)){
+    *slotPtr = 0;
+  }
+}
+
+void FeedbackClass::RebuildCoalesceIndex(){
+  ClearCoalesceIndex();
 
   uint8_t idx = feedbackUpdateReadIdx;
-  for(uint16_t i = 0; i < inFlightFrames; i++){
+  for(uint16_t pending = 0; pending < fbItemsToSend; pending++){
+    RegisterCoalesceSlot(idx);
     if(++idx >= FEEDBACK_UPDATE_BUFFER_SIZE){
       idx = 0;
     }
   }
+}
 
-  for(uint16_t pending = 0; pending < pendingToScan; pending++){
-    if(feedbackUpdateBuffer[idx].type == type){
-      if(type == FB_BANK_CHANGED || type == FB_BANK_DIGITAL1 || type == FB_BANK_DIGITAL2){
-        return idx;
-      }
-
-      if(feedbackUpdateBuffer[idx].indexChanged == indexChanged &&
-         feedbackUpdateBuffer[idx].isShifter == isShifter){
-        return idx;
-      }
-    }
-
-    if(++idx >= FEEDBACK_UPDATE_BUFFER_SIZE){
-      idx = 0;
-    }
+int16_t FeedbackClass::FindPendingUpdate(uint8_t type, uint8_t indexChanged, bool isShifter){
+  uint16_t *slotPtr = CoalesceSlotPtr(type, indexChanged, isShifter);
+  if(slotPtr && *slotPtr){
+    return (int16_t)(*slotPtr - 1);
   }
-
   return -1;
 }
 
@@ -1223,6 +1302,7 @@ void FeedbackClass::QueueFeedbackUpdate(uint8_t type, uint8_t indexChanged, uint
   feedbackUpdateBuffer[feedbackUpdateWriteIdx].updatingBank       = bankUpdate;
   feedbackUpdateBuffer[feedbackUpdateWriteIdx].rotaryValueToColor = rotaryValueToColor;
   feedbackUpdateBuffer[feedbackUpdateWriteIdx].valueToIntensity   = valueToIntensity;
+  RegisterCoalesceSlot(feedbackUpdateWriteIdx);
   IncreaseBufferIndex(WRITE_INDEX);
 }
 
@@ -1251,6 +1331,7 @@ void FeedbackClass::SetBankChangeFeedback(uint8_t type){
 
 void FeedbackClass::IncreaseBufferIndex(bool indexType){
   if(indexType == READ_INDEX){
+    UnregisterCoalesceSlot(feedbackUpdateReadIdx);
     if(++feedbackUpdateReadIdx >= FEEDBACK_UPDATE_BUFFER_SIZE)
       feedbackUpdateReadIdx = 0;
     fbItemsToSend--;

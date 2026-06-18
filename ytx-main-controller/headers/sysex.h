@@ -89,7 +89,8 @@ enum ytxIOSpecialRequests
   eraseEEPROM = 0x19,
   enableTesting = 0x1A,
   setDigitalLedColorByCC = 0x20,
-  dumpControllerState = 0x21
+  dumpControllerState = 0x21,
+  encoderDiagnostics = 0x22
 };
 
 enum ytxIOStatus
@@ -106,5 +107,7 @@ enum ytxIOStatus
   sizeError,
   N_ERRORS
 };
+
+bool RunPendingEncoderDiagnostics();
 
 #endif // SYSEX_H

@@ -36,6 +36,10 @@ void loop() {
   // Update status LED
   UpdateStatusLED();
 
+  if(RunPendingEncoderDiagnostics()){
+    return;
+  }
+
   static uint32_t antMicrosTest = micros();  
 
   // Check for incoming Serial messages
@@ -107,5 +111,4 @@ void loop() {
   if(testMicrosLoop) 
     SERIALPRINTLN(micros()-antMicrosLoop);    
 }
-
 
