@@ -150,97 +150,43 @@ void handlePitchBendUSB(byte channel, int bend){
  * Handler for Note On messages received from DIN5 port
  */
 void handleNoteOnHW(byte channel, byte note, byte velocity){
-  uint8_t msgType = MIDIHW.getType();
-  rcvdEncoderMsgType = rotaryMessageTypes::rotary_msg_note;
-  rcvdEncoderSwitchMsgType = switchMessageTypes::switch_msg_note;
-  rcvdDigitalMsgType = digitalMessageTypes::digital_msg_note;
-  rcvdAnalogMsgType = analogMessageTypes::analog_msg_note;
-
-  ProcessMidi(msgType, channel, note, velocity, MIDI_HW);
+  (void)channel;
+  (void)note;
+  (void)velocity;
 }
 
 /*
  * Handler for Note Off messages received from DIN5 port
  */
 void handleNoteOffHW(byte channel, byte note, byte velocity){
-  uint8_t msgType = MIDIHW.getType();
-  rcvdEncoderMsgType = rotaryMessageTypes::rotary_msg_note;
-  rcvdEncoderSwitchMsgType = switchMessageTypes::switch_msg_note;
-  rcvdDigitalMsgType = digitalMessageTypes::digital_msg_note;
-  rcvdAnalogMsgType = analogMessageTypes::analog_msg_note;
-
-  ProcessMidi(msgType, channel, note, velocity, MIDI_HW);
+  (void)channel;
+  (void)note;
+  (void)velocity;
 }
 
 /*
  * Handler for CC messages received from DIN5 port
  */
 void handleControlChangeHW(byte channel, byte number, byte value){
-  uint8_t msgType = MIDIHW.getType();
-  uint16_t fullParam = 0, fullValue = 0;
-  msg14bitParser(channel, number, value);
-
-  if (msg14bitComplete){
-     
-    if( rcvdEncoderMsgType == rotaryMessageTypes::rotary_msg_nrpn || 
-        rcvdEncoderSwitchMsgType == switchMessageTypes::switch_msg_nrpn || 
-        rcvdDigitalMsgType == digitalMessageTypes::digital_msg_nrpn || 
-        rcvdAnalogMsgType == analogMessageTypes::analog_msg_nrpn){
-          
-      fullParam = nrpnMessage.parameter;
-      fullValue = nrpnMessage.value;
-     // SERIALPRINT(F("NRPN MESSAGE COMPLETE -> "));
-     // SERIALPRINT(F("\tPARAM: ")); SERIALPRINT(fullParam);
-     // SERIALPRINT(F("\tVALUE: ")); SERIALPRINTLN(fullValue);
-    }else if( rcvdEncoderMsgType == rotaryMessageTypes::rotary_msg_rpn || 
-              rcvdEncoderSwitchMsgType == switchMessageTypes::switch_msg_rpn || 
-              rcvdDigitalMsgType == digitalMessageTypes::digital_msg_rpn || 
-              rcvdAnalogMsgType == analogMessageTypes::analog_msg_rpn){
-                
-      fullParam = rpnMessage.parameter;
-      fullValue = rpnMessage.value;
-     // SERIALPRINT(F("RPN MESSAGE COMPLETE -> "));
-     // SERIALPRINT(F("\tPARAM: ")); SERIALPRINT(fullParam);
-     // SERIALPRINT(F("\tVALUE: ")); SERIALPRINTLN(fullValue);
-    }   
-    ProcessMidi(msgType, channel, fullParam, fullValue, MIDI_HW);
-    msg14bitComplete = false;
-  }else{
-    rcvdEncoderMsgType = rotaryMessageTypes::rotary_msg_cc;
-    rcvdEncoderSwitchMsgType = switchMessageTypes::switch_msg_cc;
-    rcvdDigitalMsgType = digitalMessageTypes::digital_msg_cc;
-    rcvdAnalogMsgType = analogMessageTypes::analog_msg_cc;
-    
-    ProcessMidi(msgType, channel, number, value, MIDI_HW); 
-  }  
+  (void)channel;
+  (void)number;
+  (void)value;
 }
 
 /*
  * Handler for Program Change messages received from DIN5 port
  */
 void handleProgramChangeHW(byte channel, byte number){
-  uint8_t msgType = MIDIHW.getType();
-  rcvdEncoderMsgType = rotaryMessageTypes::rotary_msg_pc_rel;
-  rcvdEncoderSwitchMsgType = switchMessageTypes::switch_msg_pc;
-  rcvdDigitalMsgType = digitalMessageTypes::digital_msg_pc;
-  rcvdAnalogMsgType = analogMessageTypes::analog_msg_pc;
-
-  ProcessMidi(msgType, channel, number, 0, MIDI_HW);
+  (void)channel;
+  (void)number;
 }
 
 /*
  * Handler for Pitch Bend messages received from DIN5 port
  */
 void handlePitchBendHW(byte channel, int bend){
-  uint8_t msgType = MIDIHW.getType();
-  rcvdEncoderMsgType = rotaryMessageTypes::rotary_msg_pb;
-  rcvdEncoderSwitchMsgType = switchMessageTypes::switch_msg_pb;
-  rcvdDigitalMsgType = digitalMessageTypes::digital_msg_pb;
-  rcvdAnalogMsgType = analogMessageTypes::analog_msg_pb;
-  
-  msg14bitComplete = true;
-  ProcessMidi(msgType, channel, 0, bend, MIDI_HW);
-  msg14bitComplete = false;
+  (void)channel;
+  (void)bend;
 }
 
 /*
@@ -265,17 +211,7 @@ void handleTimeCodeQuarterFrameUSB(byte data){
  * Handler for Time Code Quarter Frame via HW
  */ 
 void handleTimeCodeQuarterFrameHW(byte data){
-  // SERIALPRINTLN("\nTCQF received via HW!");
-  // SERIALPRINT("Data: "); SERIALPRINTLN(data); 
-  // MIDI REDIRECT
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_USB){    // Send to MIDI USB port
-    MIDI.sendTimeCodeQuarterFrame(data);
-  }
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_HW){     // Send to MIDI DIN port
-    MIDIHW.sendTimeCodeQuarterFrame(data);
-  }
-
-  // YOUR CODE HERE
+  (void)data;
 }
 
 /*
@@ -300,18 +236,7 @@ void handleSongPositionUSB(unsigned beats){
  * Handler for Song Position via HW
  */ 
 void handleSongPositionHW(unsigned beats){
-  // SERIALPRINTLN("\nSong Position received via HW!");
-  // SERIALPRINT("Beats: "); SERIALPRINTLN(beats);
-
-  // MIDI REDIRECT
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_USB){    // Send to MIDI USB port
-    MIDI.sendSongPosition(beats);
-  }
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_HW){     // Send to MIDI DIN port
-    MIDIHW.sendSongPosition(beats);
-  }
-
-  // YOUR CODE HERE
+  (void)beats;
 }
 
 /*
@@ -336,18 +261,7 @@ void handleSongSelectUSB(byte songnumber){
  * Handler for Song Select via HW
  */ 
 void handleSongSelectHW(byte songnumber){
-  // SERIALPRINTLN("\nSong Select received via HW!");
-  // SERIALPRINT("Song number: "); SERIALPRINTLN(songnumber);
-
-  // MIDI REDIRECT
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_USB){    // Send to MIDI USB port
-    MIDI.sendSongSelect(songnumber);
-  }
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_HW){     // Send to MIDI DIN port
-    MIDIHW.sendSongSelect(songnumber);
-  }
-
-  // YOUR CODE HERE
+  (void)songnumber;
 }
 
 /*
@@ -371,17 +285,6 @@ void handleTuneRequestUSB(void){
  * Handler for Tune Request via HW
  */ 
 void handleTuneRequestHW(void){
-  // SERIALPRINTLN("\nTune Request received via HW!");
-
-  // MIDI REDIRECT
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_USB){    // Send to MIDI USB port
-    MIDI.sendTuneRequest();
-  }
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_HW){     // Send to MIDI DIN port
-    MIDIHW.sendTuneRequest();
-  }
-
-  // YOUR CODE HERE
 }
 
 /*
@@ -406,16 +309,7 @@ void handleClockUSB(void){
  */ 
 void handleClockHW(void){
   // SERIALPRINTLN("\nClock received via HW!");
-
-  // MIDI REDIRECT
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_USB){    // Send to MIDI USB port
-    MIDI.sendRealTime(midi::Clock);
-  }
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_HW){     // Send to MIDI DIN port
-    MIDIHW.sendRealTime(midi::Clock);
-  }
-
-  // YOUR CODE HERE
+  MIDI.sendRealTime(midi::Clock);
 }
 
 /*
@@ -440,16 +334,7 @@ void handleStartUSB(void){
  */ 
 void handleStartHW(void){
   // SERIALPRINTLN("\nStart received via HW!");
-
-  // MIDI REDIRECT
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_USB){    // Send to MIDI USB port
-    MIDI.sendRealTime(midi::Start);
-  }
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_HW){     // Send to MIDI DIN port
-    MIDIHW.sendRealTime(midi::Start);
-  }
-
-  // YOUR CODE HERE
+  MIDI.sendRealTime(midi::Start);
 }
 
 // /*
@@ -490,16 +375,7 @@ void handleContinueUSB(void){
  */ 
 void handleContinueHW(void){
   // SERIALPRINTLN("\nContinue received via HW!");
-
-  // MIDI REDIRECT
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_USB){    // Send to MIDI USB port
-    MIDI.sendRealTime(midi::Continue);
-  }
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_HW){     // Send to MIDI DIN port
-    MIDIHW.sendRealTime(midi::Continue);
-  }
-
-  // YOUR CODE HERE
+  MIDI.sendRealTime(midi::Continue);
 }
 
 /*
@@ -524,16 +400,7 @@ void handleStopUSB(void){
  */ 
 void handleStopHW(void){
     // SERIALPRINTLN("\nStop received via HW!");
-  
-  // MIDI REDIRECT
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_USB){    // Send to MIDI USB port
-    MIDI.sendRealTime(midi::Stop);
-  }
-  if(config->midiConfig.midiMergeFlags & MIDI_MERGE_FLAGS_HW_HW){     // Send to MIDI DIN port
-    MIDIHW.sendRealTime(midi::Stop);
-  }
-
-  // YOUR CODE HERE
+  MIDI.sendRealTime(midi::Stop);
 }
 
 
