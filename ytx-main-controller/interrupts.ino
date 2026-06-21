@@ -3,10 +3,31 @@ void ADC_Handler(void) {
 }
 
 void MIDIpull_Handler(void) {
-  // Call MIDI read functions and run callbacks if message arrived
+  while(Serial1.available()){
+    int incoming = Serial1.read();
+    if(incoming < 0) break;
+
+    switch((uint8_t)incoming){
+      case 0xF8:
+        MIDI.sendRealTime(midi::Clock);
+        break;
+      case 0xFA:
+        MIDI.sendRealTime(midi::Start);
+        break;
+      case 0xFB:
+        MIDI.sendRealTime(midi::Continue);
+        break;
+      case 0xFC:
+        MIDI.sendRealTime(midi::Stop);
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Call USB MIDI read functions and run callbacks if message arrived
   if(feedbackHw.fbItemsToSend < FEEDBACK_UPDATE_BUFFER_SIZE && !feedbackHw.SendingData()){
     MIDI.read();
-    MIDIHW.read();
   }
 }
 
