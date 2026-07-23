@@ -295,7 +295,7 @@ void setup() {
   MIDIHW.turnThruOff();            // Por default, la librería de Arduino MIDI tiene el THRU en ON, y NO QUEREMOS ESO!
   MIDIHW.setHandleSystemExclusive(handleSystemExclusiveHW);
 
-  // Configure a periodic interrupt where we'll call MIDI.read()
+  // Configure the periodic interrupt that forwards raw DIN transport bytes.
   MIDIpullTask.begin(MIDIpull_Handler,7000); //callback, hz sample rate
   MIDIpullTask.start(); //starts the timer
 

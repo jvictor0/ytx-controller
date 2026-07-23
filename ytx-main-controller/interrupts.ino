@@ -24,11 +24,6 @@ void MIDIpull_Handler(void) {
         break;
     }
   }
-
-  // Call USB MIDI read functions and run callbacks if message arrived
-  if(feedbackHw.fbItemsToSend < FEEDBACK_UPDATE_BUFFER_SIZE && !feedbackHw.SendingData()){
-    MIDI.read();
-  }
 }
 
 

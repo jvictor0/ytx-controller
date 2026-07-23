@@ -40,6 +40,12 @@ void loop() {
     return;
   }
 
+  // Parse USB MIDI in the main loop so feedback callbacks cannot race
+  // feedbackHw.Update() from the periodic DIN transport interrupt.
+  if(feedbackHw.fbItemsToSend < FEEDBACK_UPDATE_BUFFER_SIZE && !feedbackHw.SendingData()){
+    MIDI.read();
+  }
+
   static uint32_t antMicrosTest = micros();  
 
   // Check for incoming Serial messages
@@ -111,4 +117,3 @@ void loop() {
   if(testMicrosLoop) 
     SERIALPRINTLN(micros()-antMicrosLoop);    
 }
-
