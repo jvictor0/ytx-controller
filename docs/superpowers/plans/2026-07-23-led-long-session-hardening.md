@@ -347,4 +347,3 @@ git status --short
 
 Expected: the last three firmware commits match the required task order;
 `git diff --check` exits 0; only generated build directories are untracked.
-

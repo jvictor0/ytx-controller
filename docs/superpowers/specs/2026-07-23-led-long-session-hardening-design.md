@@ -110,4 +110,3 @@ fixes are complete.
 
 The design and implementation plan are documentation commits separate from
 the three firmware commits.
-
