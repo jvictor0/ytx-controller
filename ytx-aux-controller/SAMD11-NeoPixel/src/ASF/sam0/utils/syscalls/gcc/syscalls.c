@@ -36,6 +36,7 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -57,6 +58,8 @@ extern void _exit(int status);
 extern void _kill(int pid, int sig);
 extern int _getpid(void);
 
+extern char _sstack;
+
 extern caddr_t _sbrk(int incr)
 {
 	static unsigned char *heap = NULL;
@@ -65,8 +68,13 @@ extern caddr_t _sbrk(int incr)
 	if (heap == NULL) {
 		heap = (unsigned char *)&_end;
 	}
-	prev_heap = heap;
 
+	if ((heap + incr) > (unsigned char *)&_sstack) {
+		errno = ENOMEM;
+		return (caddr_t)-1;
+	}
+
+	prev_heap = heap;
 	heap += incr;
 
 	return (caddr_t) prev_heap;
