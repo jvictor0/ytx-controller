@@ -111,22 +111,35 @@ void feedbackRainbow(){
 
 
 bool feedbackDataAvailable(){
-	return (readIdx != writeIdx);
+	return (feedbackFramesPending > 0);
 }
 
 void feedbackDataUpdate()
 {
-	while(readIdx != writeIdx){ // If there is data to update
+	while(feedbackFramesPending > 0){
+		FeedbackFrameData frameData;
 
-			uint8_t frame = FeedbackFramesBuffer[readIdx].updateFrame;
-			uint8_t elementToChange = FeedbackFramesBuffer[readIdx].updateN;
-			uint8_t orientationMeta = FeedbackFramesBuffer[readIdx].updateO;
+		__disable_irq();
+		if(feedbackFramesPending == 0){
+			__enable_irq();
+			break;
+		}
+
+		frameData = FeedbackFramesBuffer[readIdx];
+		if(++readIdx >= FEEDBACK_BUFFER_LENGTH)
+			readIdx = 0;
+		feedbackFramesPending--;
+		__enable_irq();
+
+			uint8_t frame = frameData.updateFrame;
+			uint8_t elementToChange = frameData.updateN;
+			uint8_t orientationMeta = frameData.updateO;
 			bool isBlendFrame = (frame == ENCODER_BLEND_FRAME);
 			bool vertical = isBlendFrame ? (orientationMeta & 0x01) : orientationMeta;
-			uint16_t newState = FeedbackFramesBuffer[readIdx].updateState;
-			uint8_t intR = FeedbackFramesBuffer[readIdx].updateR;
-			uint8_t intG = FeedbackFramesBuffer[readIdx].updateG;
-			uint8_t intB = FeedbackFramesBuffer[readIdx].updateB;
+			uint16_t newState = frameData.updateState;
+			uint8_t intR = frameData.updateR;
+			uint8_t intG = frameData.updateG;
+			uint8_t intB = frameData.updateB;
 							
 		//uint8_t brightnessMult = 1;
 		//uint8_t minMaxDif = abs(max-min);
@@ -382,25 +395,22 @@ void feedbackDataUpdate()
 			}
 		}
 
-		indexChanged = FeedbackFramesBuffer[readIdx].updateN;
+			indexChanged = frameData.updateN;
 
-			if(FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_CHANGE_FRAME	||
-			   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_BLEND_FRAME	||
-			   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_VUMETER_FRAME ||
-			   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_DOUBLE_FRAME	||
-			   FeedbackFramesBuffer[readIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
-			if(indexChanged < N_ENCODERS_STRIP_1){
-				whichStripToShow |= (1<<ENCODER1_STRIP);
-			}else{
-				whichStripToShow |= (1<<ENCODER2_STRIP);
+				if(frameData.updateFrame == ENCODER_CHANGE_FRAME	||
+				   frameData.updateFrame == ENCODER_BLEND_FRAME	||
+				   frameData.updateFrame == ENCODER_VUMETER_FRAME ||
+				   frameData.updateFrame == ENCODER_DOUBLE_FRAME	||
+				   frameData.updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
+				if(indexChanged < N_ENCODERS_STRIP_1){
+					whichStripToShow |= (1<<ENCODER1_STRIP);
+				}else{
+					whichStripToShow |= (1<<ENCODER2_STRIP);
+				}
+			}else if (frameData.updateFrame == DIGITAL1_CHANGE_FRAME){
+				whichStripToShow |= (1<<DIGITAL1_STRIP);
+			}else if (frameData.updateFrame == DIGITAL2_CHANGE_FRAME){
+				whichStripToShow |= (1<<DIGITAL2_STRIP);
 			}
-		}else if (FeedbackFramesBuffer[readIdx].updateFrame == DIGITAL1_CHANGE_FRAME){
-			whichStripToShow |= (1<<DIGITAL1_STRIP);
-		}else if (FeedbackFramesBuffer[readIdx].updateFrame == DIGITAL2_CHANGE_FRAME){
-			whichStripToShow |= (1<<DIGITAL2_STRIP);
 		}
-
-		if(++readIdx >= FEEDBACK_BUFFER_LENGTH)	
-			readIdx = 0;
 	}
-}

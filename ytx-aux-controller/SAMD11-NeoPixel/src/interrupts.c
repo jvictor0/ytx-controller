@@ -166,10 +166,22 @@ void MainControllerReception_Handler(void){
 					uint16_t checkSumCalc = (2019 + checkSum((const uint8_t *)ReceptionBuffer, FeedbackFrame_Size))&0x00FF;
 					uint16_t checkSumRecv = ReceptionBuffer[receivedBytes-CHECKSUM_BYTES];
 
-					if(checkSumCalc==checkSumRecv){
-						uint8_t *messageBody = (uint8_t *)&ReceptionBuffer[0];
-					
-						FeedbackFramesBuffer[writeIdx].updateFrame	= messageBody[FeedbackFrame_Type];
+						if(checkSumCalc==checkSumRecv){
+							uint8_t *messageBody = (uint8_t *)&ReceptionBuffer[0];
+
+							if(feedbackFramesPending >= FEEDBACK_BUFFER_LENGTH){
+								failsPerSecond++;
+								SendToMain(CHECKSUM_ERROR);
+								SendDataToMain(burstFrameIndex);
+								SendDataToMain(burstFrameIndex);
+								receivedBytes = 0;
+								receivingBank = false;
+								receivingFeedbackData = false;
+								discardingBurst = true;
+								return;
+							}
+
+							FeedbackFramesBuffer[writeIdx].updateFrame	= messageBody[FeedbackFrame_Type];
 					
 							if(	FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_CHANGE_FRAME ||
 								FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_BLEND_FRAME  ||
@@ -192,10 +204,12 @@ void MainControllerReception_Handler(void){
 						FeedbackFramesBuffer[writeIdx].updateG			=	messageBody[FeedbackFrame_G];
 						FeedbackFramesBuffer[writeIdx].updateB			=	messageBody[FeedbackFrame_B];
 
-						if(++writeIdx >= FEEDBACK_BUFFER_LENGTH)	
-							writeIdx = 0;
-					
-						if(!receivingBank)
+							if(++writeIdx >= FEEDBACK_BUFFER_LENGTH)
+								writeIdx = 0;
+
+							feedbackFramesPending++;
+
+							if(!receivingBank)
 						{
 							receivingFeedbackData = false;
 							// Only ACK individual frames when not in burst mode

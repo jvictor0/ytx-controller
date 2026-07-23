@@ -40,6 +40,7 @@ extern volatile bool updateBank;
 
 extern volatile uint8_t readIdx;
 extern volatile uint8_t writeIdx;
+extern volatile uint16_t feedbackFramesPending;
 extern volatile uint8_t currentBrightness;
 extern volatile bool turnAllOffFlag;
 extern volatile bool turnAllOnFlag;
