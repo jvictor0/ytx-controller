@@ -190,6 +190,10 @@ private:
 	void RebuildCoalesceIndex();
 	void RegisterCoalesceSlot(uint8_t);
 	void UnregisterCoalesceSlot(uint8_t);
+	void ClearTransportQueue();
+	void StashTransportQueueForRecovery();
+	void DeferRecoveryFeedbackUpdate(const feedbackUpdateStruct&);
+	void ServiceRecoveryDeferredFeedback();
 	int16_t FindOldestReplaceableUnsentSlot();
 	int16_t FindNewestReplaceableUnsentSlot();
 	int16_t EncoderCoalesceTypeIndex(uint8_t);
@@ -224,8 +228,13 @@ private:
 	uint32_t antMicrosAuxInit;
 	bool updatingBankFeedback;
 	bool bankControlSlotReserved;
+	bool recoveryBaselineActive;
+	bool generatingRecoveryBaseline;
+	bool recoveryDeferredOverflowed;
+	uint16_t recoveryDeferredCount;
 	
 	feedbackUpdateStruct feedbackUpdateBuffer[FEEDBACK_UPDATE_BUFFER_SIZE];
+	feedbackUpdateStruct recoveryDeferredBuffer[RECOVERY_DEFERRED_BUFFER_SIZE];
 	uint8_t feedbackUpdateReadIdx;
 	uint8_t feedbackUpdateWriteIdx;
 	uint16_t *encoderCoalesceSlots;

@@ -85,6 +85,10 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   auxInitResetCount = 0;
   antMicrosAuxInit = 0;
   bankControlSlotReserved = false;
+  recoveryBaselineActive = false;
+  generatingRecoveryBaseline = false;
+  recoveryDeferredOverflowed = false;
+  recoveryDeferredCount = 0;
   waitingMoreData = false;
   antMillisWaitMoreData = 0;
   waitingMoreDataStartedAt = 0;
@@ -320,6 +324,16 @@ bool FeedbackClass::InitAuxController(bool resetHappened){
 void FeedbackClass::RecoverAuxControllerReset(){
   if(!begun) return;
 
+  if(recoveryBaselineActive){
+    // A repeated reset invalidates only the partial physical baseline.
+    // Desired state already deferred from before/during recovery survives.
+    ClearTransportQueue();
+  }else{
+    StashTransportQueueForRecovery();
+  }
+  recoveryBaselineActive = true;
+  generatingRecoveryBaseline = false;
+
   fbMessagesSent = 0;
   burstEntriesProcessed = 0;
   burstEntriesBeforeFirstFrame = 0;
@@ -392,7 +406,9 @@ void FeedbackClass::Update() {
       auxInitWaitingForBoot = false;
       auxInitRetryCount = 0;
       auxInitResetCount = 0;
+      generatingRecoveryBaseline = true;
       SetBankChangeFeedback(FB_BANK_CHANGED);
+      generatingRecoveryBaseline = false;
       return;
     }
 
@@ -444,6 +460,17 @@ void FeedbackClass::Update() {
   }
 
   if(auxResetPending || auxMemoryError) return;
+
+  if(recoveryBaselineActive &&
+     !updatingBankFeedback &&
+     !burstInProgress &&
+     !burstAwaitingAck &&
+     fbItemsToSend == 0){
+    recoveryBaselineActive = false;
+  }
+  if(!recoveryBaselineActive && recoveryDeferredCount){
+    ServiceRecoveryDeferredFeedback();
+  }
 
   uint32_t nowMillis = millis();
   if((waitingMoreData &&
@@ -582,7 +609,14 @@ void FeedbackClass::Update() {
     if(!IsWireFeedbackType(feedbackUpdateBuffer[feedbackUpdateReadIdx].type)){
       uint8_t controlEntryIndex = feedbackUpdateReadIdx;
       IncreaseBufferIndex(READ_INDEX);
+      bool recoveryControl = recoveryBaselineActive;
+      if(recoveryControl){
+        generatingRecoveryBaseline = true;
+      }
       ProcessQueuedFeedbackEntry(controlEntryIndex);
+      if(recoveryControl){
+        generatingRecoveryBaseline = false;
+      }
       return;
     }
 
@@ -1662,6 +1696,97 @@ void FeedbackClass::RebuildCoalesceIndex(){
   }
 }
 
+void FeedbackClass::ClearTransportQueue(){
+  feedbackUpdateReadIdx = 0;
+  feedbackUpdateWriteIdx = 0;
+  fbItemsToSend = 0;
+  updatingBankFeedback = false;
+  bankControlSlotReserved = false;
+  ClearCoalesceIndex();
+}
+
+void FeedbackClass::DeferRecoveryFeedbackUpdate(const feedbackUpdateStruct &update){
+  if(IsCoalescableType(update.type)){
+    for(uint16_t i = 0; i < recoveryDeferredCount; i++){
+      if(recoveryDeferredBuffer[i].type == update.type &&
+         recoveryDeferredBuffer[i].indexChanged == update.indexChanged &&
+         recoveryDeferredBuffer[i].isShifter == update.isShifter){
+        recoveryDeferredBuffer[i] = update;
+        return;
+      }
+    }
+  }
+
+  if(recoveryDeferredCount < RECOVERY_DEFERRED_BUFFER_SIZE){
+    recoveryDeferredBuffer[recoveryDeferredCount++] = update;
+    return;
+  }
+
+  // This should be unreachable for supported layouts (the buffer covers two
+  // complete transport queues). Preserve the newest wire state and surface
+  // the capacity fault rather than silently losing it.
+  recoveryDeferredOverflowed = true;
+  SetStatusLED(STATUS_BLINK, 3, STATUS_FB_ERROR);
+  for(uint16_t i = 0; i < recoveryDeferredCount; i++){
+    if(IsWireFeedbackType(recoveryDeferredBuffer[i].type)){
+      recoveryDeferredBuffer[i] = update;
+      return;
+    }
+  }
+  recoveryDeferredBuffer[0] = update;
+}
+
+void FeedbackClass::StashTransportQueueForRecovery(){
+  static_assert(RECOVERY_DEFERRED_BUFFER_SIZE >= (2 * FEEDBACK_UPDATE_BUFFER_SIZE),
+                "recovery buffer must hold queued and deferred desired state");
+
+  uint16_t pending = fbItemsToSend;
+  if(pending + recoveryDeferredCount > RECOVERY_DEFERRED_BUFFER_SIZE){
+    recoveryDeferredOverflowed = true;
+    SetStatusLED(STATUS_BLINK, 3, STATUS_FB_ERROR);
+  }
+
+  uint16_t roomForPending = RECOVERY_DEFERRED_BUFFER_SIZE - recoveryDeferredCount;
+  uint16_t skippedPending = 0;
+  if(pending > roomForPending){
+    skippedPending = pending - roomForPending;
+    pending = roomForPending;
+  }
+
+  for(int32_t i = (int32_t)recoveryDeferredCount - 1; i >= 0; i--){
+    recoveryDeferredBuffer[i + pending] = recoveryDeferredBuffer[i];
+  }
+
+  uint8_t queueIndex = feedbackUpdateReadIdx;
+  while(skippedPending--){
+    queueIndex = NextFeedbackIndex(queueIndex);
+  }
+  for(uint16_t i = 0; i < pending; i++){
+    recoveryDeferredBuffer[i] = feedbackUpdateBuffer[queueIndex];
+    queueIndex = NextFeedbackIndex(queueIndex);
+  }
+  recoveryDeferredCount += pending;
+  ClearTransportQueue();
+}
+
+void FeedbackClass::ServiceRecoveryDeferredFeedback(){
+  uint16_t available = FEEDBACK_UPDATE_BUFFER_SIZE - fbItemsToSend;
+  uint16_t entriesToRestore = recoveryDeferredCount < available
+                            ? recoveryDeferredCount
+                            : available;
+
+  for(uint16_t i = 0; i < entriesToRestore; i++){
+    feedbackUpdateBuffer[feedbackUpdateWriteIdx] = recoveryDeferredBuffer[i];
+    RegisterCoalesceSlot(feedbackUpdateWriteIdx);
+    IncreaseBufferIndex(WRITE_INDEX);
+  }
+
+  for(uint16_t i = entriesToRestore; i < recoveryDeferredCount; i++){
+    recoveryDeferredBuffer[i - entriesToRestore] = recoveryDeferredBuffer[i];
+  }
+  recoveryDeferredCount -= entriesToRestore;
+}
+
 int16_t FeedbackClass::FindPendingUpdate(uint8_t type, uint8_t indexChanged, bool isShifter){
   uint16_t *slotPtr = CoalesceSlotPtr(type, indexChanged, isShifter);
   if(slotPtr && *slotPtr){
@@ -1675,20 +1800,30 @@ void FeedbackClass::QueueFeedbackUpdate(uint8_t type, uint8_t indexChanged, uint
                                         bool valueToIntensity, bool externalFeedback){
   WaitForMIDI(externalFeedback);
 
+  feedbackUpdateStruct update;
+  update.type = type;
+  update.indexChanged = indexChanged;
+  update.newValue = newValue;
+  update.newOrientation = newOrientation;
+  update.isShifter = isShifter;
+  update.updatingBank = bankUpdate;
+  update.rotaryValueToColor = rotaryValueToColor;
+  update.valueToIntensity = valueToIntensity;
+  update.unused = 0;
+
+  if((recoveryBaselineActive || recoveryDeferredCount) &&
+     !generatingRecoveryBaseline){
+    DeferRecoveryFeedbackUpdate(update);
+    return;
+  }
+
   int16_t coalesceIdx = -1;
   if(IsCoalescableType(type)){
     coalesceIdx = FindPendingUpdate(type, indexChanged, isShifter);
   }
 
   if(coalesceIdx >= 0){
-    feedbackUpdateBuffer[coalesceIdx].type               = type;
-    feedbackUpdateBuffer[coalesceIdx].indexChanged       = indexChanged;
-    feedbackUpdateBuffer[coalesceIdx].newValue           = newValue;
-    feedbackUpdateBuffer[coalesceIdx].newOrientation     = newOrientation;
-    feedbackUpdateBuffer[coalesceIdx].isShifter          = isShifter;
-    feedbackUpdateBuffer[coalesceIdx].updatingBank       = bankUpdate;
-    feedbackUpdateBuffer[coalesceIdx].rotaryValueToColor = rotaryValueToColor;
-    feedbackUpdateBuffer[coalesceIdx].valueToIntensity   = valueToIntensity;
+    feedbackUpdateBuffer[coalesceIdx] = update;
     return;
   }
 
@@ -1718,14 +1853,7 @@ void FeedbackClass::QueueFeedbackUpdate(uint8_t type, uint8_t indexChanged, uint
     replacingUnsentEntry = true;
   }
 
-  feedbackUpdateBuffer[writeIndex].type               = type;
-  feedbackUpdateBuffer[writeIndex].indexChanged       = indexChanged;
-  feedbackUpdateBuffer[writeIndex].newValue           = newValue;
-  feedbackUpdateBuffer[writeIndex].newOrientation     = newOrientation;
-  feedbackUpdateBuffer[writeIndex].isShifter          = isShifter;
-  feedbackUpdateBuffer[writeIndex].updatingBank       = bankUpdate;
-  feedbackUpdateBuffer[writeIndex].rotaryValueToColor = rotaryValueToColor;
-  feedbackUpdateBuffer[writeIndex].valueToIntensity   = valueToIntensity;
+  feedbackUpdateBuffer[writeIndex] = update;
   RegisterCoalesceSlot(writeIndex);
 
   if(!replacingUnsentEntry){
