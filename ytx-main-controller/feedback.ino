@@ -1564,20 +1564,16 @@ void FeedbackClass::QueueFeedbackUpdate(uint8_t type, uint8_t indexChanged, uint
 
   // Never move the read index beneath entries already transmitted in a burst.
   // Replace the oldest unsent wire entry in place so the newest host state is
-  // retained without disturbing the ACK retirement order.
+  // retained without disturbing the ACK retirement order or dropping a
+  // bank-stage control entry.
   if(fbItemsToSend >= FEEDBACK_UPDATE_BUFFER_SIZE){
-    if(burstInProgress || burstAwaitingAck){
-      int16_t replaceIndex = FindOldestReplaceableUnsentSlot();
-      if(replaceIndex < 0){
-        return;
-      }
-      writeIndex = (uint8_t)replaceIndex;
-      UnregisterCoalesceSlot(writeIndex);
-      replacingUnsentEntry = true;
-    }else{
-      IncreaseBufferIndex(READ_INDEX);
-      writeIndex = feedbackUpdateWriteIdx;
+    int16_t replaceIndex = FindOldestReplaceableUnsentSlot();
+    if(replaceIndex < 0){
+      return;
     }
+    writeIndex = (uint8_t)replaceIndex;
+    UnregisterCoalesceSlot(writeIndex);
+    replacingUnsentEntry = true;
   }
 
   feedbackUpdateBuffer[writeIndex].type               = type;
@@ -1596,8 +1592,11 @@ void FeedbackClass::QueueFeedbackUpdate(uint8_t type, uint8_t indexChanged, uint
 }
 
 int16_t FeedbackClass::FindOldestReplaceableUnsentSlot(){
-  uint16_t entriesToScan = fbItemsToSend - burstEntriesProcessed;
-  uint8_t scanIndex = burstSendIdx;
+  bool burstActive = burstInProgress || burstAwaitingAck;
+  uint16_t entriesToScan = burstActive
+                         ? fbItemsToSend - burstEntriesProcessed
+                         : fbItemsToSend;
+  uint8_t scanIndex = burstActive ? burstSendIdx : feedbackUpdateReadIdx;
 
   while(entriesToScan--){
     if(IsWireFeedbackType(feedbackUpdateBuffer[scanIndex].type)){
