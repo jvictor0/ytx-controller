@@ -120,8 +120,8 @@ int main (void)
 			if(showNow && !receivingBank && !receivingFeedbackData){
 				showNow = false;
 				feedbackShow();
+				timeToShow = false;
 			}
-			timeToShow = false;
 		}
 		
 		if(sendShowEnd){
