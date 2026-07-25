@@ -163,7 +163,7 @@ int main (void)
 		}
 
 		if(rainbowStart){
-			if(feedbackRainbow()){
+			if(feedbackAllocationFailed || feedbackRainbow()){
 				rainbowStart = false;
 				SendToMain(END_OF_RAINBOW);
 			}

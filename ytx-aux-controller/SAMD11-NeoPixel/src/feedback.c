@@ -37,6 +37,7 @@ SOFTWARE.
 #include "main-controller-comms.h"
 
 extern uint32_t millis(void);
+extern uint32_t antMillisAllocationError;
 extern char _end;
 extern char _sstack;
 
@@ -47,7 +48,7 @@ uint8_t numDigitals2 = 0;
 
 uint8_t whichStripToShow = 0;
 
-uint16_t indexChanged = 0;
+static uint16_t rainbowFrame = 256;
 
 static uint16_t PixelAllocationBytes(uint8_t encoders, uint8_t digitals1, uint8_t digitals2)
 {
@@ -176,30 +177,46 @@ void feedbackSetBrightness(uint8_t brightness){
 
 bool feedbackRainbow(){
 	uint16_t totalLEDs = 8*(numEncoders + (numDigitals1 + numDigitals2)/2);
+	uint32_t now = millis();
 
-	if(totalLEDs>0){
-		uint16_t wait = 0;
-		if(totalLEDs < 128){
-			wait = 512/totalLEDs;
-		}else if(totalLEDs >= 128 && totalLEDs < 256){
-			wait = 1024/totalLEDs;
-		}else{
-			wait = 1400/totalLEDs;
-		}
+	if(totalLEDs == 0){
+		rainbowFrame = 256;
+		return true;
+	}
 
-		for(uint16_t frame = 0; frame < 256; frame++){
-			for(uint8_t strip = 0; strip < LED_STRIP_COUNT; strip++){
-				for(uint16_t pixel = 0; pixel < numPixels(strip); pixel++){
-					setPixelColorC(strip, pixel, Wheel((pixel + frame) & 255));
-				}
-			}
-			if(!feedbackShowAllIfIdle()){
-				return false;
-			}
-			delay(wait);
+	if(rainbowFrame >= 256){
+		rainbowFrame = 0;
+		antMillisAllocationError = now;
+	}
+
+	if((uint32_t)(now - antMillisAllocationError) >= RAINBOW_MAX_DURATION_TICKS){
+		rainbowFrame = 256;
+		return true;
+	}
+
+	for(uint8_t strip = 0; strip < LED_STRIP_COUNT; strip++){
+		for(uint16_t pixel = 0; pixel < numPixels(strip); pixel++){
+			setPixelColorC(strip, pixel, Wheel((pixel + rainbowFrame) & 255));
 		}
 	}
-	return true;
+	if(!feedbackShowAllIfIdle()){
+		return false;
+	}
+
+	if(rainbowFrame == 255){
+		rainbowFrame = 256;
+		return true;
+	}
+
+	rainbowFrame++;
+	if(totalLEDs < 128){
+		delay(512/totalLEDs);
+	}else if(totalLEDs < 256){
+		delay(1024/totalLEDs);
+	}else{
+		delay(1400/totalLEDs);
+	}
+	return false;
 }
 
 bool feedbackDataAvailable() { return (feedbackFramesPending > 0); }
@@ -526,7 +543,7 @@ void feedbackDataUpdate() {
 			}
 		}
 
-		indexChanged = frameData.updateN;
+		uint16_t indexChanged = frameData.updateN;
 
 		if (frameData.updateFrame == ENCODER_CHANGE_FRAME ||
 			frameData.updateFrame == ENCODER_BLEND_FRAME ||
