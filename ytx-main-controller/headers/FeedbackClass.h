@@ -174,7 +174,7 @@ private:
 	int8_t ProcessQueuedFeedbackEntry(uint8_t);
 	bool IsWireFeedbackType(uint8_t);
 	void SendAuxInitializationFrame();
-	bool WaitForAuxAck(uint32_t);
+	bool WaitForAuxAck(uint32_t, bool);
 	void PrepareAuxAckWait();
 	bool SendAuxInitializationWithRetry(uint8_t, uint32_t);
 	bool SendAuxCommandWithRetry(uint8_t, int16_t);

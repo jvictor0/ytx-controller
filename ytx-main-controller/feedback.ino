@@ -190,7 +190,7 @@ void FeedbackClass::PrepareAuxAckWait(){
   interrupts();
 }
 
-bool FeedbackClass::WaitForAuxAck(uint32_t timeoutUs){
+bool FeedbackClass::WaitForAuxAck(uint32_t timeoutUs, bool acceptTaggedInitAck){
   uint32_t startedAt = micros();
 
   while((uint32_t)(micros() - startedAt) < timeoutUs){
@@ -199,11 +199,13 @@ bool FeedbackClass::WaitForAuxAck(uint32_t timeoutUs){
     bool ordinaryAck = !waitingForAck && !auxResetPending;
     if(taggedAck){
       auxAckReceived = false;
-      waitingForAck = false;
+      if(acceptTaggedInitAck){
+        waitingForAck = false;
+      }
     }
     interrupts();
 
-    if(taggedAck || ordinaryAck){
+    if((acceptTaggedInitAck && taggedAck) || ordinaryAck){
       return true;
     }
   }
@@ -220,7 +222,7 @@ bool FeedbackClass::SendAuxInitializationWithRetry(uint8_t maxRetries, uint32_t 
   for(uint8_t attempt = 0; attempt < maxRetries; attempt++){
     PrepareAuxAckWait();
     SendAuxInitializationFrame();
-    if(WaitForAuxAck(ackTimeoutUs)){
+    if(WaitForAuxAck(ackTimeoutUs, true)){
       return true;
     }
   }
@@ -234,7 +236,7 @@ bool FeedbackClass::SendAuxCommandWithRetry(uint8_t command, int16_t data){
     if(data >= 0){
       Serial.write((uint8_t)data);
     }
-    if(WaitForAuxAck(AUX_COMMAND_ACK_TIMEOUT_US)){
+    if(WaitForAuxAck(AUX_COMMAND_ACK_TIMEOUT_US, false)){
       return true;
     }
   }
@@ -407,6 +409,8 @@ void FeedbackClass::Update() {
     noInterrupts();
     bool resetPending = auxResetPending;
     bool ackPending = waitingForAck;
+    bool burstFailed = burstErrorOccurred;
+    uint8_t failedAtFrame = burstErrorIndex;
     bool repaintRequired = auxQueueOverflowed;
     if(!ackPending){
       auxQueueOverflowed = false;
@@ -426,8 +430,8 @@ void FeedbackClass::Update() {
     uint8_t entriesSucceeded = 0;
     bool shouldRetry = false;
 
-    if(burstErrorOccurred){
-      framesSucceeded = burstErrorIndex;
+    if(burstFailed){
+      framesSucceeded = failedAtFrame;
       shouldRetry = true;
     }else if(ackPending){
       // Timeout
@@ -443,7 +447,7 @@ void FeedbackClass::Update() {
       framesSucceeded = fbMessagesSent;
     }
 
-    if(burstErrorOccurred){
+    if(burstFailed){
       if(framesSucceeded == 0){
         entriesSucceeded = burstEntriesBeforeFirstFrame;
       }else{
@@ -477,14 +481,8 @@ void FeedbackClass::Update() {
     if(shouldRetry){
       burstRetryCount++;
       if(burstRetryCount >= 20){
-        // Drop one full burst window and continue
-        //
-        uint8_t dropped = 0;
-        while(fbItemsToSend > 0 && dropped < MSG_BUFFER_AUX){
-          IncreaseBufferIndex(READ_INDEX);
-          dropped++;
-        }
-        burstRetryCount = 0;
+        RecoverAuxControllerReset();
+        return;
       }
       RebuildCoalesceIndex();
     }else{

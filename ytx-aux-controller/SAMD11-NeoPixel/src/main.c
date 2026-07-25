@@ -54,9 +54,9 @@ uint32_t antMillisAllocationError;
 
 static void RecoverStaleReceiveState(void)
 {
-	uint32_t now = millis();
 	uint32_t primask = __get_PRIMASK();
 	__disable_irq();
+	uint32_t now = millis();
 
 	if((receivingFeedbackData || receivingBank || receivingInit ||
 	    receivingBurstEndCount || discardingBurst) &&
@@ -96,6 +96,7 @@ int main (void)
 	if(feedbackAllocationFailed){
 		SendToMain(AUX_MEMORY_ERROR);
 	}
+	SendToMain(INIT_VALUES);
 	SendToMain(ACK_CMD);
 
 	antMillisShowBegin = millis();
