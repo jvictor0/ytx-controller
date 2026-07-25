@@ -36,7 +36,6 @@
 
 #include <stdio.h>
 #include <stdarg.h>
-#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -44,8 +43,6 @@
 extern "C" {
 #endif
 
-#undef errno
-extern int errno;
 extern int _end;
 
 extern caddr_t _sbrk(int incr);
@@ -70,7 +67,6 @@ extern caddr_t _sbrk(int incr)
 	}
 
 	if ((heap + incr) > (unsigned char *)&_sstack) {
-		errno = ENOMEM;
 		return (caddr_t)-1;
 	}
 
