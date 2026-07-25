@@ -37,7 +37,6 @@ SOFTWARE.
 #include "main-controller-comms.h"
 
 extern uint32_t millis(void);
-extern uint32_t antMillisAllocationError;
 extern char _end;
 extern char _sstack;
 
@@ -48,6 +47,7 @@ uint8_t numDigitals2 = 0;
 uint8_t whichStripToShow = 0;
 
 static uint16_t rainbowFrame = 256;
+static uint32_t rainbowStartedAt = 0;
 
 static uint16_t PixelAllocationBytes(uint8_t encoders, uint8_t digitals1, uint8_t digitals2)
 {
@@ -255,10 +255,10 @@ bool feedbackRainbow(){
 
 	if(rainbowFrame >= 256){
 		rainbowFrame = 0;
-		antMillisAllocationError = now;
+		rainbowStartedAt = now;
 	}
 
-	if((uint32_t)(now - antMillisAllocationError) >= RAINBOW_MAX_DURATION_TICKS){
+	if((uint32_t)(now - rainbowStartedAt) >= RAINBOW_MAX_DURATION_TICKS){
 		rainbowFrame = 256;
 		return true;
 	}
