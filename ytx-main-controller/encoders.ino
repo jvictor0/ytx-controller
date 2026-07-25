@@ -2193,10 +2193,21 @@ bool EncoderInputs::CaptureEncoderDiagnostics(uint8_t encNo, uint16_t durationMs
   uint8_t prevPinState = 0;
   uint32_t startMillis = millis();
   uint32_t lastWatchdogReset = startMillis;
+  uint32_t lastControllerService = startMillis;
   uint32_t prevMicros = micros();
 
   while((uint16_t)(millis() - startMillis) < durationMs){
     uint32_t nowMillis = millis();
+    if(nowMillis != lastControllerService){
+      lastControllerService = nowMillis;
+      for(uint8_t message = 0; message < USB_MIDI_MESSAGES_PER_LOOP; message++){
+        if(!MIDI.read()){
+          break;
+        }
+      }
+      feedbackHw.Update();
+    }
+
     if(nowMillis - lastWatchdogReset > WATCHDOG_CHECK_MS){
       Watchdog.reset();
       lastWatchdogReset = nowMillis;
