@@ -34,10 +34,6 @@ SOFTWARE.
 
 #include "main-controller-comms.h"
 
-
-extern FeedbackFrameData FeedbackFramesBuffer[FEEDBACK_BUFFER_LENGTH];
-
-
 volatile uint32_t millisTicks = 0;
 
 void SysTick_Handler(void)
@@ -52,12 +48,11 @@ uint32_t millis(){
 uint32_t failsPerSecond = 0;
 uint32_t framesPerSecond = 0;
 
-volatile uint8_t ReceptionBuffer[FeedbackFrame_Size+CHECKSUM_BYTES+1];
-
 void MainControllerReception_Handler(void){
 	if(SERCOM2->USART.INTFLAG.bit.RXC){					// if RX interrupt flag is set
 		uint16_t rcvWord = SERCOM2->USART.DATA.reg;		// get data from register
 		SERCOM2->USART.INTFLAG.bit.RXC = 0;				// clear interrupt flag
+		lastReceiveMillis = millisTicks;
 
 	  	bool isCommand = (rcvWord&0x100) ? true : false;
 	  	uint8_t rcvByte = (uint8_t)(rcvWord&0x00FF);
@@ -102,10 +97,14 @@ void MainControllerReception_Handler(void){
 
 			if (rcvByte == INIT_VALUES){
 				// INIT VALUES COMMAND
-				if(!receivingInit){
-					receivingInit = true;
-					receivedBytes = 0;
-				}
+				// A repeated header is an init retransmission and is always a
+				// synchronization point, including after a truncated frame.
+				receivingInit = true;
+				receivingBrightness = false;
+				receivingBank = false;
+				receivingFeedbackData = false;
+				discardingBurst = false;
+				receivedBytes = 0;
 			}else if (rcvByte == CMD_ALL_LEDS_OFF){		// TURN ALL LEDS OFF COMMAND
 				turnAllOffFlag = true;
 			}else if (rcvByte == CMD_ALL_LEDS_ON){		// TURN ALL LEDS OFF COMMAND

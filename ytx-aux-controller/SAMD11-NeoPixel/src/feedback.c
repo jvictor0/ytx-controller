@@ -34,10 +34,9 @@ SOFTWARE.
 #include <NeoPixels.h>
 #include "variables.h"
 #include "feedback.h"
+#include "main-controller-comms.h"
 
-extern uint8_t ReceptionBuffer[FeedbackFrame_Size+CHECKSUM_BYTES+1];
-
-volatile FeedbackFrameData FeedbackFramesBuffer[FEEDBACK_BUFFER_LENGTH];
+extern uint32_t millis(void);
 
 uint8_t numStripsOn = 0;
 uint8_t numEncoders = 0;
@@ -49,8 +48,15 @@ uint8_t whichStripToShow = 0;
 uint16_t indexChanged = 0;
 
 void feedbackBegin(){
+	uint32_t lastResetAnnouncement = millis() - RESET_ANNOUNCE_TICKS;
 
-	while(!rcvdInitValues);
+	while(!rcvdInitValues){
+		uint32_t now = millis();
+		if((uint32_t)(now - lastResetAnnouncement) >= RESET_ANNOUNCE_TICKS){
+			SendToMain(RESET_HAPPENED);
+			lastResetAnnouncement = now;
+		}
+	}
 
 	numEncoders = ReceptionBuffer[nEncoders];
 	numDigitals1 = ReceptionBuffer[nDigitals1];

@@ -51,6 +51,26 @@ extern uint32_t millis();
 uint32_t antMillisShowBegin;
 uint32_t antMillisShowEnd;
 
+static void RecoverStaleReceiveState(void)
+{
+	uint32_t now = millis();
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+
+	if((receivingFeedbackData || receivingBank || receivingInit || discardingBurst) &&
+	   (uint32_t)(now - lastReceiveMillis) >= RECEIVE_STATE_TIMEOUT_TICKS){
+		receivedBytes = 0;
+		receivingFeedbackData = false;
+		receivingBank = false;
+		receivingInit = false;
+		discardingBurst = false;
+	}
+
+	if(!primask){
+		__enable_irq();
+	}
+}
+
 int main (void)
 {
 	setup();
@@ -75,6 +95,8 @@ int main (void)
 	antMillisShowEnd = millis();
 
 	while (1) {		
+		RecoverStaleReceiveState();
+
 		if(feedbackDataAvailable()){
 			feedbackDataUpdate();
 			showNow = true;

@@ -54,6 +54,10 @@ extern volatile uint8_t burstFrameIndex;
 extern volatile bool showNow;
 extern volatile bool timeToShow;
 extern volatile bool sendShowEnd;
+extern volatile uint32_t lastReceiveMillis;
+
+extern volatile uint8_t ReceptionBuffer[FeedbackFrame_Size+CHECKSUM_BYTES+1];
+extern volatile FeedbackFrameData FeedbackFramesBuffer[FEEDBACK_BUFFER_LENGTH];
 
 
 #endif /* VARIABLES_H_ */

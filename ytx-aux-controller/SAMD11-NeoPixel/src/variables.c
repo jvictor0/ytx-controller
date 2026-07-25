@@ -51,5 +51,7 @@ volatile uint8_t burstFrameIndex = 0;
 volatile bool showNow = false;
 volatile bool timeToShow = false;
 volatile bool sendShowEnd = false;
-
+volatile uint32_t lastReceiveMillis = 0;
+volatile uint8_t ReceptionBuffer[FeedbackFrame_Size+CHECKSUM_BYTES+1];
+volatile FeedbackFrameData FeedbackFramesBuffer[FEEDBACK_BUFFER_LENGTH];
 
