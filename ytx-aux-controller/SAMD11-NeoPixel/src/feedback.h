@@ -30,9 +30,10 @@ SOFTWARE.
 #define FEEDBACK_H_
 
 bool feedbackBegin();
-void feedbackRainbow();
+bool feedbackRainbow();
 void feedbackShow();
 void feedbackShowAll();
+bool feedbackShowAllIfIdle();
 bool feedbackDataAvailable();
 void feedbackDataUpdate();
 void feedbackSetBrightness(uint8_t brightness);

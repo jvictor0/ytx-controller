@@ -143,13 +143,38 @@ void feedbackShowAll(){
 	SendToMain(SHOW_END);
 }
 
+bool feedbackShowAllIfIdle(){
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+
+	if(receivingBank || receivingFeedbackData ||
+	   SERCOM2->USART.INTFLAG.bit.RXC || SERCOM2->USART.INTFLAG.bit.ERROR){
+		if(!primask){
+			__enable_irq();
+		}
+		return false;
+	}
+
+	// Hold receive state stable from the idle check through the physical show.
+	// pixelsShow() preserves the caller's PRIMASK, so showAll() cannot reopen
+	// the burst-start race between strips.
+	SendToMain(SHOW_IN_PROGRESS);
+	showAll();
+
+	if(!primask){
+		__enable_irq();
+	}
+	SendToMain(SHOW_END);
+	return true;
+}
+
 void feedbackSetBrightness(uint8_t brightness){
 	for (int i=0; i < LED_STRIP_COUNT; i++){
 		setBrightness(i, brightness);
 	}
 }
 
-void feedbackRainbow(){
+bool feedbackRainbow(){
 	uint16_t totalLEDs = 8*(numEncoders + (numDigitals1 + numDigitals2)/2);
 
 	if(totalLEDs>0){
@@ -168,10 +193,13 @@ void feedbackRainbow(){
 					setPixelColorC(strip, pixel, Wheel((pixel + frame) & 255));
 				}
 			}
-			feedbackShowAll();
+			if(!feedbackShowAllIfIdle()){
+				return false;
+			}
 			delay(wait);
 		}
 	}
+	return true;
 }
 
 bool feedbackDataAvailable() { return (feedbackFramesPending > 0); }

@@ -129,34 +129,47 @@ int main (void)
 			sendShowEnd = false;
 		}
 		
+		// Command flags are set by the receive ISR. Clear them only after every
+		// requested physical show starts from an atomically verified idle state.
 		if(turnAllOffFlag){
-			turnAllOffFlag = false;
 			setAll(NP_OFF,NP_OFF,NP_OFF);
-			feedbackShowAll();
+			if(feedbackShowAllIfIdle()){
+				turnAllOffFlag = false;
+			}
 		}
 
 		if(turnAllOnFlag){
-			turnAllOnFlag = false;
+			bool commandCompleted = true;
 			setAll(NP_ON*2, NP_OFF, NP_OFF);
-			feedbackShowAll();
-			delay(1500);
-			setAll(NP_OFF, NP_ON*2, NP_OFF);
-			feedbackShowAll();
-			delay(1500);
-			setAll(NP_OFF, NP_OFF, NP_ON*2);
-			feedbackShowAll();
-			delay(1500);
-			setAll(NP_ON, NP_ON, NP_ON);
-			feedbackShowAll();
+			commandCompleted = feedbackShowAllIfIdle();
+			if(commandCompleted){
+				delay(1500);
+				setAll(NP_OFF, NP_ON*2, NP_OFF);
+				commandCompleted = feedbackShowAllIfIdle();
+			}
+			if(commandCompleted){
+				delay(1500);
+				setAll(NP_OFF, NP_OFF, NP_ON*2);
+				commandCompleted = feedbackShowAllIfIdle();
+			}
+			if(commandCompleted){
+				delay(1500);
+				setAll(NP_ON, NP_ON, NP_ON);
+				commandCompleted = feedbackShowAllIfIdle();
+			}
+			if(commandCompleted){
+				turnAllOnFlag = false;
+			}
 		}
 
 		if(rainbowStart){
-			rainbowStart = false;
-			feedbackRainbow();
-			SendToMain(END_OF_RAINBOW);
+			if(feedbackRainbow()){
+				rainbowStart = false;
+				SendToMain(END_OF_RAINBOW);
+			}
 		}
 
-		if(changeBrightnessFlag){
+		if(changeBrightnessFlag && !receivingBank && !receivingFeedbackData){
 			changeBrightnessFlag = false;
 			feedbackSetBrightness(currentBrightness);
 			SendToMain(ACK_CMD);
