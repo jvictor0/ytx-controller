@@ -189,6 +189,7 @@ private:
 	void RegisterCoalesceSlot(uint8_t);
 	void UnregisterCoalesceSlot(uint8_t);
 	int16_t FindOldestReplaceableUnsentSlot();
+	int16_t FindNewestReplaceableUnsentSlot();
 	int16_t EncoderCoalesceTypeIndex(uint8_t);
 	int16_t DigitalCoalesceTypeIndex(uint8_t);
 	int16_t BankCoalesceTypeIndex(uint8_t);
@@ -218,6 +219,7 @@ private:
 	uint8_t auxInitResetCount;
 	uint32_t antMicrosAuxInit;
 	bool updatingBankFeedback;
+	bool bankControlSlotReserved;
 	
 	feedbackUpdateStruct feedbackUpdateBuffer[FEEDBACK_UPDATE_BUFFER_SIZE];
 	uint8_t feedbackUpdateReadIdx;

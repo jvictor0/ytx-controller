@@ -55,6 +55,7 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   auxInitRetryCount = 0;
   auxInitResetCount = 0;
   antMicrosAuxInit = 0;
+  bankControlSlotReserved = false;
   waitingMoreData = false;
   antMillisWaitMoreData = 0;
   encoderCoalesceSlots = NULL;
@@ -644,6 +645,7 @@ int8_t FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
       // Then, if necessary, the DIGITAL 2 port
       //
       updatingBankFeedback = true;
+      bankControlSlotReserved = true;
 
       // Update all rotary encoders
       //
@@ -698,6 +700,7 @@ int8_t FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
         }
       }
       SetBankChangeFeedback(FB_BANK_DIGITAL1);
+      bankControlSlotReserved = false;
     }
     break;
     case FB_BANK_DIGITAL1:
@@ -706,6 +709,7 @@ int8_t FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
       //
       if(amountOfDigitalInConfig[DIGITAL_PORT_2] > 0)
       {
+        bankControlSlotReserved = true;
         // If there are digitals on the second port
         //
         for(uint16_t n = 0; n < amountOfDigitalInConfig[DIGITAL_PORT_1]; n++)
@@ -731,6 +735,7 @@ int8_t FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
           }
         }
         SetBankChangeFeedback(FB_BANK_DIGITAL2);
+        bankControlSlotReserved = false;
       }
       else
       {
@@ -1571,8 +1576,13 @@ void FeedbackClass::QueueFeedbackUpdate(uint8_t type, uint8_t indexChanged, uint
   // Replace the oldest unsent wire entry in place so the newest host state is
   // retained without disturbing the ACK retirement order or dropping a
   // bank-stage control entry.
-  if(fbItemsToSend >= FEEDBACK_UPDATE_BUFFER_SIZE){
-    int16_t replaceIndex = FindOldestReplaceableUnsentSlot();
+  bool preservingBankControlSlot = bankControlSlotReserved &&
+                                   IsWireFeedbackType(type) &&
+                                   fbItemsToSend >= (FEEDBACK_UPDATE_BUFFER_SIZE - 1);
+  if(fbItemsToSend >= FEEDBACK_UPDATE_BUFFER_SIZE || preservingBankControlSlot){
+    int16_t replaceIndex = IsWireFeedbackType(type)
+                         ? FindOldestReplaceableUnsentSlot()
+                         : FindNewestReplaceableUnsentSlot();
     if(replaceIndex < 0){
       return;
     }
@@ -1613,6 +1623,24 @@ int16_t FeedbackClass::FindOldestReplaceableUnsentSlot(){
   }
 
   return -1;
+}
+
+int16_t FeedbackClass::FindNewestReplaceableUnsentSlot(){
+  bool burstActive = burstInProgress || burstAwaitingAck;
+  uint16_t entriesToScan = burstActive
+                         ? fbItemsToSend - burstEntriesProcessed
+                         : fbItemsToSend;
+  uint8_t scanIndex = burstActive ? burstSendIdx : feedbackUpdateReadIdx;
+  int16_t newestReplaceable = -1;
+
+  while(entriesToScan--){
+    if(IsWireFeedbackType(feedbackUpdateBuffer[scanIndex].type)){
+      newestReplaceable = scanIndex;
+    }
+    scanIndex++;
+  }
+
+  return newestReplaceable;
 }
 
 void FeedbackClass::SetChangeEncoderFeedback(uint8_t type, uint8_t encIndex, uint16_t val, uint8_t encoderOrientation, 
