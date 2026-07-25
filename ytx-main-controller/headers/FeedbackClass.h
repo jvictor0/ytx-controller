@@ -167,7 +167,7 @@ private:
 	}feedbackUpdateStruct;
 
 	void AddCheckSum();
-	bool SendFeedbackData();
+	void SendFeedbackData();
 	int8_t SendDataIfReady();
 	void FillFrameWithEncoderData(byte);
 	void FillFrameWithDigitalData(byte);

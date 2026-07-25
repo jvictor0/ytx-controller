@@ -464,7 +464,8 @@ void FeedbackClass::Update() {
       return;
     }
 
-    bool ackTimedOut = ackPending && ((uint32_t)(now - antMicrosAck) >= 5000);
+    bool ackTimedOut = ackPending &&
+                       ((uint32_t)(now - antMicrosAck) >= AUX_BURST_ACK_TIMEOUT_US);
     if(ackPending && !ackTimedOut){
       return;
     }
@@ -535,6 +536,11 @@ void FeedbackClass::Update() {
         // sustained load into reset/retry churn.
         auxQueueFullBackoff = true;
         antMicrosQueueFull = now;
+        burstRetryCount = 0;
+      }else if(entriesSucceeded > 0){
+        // The peer accepted a verified prefix, so transport is making
+        // progress. Escalate only consecutive zero-progress failures.
+        burstRetryCount = 0;
       }else{
         burstRetryCount++;
         if(burstRetryCount >= 20){
@@ -627,19 +633,6 @@ void FeedbackClass::Update() {
     }
 
     int8_t processResult = ProcessQueuedFeedbackEntry(fbUpdateQueueIndex);
-    if(processResult < 0){
-      // If the first frame was paused, the aux may never have observed the
-      // burst header. Abandon only the transmission attempt and reissue
-      // BURST_INIT after SHOW_END; no queue entry has been consumed.
-      if(fbMessagesSent == 0){
-        burstInProgress = false;
-        noInterrupts();
-        auxBurstTransmissionActive = false;
-        interrupts();
-        RebuildCoalesceIndex();
-      }
-      break;
-    }
 
     burstSendIdx = NextFeedbackIndex(burstSendIdx);
 
@@ -1829,10 +1822,7 @@ int8_t FeedbackClass::SendDataIfReady(){
     return 0;
   }
 
-  if(!SendFeedbackData()){
-    return -1;
-  }
-
+  SendFeedbackData();
   feedbackDataToSend = false;
   return 1;
 }
@@ -1847,7 +1837,7 @@ void FeedbackClass::AddCheckSum(){
 }
 
 // #define DEBUG_FB_FRAME
-bool FeedbackClass::SendFeedbackData(){
+void FeedbackClass::SendFeedbackData(){
   // In pipelined mode, just send the frame without waiting for ACK
   // The ACK will be checked after BURST_END is sent
   //
@@ -1860,10 +1850,6 @@ bool FeedbackClass::SendFeedbackData(){
     SERIALPRINTLN();
   #endif
   
-  if(fbShowInProgress){
-    return false;
-  }
-
   uint16_t sum = 2019 + checkSum(feedbackFrameBuffer, FeedbackFrame_Size);
 
   Serial.write9bit(NEW_FRAME_BYTE);             // SEND FRAME HEADER
@@ -1876,7 +1862,6 @@ bool FeedbackClass::SendFeedbackData(){
   Serial.write(sum&0x00FF);
 
   Serial.write9bit(END_OF_FRAME_BYTE);          // SEND END OF FRAME BYTE
-  return true;
 }
 
 void FeedbackClass::SendCommand(uint8_t cmd){

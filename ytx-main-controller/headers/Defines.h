@@ -401,6 +401,7 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define AUX_MEMORY_RECOVERY_MAX_RESETS          2
 #define AUX_MEMORY_RECOVERY_STABLE_US      500000UL
 #define AUX_QUEUE_FULL_BACKOFF_US           25000UL
+#define AUX_BURST_ACK_TIMEOUT_US              5000UL
 
 // COMMANDS
 #define ACK_CMD                 0xAA
