@@ -929,6 +929,7 @@ int8_t FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
             SetChangeDigitalFeedback(n, digitalHw.GetDigitalValue(n), digitalHw.GetDigitalState(n), NO_SHIFTER, BANK_UPDATE);
           }
         }
+        updatingBankFeedback = true;
         SetBankChangeFeedback(FB_BANK_DIGITAL2);
         bankControlSlotReserved = false;
       }
