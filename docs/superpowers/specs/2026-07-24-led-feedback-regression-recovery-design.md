@@ -122,8 +122,11 @@ Every payload send reports whether a frame was actually written. A show that
 begins immediately before a burst pauses the same queue entry rather than
 retiring it. `BURST_END` is followed by the expected frame count twice; the aux
 ACKs only when both count bytes agree with its received-frame count. A mismatch
-uses the existing indexed retry response. Retry exhaustion reinitializes the
-aux without dropping queued entries.
+uses the existing retry response with index zero because a count alone cannot
+identify a contiguous successful prefix. The whole burst is replayed, while a
+checksum failure may still retire its verified prefix. Queue-retirement
+accounting spans all 256 main-controller entries. Retry exhaustion
+reinitializes the aux without dropping queued entries.
 
 Control-only bank entries are expanded outside wire bursts, preserving a
 one-to-one mapping between acknowledged frame counts and retired queue entries.
