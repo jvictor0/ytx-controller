@@ -134,19 +134,21 @@ static bool feedbackShowWithGrant(uint8_t requestedKind){
 			receivingInit || receivingBrightness ||
 			receivingBurstEndCount || discardingBurst ||
 			SERCOM2->USART.INTFLAG.bit.RXC || SERCOM2->USART.INTFLAG.bit.ERROR;
-		showRequestKind = SHOW_KIND_NONE;
 		showGrantKind = SHOW_KIND_NONE;
 
 		if(receiveBusy){
+			// Keep this request outstanding and restart its retry window. This
+			// gives the main controller time to resume a pending transmission
+			// that can clear the stale receive state before another grant.
+			showRequestMillis = now;
 			if(!primask){
 				__enable_irq();
 			}
-			// Release the main-side gate when the atomic recheck rejects a
-			// grant. The caller will issue a fresh request for the same work.
 			SendToMain(SHOW_END);
 			return false;
 		}
 
+		showRequestKind = SHOW_KIND_NONE;
 		if(requestedKind == SHOW_KIND_ALL){
 			showAll();
 		}else{
