@@ -34,6 +34,10 @@ SOFTWARE.
 
 #include "main-controller-comms.h"
 
+extern uint8_t numEncoders;
+extern uint8_t numDigitals1;
+extern uint8_t numDigitals2;
+
 volatile uint32_t millisTicks = 0;
 
 void SysTick_Handler(void)
@@ -263,14 +267,25 @@ void MainControllerReception_Handler(void){
 						receivingFeedbackData = false;
 						discardingBurst = true;
 					}
-				}else if (receivingInit){
-					// INIT VALUES BYTES						
-					if (receivedBytes == CONFIG_FRAME_SIZE){
-						receivedBytes = 0;
-						rcvdInitValues = true;
-						receivingInit = false;
-						if(auxReady){
-							// Tag the following ACK so a late init ACK cannot
+					}else if (receivingInit){
+						// INIT VALUES BYTES
+						if (receivedBytes == CONFIG_FRAME_SIZE){
+							bool layoutChanged = auxReady &&
+								(ReceptionBuffer[nEncoders] != numEncoders ||
+								 ReceptionBuffer[nDigitals1] != numDigitals1 ||
+								 ReceptionBuffer[nDigitals2] != numDigitals2);
+							receivedBytes = 0;
+							rcvdInitValues = true;
+							receivingInit = false;
+							if(auxReady){
+								// Pixel buffers are sized only during boot. A changed
+								// layout, or a retry after allocation failure, must
+								// reboot and allocate from a clean heap rather than
+								// acknowledging stale strip sizes.
+								if(layoutChanged || feedbackAllocationFailed){
+									system_reset();
+								}
+								// Tag the following ACK so a late init ACK cannot
 							// complete an unrelated burst on the main controller.
 							SendToMain(INIT_VALUES);
 							SendToMain(ACK_CMD);
