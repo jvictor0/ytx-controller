@@ -32,6 +32,7 @@ SOFTWARE.
 bool feedbackBegin();
 void feedbackRainbow();
 void feedbackShow();
+void feedbackShowAll();
 bool feedbackDataAvailable();
 void feedbackDataUpdate();
 void feedbackSetBrightness(uint8_t brightness);

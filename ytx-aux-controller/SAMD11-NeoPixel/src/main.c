@@ -118,11 +118,7 @@ int main (void)
 		if(timeToShow){		
 			if(showNow && !receivingBank && !receivingFeedbackData){
 				showNow = false;
-				SendToMain(SHOW_IN_PROGRESS);
-				
 				feedbackShow();
-				
-				SendToMain(SHOW_END);	
 			}
 			timeToShow = false;
 		}
@@ -135,22 +131,22 @@ int main (void)
 		if(turnAllOffFlag){
 			turnAllOffFlag = false;
 			setAll(NP_OFF,NP_OFF,NP_OFF);
-			showAll();
+			feedbackShowAll();
 		}
 
 		if(turnAllOnFlag){
 			turnAllOnFlag = false;
 			setAll(NP_ON*2, NP_OFF, NP_OFF);
-			showAll();
+			feedbackShowAll();
 			delay(1500);
 			setAll(NP_OFF, NP_ON*2, NP_OFF);
-			showAll();
+			feedbackShowAll();
 			delay(1500);
 			setAll(NP_OFF, NP_OFF, NP_ON*2);
-			showAll();
+			feedbackShowAll();
 			delay(1500);
 			setAll(NP_ON, NP_ON, NP_ON);
-			showAll();
+			feedbackShowAll();
 		}
 
 		if(rainbowStart){

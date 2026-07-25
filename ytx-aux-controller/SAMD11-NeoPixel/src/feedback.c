@@ -116,11 +116,13 @@ bool feedbackBegin(){
 	}
 	
 	setAll(NP_OFF,NP_OFF,NP_OFF);
-	showAll();
+	feedbackShowAll();
 	return true;
 }
 
 void feedbackShow(){
+	SendToMain(SHOW_IN_PROGRESS);
+
 	for (int i = 0; i < LED_STRIP_COUNT; i++){
 		if(whichStripToShow&(1<<i)){
 			pixelsShow(i);
@@ -128,6 +130,13 @@ void feedbackShow(){
 	}
 
 	whichStripToShow = 0;
+	SendToMain(SHOW_END);
+}
+
+void feedbackShowAll(){
+	SendToMain(SHOW_IN_PROGRESS);
+	showAll();
+	SendToMain(SHOW_END);
 }
 
 void feedbackSetBrightness(uint8_t brightness){
@@ -139,7 +148,7 @@ void feedbackSetBrightness(uint8_t brightness){
 void feedbackRainbow(){
 	uint16_t totalLEDs = 8*(numEncoders + (numDigitals1 + numDigitals2)/2);
 
-	if(totalLEDs>0){	
+	if(totalLEDs>0){
 		uint16_t wait = 0;
 		if(totalLEDs < 128){
 			wait = 512/totalLEDs;
@@ -148,7 +157,16 @@ void feedbackRainbow(){
 		}else{
 			wait = 1400/totalLEDs;
 		}
-		rainbowAll(wait);
+
+		for(uint16_t frame = 0; frame < 256; frame++){
+			for(uint8_t strip = 0; strip < LED_STRIP_COUNT; strip++){
+				for(uint16_t pixel = 0; pixel < numPixels(strip); pixel++){
+					setPixelColorC(strip, pixel, Wheel((pixel + frame) & 255));
+				}
+			}
+			feedbackShowAll();
+			delay(wait);
+		}
 	}
 }
 
