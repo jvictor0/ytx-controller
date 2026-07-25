@@ -2205,7 +2205,13 @@ bool EncoderInputs::CaptureEncoderDiagnostics(uint8_t encNo, uint16_t durationMs
           break;
         }
       }
-      feedbackHw.Update();
+      ServiceAuxControllerReset();
+      bool pauseFeedbackForMemoryRecovery = ServiceAuxMemoryError();
+      RecoverStaleAuxShow();
+      if(!pauseFeedbackForMemoryRecovery &&
+         (enableProcessing || feedbackHw.AuxRecoveryInProgress())){
+        feedbackHw.Update();
+      }
     }
 
     if(nowMillis - lastWatchdogReset > WATCHDOG_CHECK_MS){
