@@ -75,10 +75,18 @@ void AuxControllerReception_Handler(){
     {
       fbShowInProgress = false;
     }
+    else if(rcvByte == INIT_VALUES)
+    {
+      auxInitAckTagged = true;
+    }
     else if(rcvByte == ACK_CMD)
     {
       auxAckReceived = true;
-      waitingForAck = false;
+      if(auxInitAckTagged){
+        auxInitAckTagged = false;
+      }else{
+        waitingForAck = false;
+      }
     }
     else if(rcvByte == CHECKSUM_ERROR)
     {
@@ -92,6 +100,7 @@ void AuxControllerReception_Handler(){
       fbShowInProgress = false;
       waitingForAck = false;
       auxAckReceived = false;
+      auxInitAckTagged = false;
       receivingErrorIndex = false;
       errorIndexBytesReceived = 0;
       errorIndexByte1 = 0;

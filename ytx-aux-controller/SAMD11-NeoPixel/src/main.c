@@ -65,6 +65,7 @@ int main (void)
 	port_pin_set_output_level(LED_YTX_PIN, LED_0_ACTIVE);
 
 	feedbackBegin();	
+	auxReady = true;
 
 	port_pin_set_output_level(LED_YTX_PIN, LED_0_INACTIVE);
 

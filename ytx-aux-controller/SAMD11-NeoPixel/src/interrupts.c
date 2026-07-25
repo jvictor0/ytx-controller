@@ -242,6 +242,12 @@ void MainControllerReception_Handler(void){
 						receivedBytes = 0;
 						rcvdInitValues = true;
 						receivingInit = false;
+						if(auxReady){
+							// Tag the following ACK so a late init ACK cannot
+							// complete an unrelated burst on the main controller.
+							SendToMain(INIT_VALUES);
+							SendToMain(ACK_CMD);
+						}
 					}
 				}
 			}

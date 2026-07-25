@@ -34,6 +34,7 @@ SOFTWARE.
 
 extern volatile uint8_t receivedBytes;
 extern volatile bool rcvdInitValues;
+extern volatile bool auxReady;
 extern volatile bool receivingInit;
 extern volatile bool receivingBrightness;
 extern volatile bool updateBank;

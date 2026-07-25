@@ -220,6 +220,7 @@ void FeedbackClass::RecoverAuxControllerReset(){
   fbShowInProgress = false;
   waitingForAck = false;
   auxAckReceived = false;
+  auxInitAckTagged = false;
   burstErrorOccurred = false;
   burstErrorIndex = 0;
   receivingErrorIndex = false;
@@ -247,6 +248,12 @@ void FeedbackClass::Update() {
     if(initAckReceived){
       auxAckReceived = false;
       waitingForAck = false;
+      receivingErrorIndex = false;
+      errorIndexBytesReceived = 0;
+      errorIndexByte1 = 0;
+      errorIndexByte2 = 0;
+      burstErrorOccurred = false;
+      burstErrorIndex = 0;
     }
     interrupts();
 

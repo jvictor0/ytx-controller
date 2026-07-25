@@ -31,6 +31,7 @@ SOFTWARE.
 
 volatile uint8_t receivedBytes = 0;
 volatile bool rcvdInitValues = false;
+volatile bool auxReady = false;
 volatile bool receivingInit = false;
 volatile bool receivingBrightness = false;
 volatile bool updateBank = false;
@@ -50,6 +51,5 @@ volatile uint8_t burstFrameIndex = 0;
 volatile bool showNow = false;
 volatile bool timeToShow = false;
 volatile bool sendShowEnd = false;
-
 
 
