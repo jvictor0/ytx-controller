@@ -1099,7 +1099,7 @@ void CheckSerialSAMD11(){
       fbShowInProgress = false;
       feedbackHw.SendCommand(ACK_CMD);
     }else if(cmd == RESET_HAPPENED){
-      feedbackHw.InitAuxController(true); // Flag reset so it doesn't do a rainbow
+      feedbackHw.RecoverAuxControllerReset();
     }
   }
 }

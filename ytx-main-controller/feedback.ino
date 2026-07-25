@@ -48,6 +48,8 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   burstSendIdx = 0;
   burstInProgress = false;
   burstAwaitingAck = false;
+  auxInitRecoveryInProgress = false;
+  antMicrosAuxInit = 0;
   sendingFbData = false;
   waitingMoreData = false;
   antMillisWaitMoreData = 0;
@@ -160,12 +162,10 @@ void FeedbackClass::InitFb(){
   begun = true;
 }
 
-void FeedbackClass::InitAuxController(bool resetHappened){
-  // SEND INITIAL VALUES AND LED BRIGHTNESS TO SAMD11
-  bool makeRainbowAnimation = resetHappened ? 0 : config->board.rainbowOn;
+void FeedbackClass::SendAuxInitializationFrame(){
   byte initFrameArray[] = { nEncoders, amountOfDigitalInConfig[0], amountOfDigitalInConfig[1]};
                             // currentBrightness,
-                            // resetHappened ? 0 : config->board.rainbowOn};
+                            // config->board.rainbowOn};
 
   Serial.write9bit(INIT_VALUES);
 
@@ -174,6 +174,13 @@ void FeedbackClass::InitAuxController(bool resetHappened){
   }
 
   Serial.write9bit(END_OF_FRAME_BYTE);
+}
+
+void FeedbackClass::InitAuxController(bool resetHappened){
+  // SEND INITIAL VALUES AND LED BRIGHTNESS TO SAMD11
+  bool makeRainbowAnimation = resetHappened ? 0 : config->board.rainbowOn;
+
+  SendAuxInitializationFrame();
 
   waitingForAck = true;
   while(waitingForAck);
@@ -205,12 +212,14 @@ void FeedbackClass::RecoverAuxControllerReset(){
   burstSendIdx = feedbackUpdateReadIdx;
   burstInProgress = false;
   burstAwaitingAck = false;
+  auxInitRecoveryInProgress = false;
   sendingFbData = false;
   feedbackDataToSend = false;
 
   noInterrupts();
   fbShowInProgress = false;
   waitingForAck = false;
+  auxAckReceived = false;
   burstErrorOccurred = false;
   burstErrorIndex = 0;
   receivingErrorIndex = false;
@@ -220,13 +229,52 @@ void FeedbackClass::RecoverAuxControllerReset(){
   interrupts();
 
   RebuildCoalesceIndex();
-  InitAuxController(true);
-  SetBankChangeFeedback(FB_BANK_CHANGED);
+  auxInitRecoveryInProgress = true;
+  waitingForAck = true;
+  SendAuxInitializationFrame();
+  antMicrosAuxInit = micros();
 }
 
 void FeedbackClass::Update() {
 
   if(!begun || auxResetPending) return;    // If didn't go through INIT or aux reset, return;
+
+  if(auxInitRecoveryInProgress){
+    uint32_t now = micros();
+    noInterrupts();
+    bool resetPending = auxResetPending;
+    bool initAckReceived = auxAckReceived;
+    if(initAckReceived){
+      auxAckReceived = false;
+      waitingForAck = false;
+    }
+    interrupts();
+
+    if(resetPending){
+      return;
+    }
+
+    if(initAckReceived){
+      auxInitRecoveryInProgress = false;
+      SetBankChangeFeedback(FB_BANK_CHANGED);
+      return;
+    }
+
+    if((uint32_t)(now - antMicrosAuxInit) >= AUX_INIT_ACK_TIMEOUT_US){
+      noInterrupts();
+      waitingForAck = true;
+      burstErrorOccurred = false;
+      burstErrorIndex = 0;
+      receivingErrorIndex = false;
+      errorIndexBytesReceived = 0;
+      errorIndexByte1 = 0;
+      errorIndexByte2 = 0;
+      interrupts();
+      SendAuxInitializationFrame();
+      antMicrosAuxInit = micros();
+    }
+    return;
+  }
 
   if((waitingMoreData && (millis()-antMillisWaitMoreData > MAX_WAIT_MORE_DATA_MS)) || (fbItemsToSend >= MSG_BUFFER_AUX)){
     waitingMoreData = false;

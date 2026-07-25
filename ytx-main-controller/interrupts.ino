@@ -77,6 +77,7 @@ void AuxControllerReception_Handler(){
     }
     else if(rcvByte == ACK_CMD)
     {
+      auxAckReceived = true;
       waitingForAck = false;
     }
     else if(rcvByte == CHECKSUM_ERROR)
@@ -90,6 +91,7 @@ void AuxControllerReception_Handler(){
     {
       fbShowInProgress = false;
       waitingForAck = false;
+      auxAckReceived = false;
       receivingErrorIndex = false;
       errorIndexBytesReceived = 0;
       errorIndexByte1 = 0;

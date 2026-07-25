@@ -175,6 +175,7 @@ bool firstTime;
 volatile bool fbShowInProgress = false;
 bool sendingFbData = false;
 volatile bool waitingForAck = false;
+volatile bool auxAckReceived = false;
 volatile bool waitingForRainbow = true;    // At startup, wait for rainbow animation to finish
 volatile bool auxResetPending = false;
 uint32_t antMicrosAck = 0;

@@ -387,6 +387,7 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define FB_MAX_FRAMES_PER_UPDATE      8
 #define USB_MIDI_MESSAGES_PER_LOOP     8
 #define AUX_SHOW_TIMEOUT_US            250000UL
+#define AUX_INIT_ACK_TIMEOUT_US         5000UL
 
 // COMMANDS
 #define ACK_CMD                 0xAA

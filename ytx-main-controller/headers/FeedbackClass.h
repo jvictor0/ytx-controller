@@ -171,6 +171,7 @@ private:
 	void FillFrameWithEncoderData(byte);
 	void FillFrameWithDigitalData(byte);
 	void ProcessQueuedFeedbackEntry(uint8_t);
+	void SendAuxInitializationFrame();
 	void SetShifterFeedback();
 	void WaitForMIDI(bool);
 	void IncreaseBufferIndex(bool);
@@ -201,6 +202,8 @@ private:
 	uint8_t burstSendIdx;
 	bool burstInProgress;
 	bool burstAwaitingAck;
+	bool auxInitRecoveryInProgress;
+	uint32_t antMicrosAuxInit;
 	bool updatingBankFeedback;
 	
 	feedbackUpdateStruct feedbackUpdateBuffer[FEEDBACK_UPDATE_BUFFER_SIZE];
