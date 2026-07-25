@@ -41,6 +41,11 @@ callbacks.
 The 7 kHz timer remains dedicated to low-latency DIN
 Clock/Start/Continue/Stop forwarding.
 
+If the main feedback queue fills while a burst is in flight, the oldest unsent
+wire entry is replaced in place. Already-transmitted entries and queued
+bank-control sentinels are never moved, so ACK retirement remains ordered while
+the newest host state is retained.
+
 ## Stale Aux-Show Recovery
 
 The main controller will treat an aux show as stale after 250 milliseconds.
@@ -55,6 +60,22 @@ state.
 
 This timeout is recovery, not normal flow: a valid `SHOW_END` continues to
 clear the flag immediately.
+
+The aux also times out incomplete receive state after 20 milliseconds without
+a byte. This clears truncated init, frame, burst-end-count, and discard state so
+the strict show exclusion cannot become permanent.
+
+## Aux Reset and Initialization
+
+After boot or reset, the aux emits `RESET_HAPPENED` every 100 milliseconds
+until it accepts a complete initialization frame. Every `INIT_VALUES` header is
+a resynchronization point. The main controller bounds boot and runtime retries,
+accepts tagged initialization ACKs without allowing them to complete unrelated
+commands, and escalates repeated runtime failure through bounded aux resets.
+
+Feedback servicing runs even while normal input processing is disabled. Reset
+notifications remain pending until the feedback object is initialized and
+repeat notifications do not restart an active recovery.
 
 ## Aux Feedback Scheduling
 
@@ -81,6 +102,10 @@ from the full-queue ISR path.
 The same behavior is valid for burst and individual frames: individual frames
 are accepted after making capacity and receive their normal ACK.
 
+The aux emits `AUX_QUEUE_OVERFLOW` before the successful ACK. The main
+controller then schedules a coalesced full-bank repaint, repairing the element
+whose older pending frame was discarded.
+
 ## Show/Burst Exclusion
 
 The aux may call `feedbackShow()` only when neither a burst nor an individual
@@ -93,6 +118,25 @@ frame is being received:
 This prevents `SHOW_IN_PROGRESS` from being asserted between frames of a burst
 and removes the main controller's silent mid-burst frame-loss path.
 
+Every payload send reports whether a frame was actually written. A show that
+begins immediately before a burst pauses the same queue entry rather than
+retiring it. `BURST_END` is followed by the expected frame count twice; the aux
+ACKs only when both count bytes agree with its received-frame count. A mismatch
+uses the existing indexed retry response. Retry exhaustion reinitializes the
+aux without dropping queued entries.
+
+Control-only bank entries are expanded outside wire bursts, preserving a
+one-to-one mapping between acknowledged frame counts and retired queue entries.
+
+## Aux Memory Boundary
+
+The 512-byte stack floor remains unchanged. Before allocating NeoPixel buffers,
+the aux validates the actual encoder/digital layout against `_end.._sstack`,
+including allocator overhead and a safety margin. An unsupported layout or
+allocation failure blinks the aux status LED and emits `AUX_MEMORY_ERROR`;
+the main controller stops feedback transmission and reports a status error
+instead of silently running with dead strips.
+
 ## Error Handling
 
 - Checksum and malformed-frame failures retain the existing retry protocol.
@@ -100,6 +144,8 @@ and removes the main controller's silent mid-burst frame-loss path.
 - Stale show state recovers locally without resetting either controller.
 - USB MIDI parsing continues even if the LED queue is saturated or the aux is
   recovering.
+- Burst ACKs validate the repeated protocol-level frame count.
+- Aux allocation failure is explicit on both controllers.
 
 ## Verification
 
@@ -107,6 +153,10 @@ The repository has no unit-test harness for these embedded protocol paths. Per
 project direction, this pass will not invent one. Each behavior change will be
 verified by its narrow firmware build and source-level invariant checks, then
 the combined result will be verified with `make all`.
+
+The aux Makefile tracks header and linker-script dependencies and emits
+`-fstack-usage` files so incremental verification cannot silently use stale
+objects and the stack reserve has measurable evidence.
 
 The controller may be flashed only after the complete build is reviewed. The
 final branch diff will receive a broad Claude Opus review through xagent,

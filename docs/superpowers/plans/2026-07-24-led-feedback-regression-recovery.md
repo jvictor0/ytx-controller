@@ -11,7 +11,8 @@
 ## Global Constraints
 
 - Preserve the 7 kHz raw DIN Clock/Start/Continue/Stop forwarding path.
-- Preserve the feedback wire format and all 128 aux queue slots.
+- Preserve 9-bit command framing and all 128 aux queue slots. The corrective
+  review may extend `BURST_END` with repeated delivery-count bytes.
 - Keep USB MIDI callbacks out of interrupt context.
 - Keep the SAMD11 reset SP at `0x20001000` and its 512-byte stack floor at `0x20000e00`.
 - Do not add a new test framework; use the repository's existing firmware builds and source invariant checks.
