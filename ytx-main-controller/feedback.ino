@@ -326,13 +326,11 @@ void FeedbackClass::RecoverAuxControllerReset(){
 
 void FeedbackClass::Update() {
 
-  if(!begun || auxResetPending) return;    // If didn't go through INIT or aux reset, return;
-  if(auxMemoryError) return;
+  if(!begun) return;
 
   if(auxInitRecoveryInProgress){
     uint32_t now = micros();
     noInterrupts();
-    bool resetPending = auxResetPending;
     bool initAckReceived = auxAckReceived;
     if(initAckReceived){
       auxAckReceived = false;
@@ -345,10 +343,6 @@ void FeedbackClass::Update() {
       burstErrorIndex = 0;
     }
     interrupts();
-
-    if(resetPending){
-      return;
-    }
 
     if(initAckReceived){
       auxInitRecoveryInProgress = false;
@@ -401,6 +395,8 @@ void FeedbackClass::Update() {
     }
     return;
   }
+
+  if(auxResetPending || auxMemoryError) return;
 
   if((waitingMoreData && (millis()-antMillisWaitMoreData > MAX_WAIT_MORE_DATA_MS)) || (fbItemsToSend >= MSG_BUFFER_AUX)){
     waitingMoreData = false;

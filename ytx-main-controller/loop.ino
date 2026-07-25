@@ -99,7 +99,9 @@ void loop() {
   // Parse USB MIDI in the main loop so feedback callbacks cannot race
   // feedbackHw.Update() from the periodic DIN transport interrupt.
   ServiceUsbMidi();
-  feedbackHw.Update();
+  if(enableProcessing || feedbackHw.AuxRecoveryInProgress()){
+    feedbackHw.Update();
+  }
 
   static uint32_t antMicrosTest = micros();  
 
