@@ -87,7 +87,7 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   antMicrosAuxInit = 0;
   bankControlSlotReserved = false;
   recoveryBaselineActive = false;
-  generatingRecoveryBaseline = false;
+  recoveryTransportBypass = false;
   recoveryDeferredOverflowed = false;
   recoveryDeferredCount = 0;
   waitingMoreData = false;
@@ -338,7 +338,7 @@ void FeedbackClass::RecoverAuxControllerReset(){
     StashTransportQueueForRecovery();
   }
   recoveryBaselineActive = true;
-  generatingRecoveryBaseline = false;
+  recoveryTransportBypass = false;
 
   fbMessagesSent = 0;
   burstEntriesProcessed = 0;
@@ -415,9 +415,9 @@ void FeedbackClass::Update() {
       auxInitWaitingForBoot = false;
       auxInitRetryCount = 0;
       auxInitResetCount = 0;
-      generatingRecoveryBaseline = true;
+      recoveryTransportBypass = true;
       SetBankChangeFeedback(FB_BANK_CHANGED);
-      generatingRecoveryBaseline = false;
+      recoveryTransportBypass = false;
       return;
     }
 
@@ -620,13 +620,13 @@ void FeedbackClass::Update() {
     if(!IsWireFeedbackType(feedbackUpdateBuffer[feedbackUpdateReadIdx].type)){
       uint8_t controlEntryIndex = feedbackUpdateReadIdx;
       IncreaseBufferIndex(READ_INDEX);
-      bool recoveryControl = recoveryBaselineActive;
+      bool recoveryControl = recoveryBaselineActive || recoveryDeferredCount;
       if(recoveryControl){
-        generatingRecoveryBaseline = true;
+        recoveryTransportBypass = true;
       }
       ProcessQueuedFeedbackEntry(controlEntryIndex);
       if(recoveryControl){
-        generatingRecoveryBaseline = false;
+        recoveryTransportBypass = false;
       }
       return;
     }
@@ -1791,6 +1791,16 @@ void FeedbackClass::ServiceRecoveryDeferredFeedback(){
                             ? recoveryDeferredCount
                             : available;
 
+  // A bank-stage control expands into a bounded group of wire entries. Keep
+  // it at a transport boundary so that expansion cannot evict retained host
+  // state already restored behind it.
+  for(uint16_t i = 0; i < entriesToRestore; i++){
+    if(!IsWireFeedbackType(recoveryDeferredBuffer[i].type)){
+      entriesToRestore = (i == 0 && fbItemsToSend == 0) ? 1 : i;
+      break;
+    }
+  }
+
   for(uint16_t i = 0; i < entriesToRestore; i++){
     feedbackUpdateBuffer[feedbackUpdateWriteIdx] = recoveryDeferredBuffer[i];
     RegisterCoalesceSlot(feedbackUpdateWriteIdx);
@@ -1828,7 +1838,7 @@ void FeedbackClass::QueueFeedbackUpdate(uint8_t type, uint8_t indexChanged, uint
   update.unused = 0;
 
   if((recoveryBaselineActive || recoveryDeferredCount) &&
-     !generatingRecoveryBaseline){
+     !recoveryTransportBypass){
     DeferRecoveryFeedbackUpdate(update);
     return;
   }

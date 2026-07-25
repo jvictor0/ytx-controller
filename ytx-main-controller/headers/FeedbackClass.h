@@ -230,7 +230,7 @@ private:
 	bool updatingBankFeedback;
 	bool bankControlSlotReserved;
 	bool recoveryBaselineActive;
-	bool generatingRecoveryBaseline;
+	bool recoveryTransportBypass;
 	bool recoveryDeferredOverflowed;
 	uint16_t recoveryDeferredCount;
 	
