@@ -36,6 +36,30 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   nEncoders = maxEncoders;
   nDigitals = maxDigital;
   nIndependent = maxIndependent;
+  updatingBankFeedback = false;
+  antMicrosAck = 0;
+
+  noInterrupts();
+  fbShowInProgress = false;
+  antMicrosAuxShow = 0;
+  waitingForAck = false;
+  auxAckReceived = false;
+  auxInitAckTagged = false;
+  auxBurstTransmissionActive = false;
+  auxBurstAckExpected = false;
+  auxQueueOverflowed = false;
+  auxMemoryError = false;
+  auxMemoryErrorReportCount = 0;
+  auxMemoryErrorLastMicros = 0;
+  waitingForRainbow = false;
+  auxResetPending = false;
+  burstErrorOccurred = false;
+  burstErrorIndex = 0;
+  receivingErrorIndex = false;
+  errorIndexBytesReceived = 0;
+  errorIndexByte1 = 0;
+  errorIndexByte2 = 0;
+  interrupts();
 
   if(!nBanks) return;    // If number of encoders is zero, return;
   
