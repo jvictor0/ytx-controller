@@ -57,12 +57,15 @@ static void RecoverStaleReceiveState(void)
 	uint32_t primask = __get_PRIMASK();
 	__disable_irq();
 
-	if((receivingFeedbackData || receivingBank || receivingInit || discardingBurst) &&
+	if((receivingFeedbackData || receivingBank || receivingInit ||
+	    receivingBurstEndCount || discardingBurst) &&
 	   (uint32_t)(now - lastReceiveMillis) >= RECEIVE_STATE_TIMEOUT_TICKS){
 		receivedBytes = 0;
 		receivingFeedbackData = false;
 		receivingBank = false;
 		receivingInit = false;
+		receivingBurstEndCount = false;
+		burstEndCountBytes = 0;
 		discardingBurst = false;
 	}
 

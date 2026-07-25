@@ -77,6 +77,8 @@ void MainControllerReception_Handler(void){
 				receivedBytes = 0;
 				receivingBank = true;
 				receivingFeedbackData = true;
+				receivingBurstEndCount = false;
+				burstEndCountBytes = 0;
 				burstFrameIndex = 0;
 				return;
 			}
@@ -104,6 +106,8 @@ void MainControllerReception_Handler(void){
 				receivingBank = false;
 				receivingFeedbackData = false;
 				discardingBurst = false;
+				receivingBurstEndCount = false;
+				burstEndCountBytes = 0;
 				receivedBytes = 0;
 			}else if (rcvByte == CMD_ALL_LEDS_OFF){		// TURN ALL LEDS OFF COMMAND
 				turnAllOffFlag = true;
@@ -120,18 +124,13 @@ void MainControllerReception_Handler(void){
 				receivingBank = true;
 				receivingFeedbackData = true;
 				receivedBytes = 0;
+				receivingBurstEndCount = false;
+				burstEndCountBytes = 0;
 				burstFrameIndex = 0;
 			}else if (rcvByte == BURST_END && receivingBank && receivingFeedbackData){
-				// BANK END COMMAND
-				// SerialUSB.println("BANK END COMMAND");
-				receivingBank = false;
-				receivingFeedbackData = false;
 				receivedBytes = 0;
-				burstFrameIndex = 0;
-				updateBank = true;
-				// ACK the entire burst now that it's complete
-				//
-				SendToMain(ACK_CMD);
+				receivingBurstEndCount = true;
+				burstEndCountBytes = 0;
 			}else if(rcvByte == NEW_FRAME_BYTE){
 				// FIRST BYTE OF A DATA FRAME
 				//
@@ -247,6 +246,34 @@ void MainControllerReception_Handler(void){
 			}
 		//not a command byte -> write to reception buffer
 	    }else{
+			if(receivingBurstEndCount){
+				if(burstEndCountBytes == 0){
+					burstEndCountFirst = rcvByte;
+					burstEndCountBytes = 1;
+				}else{
+					uint8_t receivedFrameCount = burstFrameIndex;
+					bool countValid = (burstEndCountFirst == rcvByte) &&
+					                  (rcvByte == receivedFrameCount);
+
+					receivingBank = false;
+					receivingFeedbackData = false;
+					receivingBurstEndCount = false;
+					burstEndCountBytes = 0;
+					receivedBytes = 0;
+					burstFrameIndex = 0;
+
+					if(countValid){
+						updateBank = true;
+						SendToMain(ACK_CMD);
+					}else{
+						failsPerSecond++;
+						SendToMain(CHECKSUM_ERROR);
+						SendDataToMain(receivedFrameCount);
+						SendDataToMain(receivedFrameCount);
+					}
+				}
+				return;
+			}
 
 	    	if(receivedBytes >= (sizeof(ReceptionBuffer)-1)){
 	    		receivedBytes = 0;

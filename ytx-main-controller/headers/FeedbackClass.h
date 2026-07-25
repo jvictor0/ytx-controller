@@ -168,11 +168,12 @@ private:
 	}feedbackUpdateStruct;
 
 	void AddCheckSum();
-	void SendFeedbackData();
-	void SendDataIfReady();
+	bool SendFeedbackData();
+	int8_t SendDataIfReady();
 	void FillFrameWithEncoderData(byte);
 	void FillFrameWithDigitalData(byte);
-	void ProcessQueuedFeedbackEntry(uint8_t);
+	int8_t ProcessQueuedFeedbackEntry(uint8_t);
+	bool IsWireFeedbackType(uint8_t);
 	void SendAuxInitializationFrame();
 	bool WaitForAuxAck(uint32_t);
 	void PrepareAuxAckWait();
@@ -203,6 +204,9 @@ private:
 	
 	volatile bool feedbackDataToSend;
 	uint8_t fbMessagesSent;
+	uint8_t burstEntriesProcessed;
+	uint8_t burstEntriesBeforeFirstFrame;
+	uint8_t burstFrameEntryCounts[MSG_BUFFER_AUX];
 	uint8_t burstRetryCount;
 	uint16_t burstItemsRemaining;
 	uint8_t burstSendIdx;

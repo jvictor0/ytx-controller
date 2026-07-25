@@ -84,7 +84,7 @@ void AuxControllerReception_Handler(){
       if(auxInitAckTagged){
         auxInitAckTagged = false;
         auxAckReceived = true;
-      }else{
+      }else if(!auxBurstTransmissionActive || auxBurstAckExpected){
         waitingForAck = false;
       }
     }
@@ -101,6 +101,8 @@ void AuxControllerReception_Handler(){
       waitingForAck = false;
       auxAckReceived = false;
       auxInitAckTagged = false;
+      auxBurstTransmissionActive = false;
+      auxBurstAckExpected = false;
       receivingErrorIndex = false;
       errorIndexBytesReceived = 0;
       errorIndexByte1 = 0;

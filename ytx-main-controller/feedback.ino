@@ -43,6 +43,8 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   feedbackUpdateReadIdx = 0;
   fbItemsToSend = 0;
   fbMessagesSent = 0;
+  burstEntriesProcessed = 0;
+  burstEntriesBeforeFirstFrame = 0;
   burstRetryCount = 0;
   burstItemsRemaining = 0;
   burstSendIdx = 0;
@@ -277,6 +279,8 @@ void FeedbackClass::RecoverAuxControllerReset(){
   if(!begun) return;
 
   fbMessagesSent = 0;
+  burstEntriesProcessed = 0;
+  burstEntriesBeforeFirstFrame = 0;
   burstRetryCount = 0;
   burstItemsRemaining = 0;
   burstSendIdx = feedbackUpdateReadIdx;
@@ -293,6 +297,8 @@ void FeedbackClass::RecoverAuxControllerReset(){
   waitingForAck = false;
   auxAckReceived = false;
   auxInitAckTagged = false;
+  auxBurstTransmissionActive = false;
+  auxBurstAckExpected = false;
   burstErrorOccurred = false;
   burstErrorIndex = 0;
   receivingErrorIndex = false;
@@ -408,6 +414,7 @@ void FeedbackClass::Update() {
     }
 
     uint8_t framesSucceeded = 0;
+    uint8_t entriesSucceeded = 0;
     bool shouldRetry = false;
 
     if(burstErrorOccurred){
@@ -426,16 +433,31 @@ void FeedbackClass::Update() {
     if(framesSucceeded > fbMessagesSent){
       framesSucceeded = fbMessagesSent;
     }
-    if(framesSucceeded > fbItemsToSend){
-      framesSucceeded = fbItemsToSend;
+
+    if(burstErrorOccurred){
+      if(framesSucceeded == 0){
+        entriesSucceeded = burstEntriesBeforeFirstFrame;
+      }else{
+        entriesSucceeded = burstFrameEntryCounts[framesSucceeded - 1];
+      }
+    }else if(!shouldRetry){
+      entriesSucceeded = burstEntriesProcessed;
     }
 
-    for(uint8_t i = 0; i < framesSucceeded; i++){
+    if(entriesSucceeded > fbItemsToSend){
+      entriesSucceeded = fbItemsToSend;
+    }
+
+    for(uint8_t i = 0; i < entriesSucceeded; i++){
       IncreaseBufferIndex(READ_INDEX);
     }
 
     fbMessagesSent = 0;
+    burstEntriesProcessed = 0;
+    burstEntriesBeforeFirstFrame = 0;
     waitingForAck = false;
+    auxBurstTransmissionActive = false;
+    auxBurstAckExpected = false;
     burstInProgress = false;
     burstAwaitingAck = false;
     receivingErrorIndex = false;
@@ -471,6 +493,13 @@ void FeedbackClass::Update() {
       return;
     }
 
+    if(!IsWireFeedbackType(feedbackUpdateBuffer[feedbackUpdateReadIdx].type)){
+      uint8_t controlEntryIndex = feedbackUpdateReadIdx;
+      IncreaseBufferIndex(READ_INDEX);
+      ProcessQueuedFeedbackEntry(controlEntryIndex);
+      return;
+    }
+
     burstInProgress = true;
     burstErrorOccurred = false;
     burstErrorIndex = 0;
@@ -479,30 +508,48 @@ void FeedbackClass::Update() {
     errorIndexByte1 = 0;
     errorIndexByte2 = 0;
     fbMessagesSent = 0;
+    burstEntriesProcessed = 0;
+    burstEntriesBeforeFirstFrame = 0;
     burstSendIdx = feedbackUpdateReadIdx;
     burstItemsRemaining = fbItemsToSend;
+    auxBurstTransmissionActive = true;
+    auxBurstAckExpected = false;
     Serial.write9bit(BURST_INIT);
   }
 
   // Send a bounded number of frames per loop iteration (non-blocking)
   //
-  sendingFbData = true;
   uint8_t framesSentNow = 0;
   while(burstItemsRemaining && fbMessagesSent < MSG_BUFFER_AUX &&
         framesSentNow < FB_MAX_FRAMES_PER_UPDATE && !auxResetPending){
     uint8_t fbUpdateQueueIndex = burstSendIdx;
+
+    if(!IsWireFeedbackType(feedbackUpdateBuffer[fbUpdateQueueIndex].type)){
+      burstItemsRemaining = 0;
+      break;
+    }
+
+    int8_t processResult = ProcessQueuedFeedbackEntry(fbUpdateQueueIndex);
+    if(processResult < 0){
+      break;
+    }
 
     if(++burstSendIdx >= FEEDBACK_UPDATE_BUFFER_SIZE){
       burstSendIdx = 0;
     }
 
     burstItemsRemaining--;
+    burstEntriesProcessed++;
     UnregisterCoalesceSlot(fbUpdateQueueIndex);
-    ProcessQueuedFeedbackEntry(fbUpdateQueueIndex);
-    fbMessagesSent++;
+
+    if(processResult > 0){
+      burstFrameEntryCounts[fbMessagesSent] = burstEntriesProcessed;
+      fbMessagesSent++;
+    }else if(fbMessagesSent == 0){
+      burstEntriesBeforeFirstFrame = burstEntriesProcessed;
+    }
     framesSentNow++;
   }
-  sendingFbData = false;
 
   if(auxResetPending){
     return;
@@ -514,9 +561,12 @@ void FeedbackClass::Update() {
 
   // Burst payload is done, now wait ACK asynchronously
   //
-  Serial.write9bit(BURST_END);
   waitingForAck = true;
   antMicrosAck = micros();
+  Serial.write9bit(BURST_END);
+  Serial.write(fbMessagesSent);
+  Serial.write(fbMessagesSent);
+  auxBurstAckExpected = true;
   burstInProgress = false;
   burstAwaitingAck = true;
 }
@@ -529,8 +579,13 @@ bool FeedbackClass::AuxRecoveryInProgress(){
   return auxInitRecoveryInProgress;
 }
 
-void FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
+bool FeedbackClass::IsWireFeedbackType(uint8_t type){
+  return type >= FB_ENCODER && type <= FB_DIG_VAL_TO_INT;
+}
+
+int8_t FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
   uint8_t fbUpdateType = feedbackUpdateBuffer[fbUpdateQueueIndex].type;
+  feedbackDataToSend = false;
 
   switch(fbUpdateType)
   {
@@ -544,14 +599,14 @@ void FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
     case FB_ENC_VUMETER:
     {
       FillFrameWithEncoderData(fbUpdateQueueIndex);
-      SendDataIfReady();
+      return SendDataIfReady();
     }
     break;
     case FB_DIGITAL:
     case FB_DIG_VAL_TO_INT:
     {
       FillFrameWithDigitalData(fbUpdateQueueIndex);
-      SendDataIfReady();
+      return SendDataIfReady();
     }
     break;
     case FB_ANALOG:
@@ -726,6 +781,7 @@ void FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
     default:
       break;
   }
+  return 0;
 }
 
 void FeedbackClass::SetShifterFeedback(){
@@ -1568,11 +1624,17 @@ bool FeedbackClass::SendingData(void){
   return sendingFbData;
 }
 
-void FeedbackClass::SendDataIfReady(){
-  
-  SendFeedbackData(); 
-  feedbackDataToSend = false;
+int8_t FeedbackClass::SendDataIfReady(){
+  if(!feedbackDataToSend){
+    return 0;
+  }
 
+  if(!SendFeedbackData()){
+    return -1;
+  }
+
+  feedbackDataToSend = false;
+  return 1;
 }
 
 void FeedbackClass::AddCheckSum(){ 
@@ -1585,7 +1647,7 @@ void FeedbackClass::AddCheckSum(){
 }
 
 // #define DEBUG_FB_FRAME
-void FeedbackClass::SendFeedbackData(){
+bool FeedbackClass::SendFeedbackData(){
   // In pipelined mode, just send the frame without waiting for ACK
   // The ACK will be checked after BURST_END is sent
   //
@@ -1598,21 +1660,23 @@ void FeedbackClass::SendFeedbackData(){
     SERIALPRINTLN();
   #endif
   
-  if(!fbShowInProgress)
-  {
-    uint16_t sum = 2019 + checkSum(feedbackFrameBuffer, FeedbackFrame_Size);
-
-    Serial.write9bit(NEW_FRAME_BYTE);             // SEND FRAME HEADER
-
-    for (int i = 0; i < FeedbackFrame_Size; i++)
-    {
-      Serial.write(feedbackFrameBuffer[i]);       // FRAME BODY
-    }
-
-    Serial.write(sum&0x00FF);
-
-    Serial.write9bit(END_OF_FRAME_BYTE);          // SEND END OF FRAME BYTE  
+  if(fbShowInProgress){
+    return false;
   }
+
+  uint16_t sum = 2019 + checkSum(feedbackFrameBuffer, FeedbackFrame_Size);
+
+  Serial.write9bit(NEW_FRAME_BYTE);             // SEND FRAME HEADER
+
+  for (int i = 0; i < FeedbackFrame_Size; i++)
+  {
+    Serial.write(feedbackFrameBuffer[i]);       // FRAME BODY
+  }
+
+  Serial.write(sum&0x00FF);
+
+  Serial.write9bit(END_OF_FRAME_BYTE);          // SEND END OF FRAME BYTE
+  return true;
 }
 
 void FeedbackClass::SendCommand(uint8_t cmd){
