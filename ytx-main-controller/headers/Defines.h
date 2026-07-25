@@ -397,6 +397,7 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define AUX_COMMAND_MAX_RETRIES             3
 #define AUX_RAINBOW_TIMEOUT_US        5000000UL
 #define AUX_RAINBOW_MAX_RETRIES             2
+#define AUX_MEMORY_ERROR_CONFIRM_US     250000UL
 
 // COMMANDS
 #define ACK_CMD                 0xAA

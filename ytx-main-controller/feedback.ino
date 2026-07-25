@@ -309,6 +309,8 @@ void FeedbackClass::RecoverAuxControllerReset(){
   auxBurstAckExpected = false;
   auxQueueOverflowed = false;
   auxMemoryError = false;
+  auxMemoryErrorReportCount = 0;
+  auxMemoryErrorLastMicros = 0;
   burstErrorOccurred = false;
   burstErrorIndex = 0;
   receivingErrorIndex = false;

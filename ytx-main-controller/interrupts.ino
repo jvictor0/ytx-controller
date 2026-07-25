@@ -103,6 +103,7 @@ void AuxControllerReception_Handler(){
       auxInitAckTagged = false;
       auxBurstTransmissionActive = false;
       auxBurstAckExpected = false;
+      auxMemoryErrorReportCount = 0;
       receivingErrorIndex = false;
       errorIndexBytesReceived = 0;
       errorIndexByte1 = 0;
@@ -115,7 +116,17 @@ void AuxControllerReception_Handler(){
     }
     else if(rcvByte == AUX_MEMORY_ERROR)
     {
-      auxMemoryError = true;
+      uint32_t now = micros();
+      if(auxMemoryErrorReportCount == 0 ||
+         (uint32_t)(now - auxMemoryErrorLastMicros) > AUX_MEMORY_ERROR_CONFIRM_US){
+        auxMemoryErrorReportCount = 1;
+      }else if(auxMemoryErrorReportCount < 2){
+        auxMemoryErrorReportCount++;
+      }
+      auxMemoryErrorLastMicros = now;
+      if(auxMemoryErrorReportCount >= 2){
+        auxMemoryError = true;
+      }
     }
     else if(rcvByte == END_OF_RAINBOW)
     {
