@@ -50,7 +50,8 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   auxCommandAckTagged = false;
   auxBurstTransmissionActive = false;
   auxBurstAckExpected = false;
-  auxQueueOverflowed = false;
+  auxQueueFullOccurred = false;
+  receivingQueueFullIndex = false;
   auxMemoryError = false;
   auxMemoryErrorReportCount = 0;
   auxMemoryErrorLastMicros = 0;
@@ -71,6 +72,8 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   burstEntriesProcessed = 0;
   burstEntriesBeforeFirstFrame = 0;
   burstRetryCount = 0;
+  auxQueueFullBackoff = false;
+  antMicrosQueueFull = 0;
   burstItemsRemaining = 0;
   burstSendIdx = 0;
   burstInProgress = false;
@@ -319,6 +322,8 @@ void FeedbackClass::RecoverAuxControllerReset(){
   burstEntriesProcessed = 0;
   burstEntriesBeforeFirstFrame = 0;
   burstRetryCount = 0;
+  auxQueueFullBackoff = false;
+  antMicrosQueueFull = 0;
   burstItemsRemaining = 0;
   burstSendIdx = feedbackUpdateReadIdx;
   burstInProgress = false;
@@ -337,7 +342,8 @@ void FeedbackClass::RecoverAuxControllerReset(){
   auxCommandAckTagged = false;
   auxBurstTransmissionActive = false;
   auxBurstAckExpected = false;
-  auxQueueOverflowed = false;
+  auxQueueFullOccurred = false;
+  receivingQueueFullIndex = false;
   auxMemoryError = false;
   auxMemoryErrorReportCount = 0;
   auxMemoryErrorLastMicros = 0;
@@ -371,6 +377,8 @@ void FeedbackClass::Update() {
       errorIndexBytesReceived = 0;
       errorIndexByte1 = 0;
       errorIndexByte2 = 0;
+      receivingQueueFullIndex = false;
+      auxQueueFullOccurred = false;
       burstErrorOccurred = false;
       burstErrorIndex = 0;
     }
@@ -422,6 +430,8 @@ void FeedbackClass::Update() {
       errorIndexBytesReceived = 0;
       errorIndexByte1 = 0;
       errorIndexByte2 = 0;
+      receivingQueueFullIndex = false;
+      auxQueueFullOccurred = false;
       interrupts();
       SendAuxInitializationFrame();
       auxInitRetryCount++;
@@ -445,6 +455,7 @@ void FeedbackClass::Update() {
     bool ackPending = waitingForAck;
     bool burstFailed = burstErrorOccurred;
     uint8_t failedAtFrame = burstErrorIndex;
+    bool queueFull = auxQueueFullOccurred;
     interrupts();
 
     if(resetPending){
@@ -509,15 +520,25 @@ void FeedbackClass::Update() {
     errorIndexBytesReceived = 0;
     errorIndexByte1 = 0;
     errorIndexByte2 = 0;
+    receivingQueueFullIndex = false;
     burstErrorOccurred = false;
     burstErrorIndex = 0;
+    auxQueueFullOccurred = false;
     interrupts();
 
     if(shouldRetry){
-      burstRetryCount++;
-      if(burstRetryCount >= 20){
-        RecoverAuxControllerReset();
-        return;
+      if(queueFull){
+        // Full is ordinary backpressure. Give the aux a bounded opportunity
+        // to drain before retrying the retained suffix, and never turn
+        // sustained load into reset/retry churn.
+        auxQueueFullBackoff = true;
+        antMicrosQueueFull = now;
+      }else{
+        burstRetryCount++;
+        if(burstRetryCount >= 20){
+          RecoverAuxControllerReset();
+          return;
+        }
       }
       RebuildCoalesceIndex();
     }else{
@@ -530,6 +551,13 @@ void FeedbackClass::Update() {
   // Start a new burst only when we're not in "wait for more data" window and show isn't busy
   //
   if(!burstInProgress){
+    if(auxQueueFullBackoff){
+      if((uint32_t)(micros() - antMicrosQueueFull) < AUX_QUEUE_FULL_BACKOFF_US){
+        return;
+      }
+      auxQueueFullBackoff = false;
+    }
+
     if(waitingMoreData || fbShowInProgress || fbItemsToSend == 0){
       return;
     }
@@ -555,6 +583,8 @@ void FeedbackClass::Update() {
     errorIndexBytesReceived = 0;
     errorIndexByte1 = 0;
     errorIndexByte2 = 0;
+    receivingQueueFullIndex = false;
+    auxQueueFullOccurred = false;
     bool showStarted = fbShowInProgress;
     if(!showStarted){
       auxCommandAckTagged = false;

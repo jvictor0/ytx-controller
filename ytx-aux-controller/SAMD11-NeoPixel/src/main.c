@@ -71,7 +71,6 @@ static void RecoverStaleReceiveState(void)
 		burstEndCountBytes = 0;
 		burstEndCountFirst = 0;
 		burstFrameIndex = 0;
-		burstQueueOverflowed = false;
 		discardingBurst = false;
 	}
 

@@ -219,10 +219,18 @@ void MainControllerReception_Handler(void){
 						uint8_t *messageBody = (uint8_t *)&ReceptionBuffer[0];
 
 						if(feedbackFramesPending >= FEEDBACK_BUFFER_LENGTH){
-							if(++readIdx >= FEEDBACK_BUFFER_LENGTH)
-								readIdx = 0;
-							feedbackFramesPending--;
-							burstQueueOverflowed = true;
+							// Preserve the complete queued prefix. Report the
+							// first frame that was not accepted so the main
+							// controller can retire only the exact prefix and
+							// retry this frame and the remaining suffix.
+							SendToMain(AUX_QUEUE_FULL);
+							SendDataToMain(burstFrameIndex);
+							SendDataToMain(burstFrameIndex);
+							receivedBytes = 0;
+							receivingBank = false;
+							receivingFeedbackData = false;
+							discardingBurst = true;
+							return;
 						}
 
 						FeedbackFramesBuffer[writeIdx].updateFrame = messageBody[FeedbackFrame_Type];
@@ -312,10 +320,6 @@ void MainControllerReception_Handler(void){
 					burstFrameIndex = 0;
 
 					if(countValid){
-						if(burstQueueOverflowed){
-							SendToMain(AUX_QUEUE_OVERFLOW);
-							burstQueueOverflowed = false;
-						}
 						SendToMain(ACK_CMD);
 					}else{
 						// A delivery-count mismatch proves that at least one

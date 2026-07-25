@@ -400,6 +400,7 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define AUX_MEMORY_ERROR_CONFIRM_US     250000UL
 #define AUX_MEMORY_RECOVERY_MAX_RESETS          2
 #define AUX_MEMORY_RECOVERY_STABLE_US      500000UL
+#define AUX_QUEUE_FULL_BACKOFF_US           25000UL
 
 // COMMANDS
 #define ACK_CMD                 0xAA
@@ -417,7 +418,7 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define CMD_RAINBOW_START       0xFB
 #define RESET_HAPPENED          0xFC
 #define AUX_MEMORY_ERROR        0xFD
-#define AUX_QUEUE_OVERFLOW      0xFE
+#define AUX_QUEUE_FULL          0xFE
 #define END_OF_FRAME_BYTE       0xFF
 
 

@@ -210,6 +210,8 @@ private:
 	uint16_t burstEntriesBeforeFirstFrame;
 	uint16_t burstFrameEntryCounts[MSG_BUFFER_AUX];
 	uint8_t burstRetryCount;
+	bool auxQueueFullBackoff;
+	uint32_t antMicrosQueueFull;
 	uint16_t burstItemsRemaining;
 	uint8_t burstSendIdx;
 	bool burstInProgress;

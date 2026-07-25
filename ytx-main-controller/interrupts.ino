@@ -58,6 +58,8 @@ void AuxControllerReception_Handler(){
         burstErrorIndex = 0;
       }
 
+      auxQueueFullOccurred = receivingQueueFullIndex;
+      receivingQueueFullIndex = false;
       burstErrorOccurred = true;
       waitingForAck = false;
     }
@@ -99,6 +101,7 @@ void AuxControllerReception_Handler(){
     {
       // Start receiving the error index bytes
       //
+      receivingQueueFullIndex = false;
       receivingErrorIndex = true;
       errorIndexBytesReceived = 0;
     }
@@ -116,11 +119,17 @@ void AuxControllerReception_Handler(){
       errorIndexBytesReceived = 0;
       errorIndexByte1 = 0;
       errorIndexByte2 = 0;
+      receivingQueueFullIndex = false;
+      auxQueueFullOccurred = false;
       auxResetPending = true;
     }
-    else if(rcvByte == AUX_QUEUE_OVERFLOW)
+    else if(rcvByte == AUX_QUEUE_FULL)
     {
-      auxQueueOverflowed = true;
+      // Queue pressure is flow control, not data corruption. The following
+      // duplicated index is the exact first frame the aux did not accept.
+      receivingQueueFullIndex = true;
+      receivingErrorIndex = true;
+      errorIndexBytesReceived = 0;
     }
     else if(rcvByte == AUX_MEMORY_ERROR)
     {
