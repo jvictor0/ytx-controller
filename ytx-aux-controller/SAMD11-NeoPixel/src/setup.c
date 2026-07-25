@@ -101,8 +101,8 @@ void setup(void){
 	configure_usart();
 
 	
-	/* Configure a 1 ms system tick. All *_TICKS intervals are milliseconds. */
-	SysTick_Config(SYSTICK_COUNTS_PER_MS);
+	/* Configure the tick rate shared by all *_TICKS intervals. */
+	SysTick_Config(SYSTICK_COUNTS_PER_TICK);
 	//uint16_t clockRate = system_gclk_gen_get_hz(GCLK_GENERATOR_0);
 	/* Enable Interrupts */
 	__enable_irq();	

@@ -6,6 +6,7 @@
  */ 
 
 #include <NeoPixels.h>
+#include "defines.h"
 
 extern volatile uint32_t millisTicks;
 
@@ -22,7 +23,8 @@ static void accountForMaskedShowTime(uint16_t bytes, uint32_t startValue)
 	// An 800 kHz strip consumes 10 us per RGB byte. The start/end counter
 	// values provide the sub-millisecond phase; the byte count disambiguates
 	// how many full SysTick periods elapsed while interrupts were masked.
-	uint32_t expectedCycles = ((uint32_t)bytes * period) / 100U;
+	uint32_t expectedCycles = ((uint32_t)bytes * period * WS2812_BYTE_TIME_US) /
+	                          AUX_MICROSECONDS_PER_TICK;
 	int32_t wrapNumerator = (int32_t)expectedCycles -
 	                        (int32_t)startValue +
 	                        (int32_t)endValue;
