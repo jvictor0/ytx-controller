@@ -155,8 +155,8 @@ static bool feedbackShowWithGrant(uint8_t requestedKind){
 					pixelsShow(i);
 				}
 			}
-			whichStripToShow = 0;
 		}
+		whichStripToShow = 0;
 
 		if(!primask){
 			__enable_irq();
