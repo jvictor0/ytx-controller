@@ -413,6 +413,7 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define SHOW_END                0xFA
 #define CMD_RAINBOW_START       0xFB
 #define RESET_HAPPENED          0xFC
+#define AUX_QUEUE_OVERFLOW      0xFE
 #define END_OF_FRAME_BYTE       0xFF
 
 

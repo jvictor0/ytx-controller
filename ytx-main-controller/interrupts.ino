@@ -109,6 +109,10 @@ void AuxControllerReception_Handler(){
       errorIndexByte2 = 0;
       auxResetPending = true;
     }
+    else if(rcvByte == AUX_QUEUE_OVERFLOW)
+    {
+      auxQueueOverflowed = true;
+    }
     else if(rcvByte == END_OF_RAINBOW)
     {
       waitingForRainbow = false;

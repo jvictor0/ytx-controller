@@ -172,6 +172,7 @@ void MainControllerReception_Handler(void){
 									readIdx = 0;
 								feedbackFramesPending--;
 								failsPerSecond++;
+								burstQueueOverflowed = true;
 							}
 
 							FeedbackFramesBuffer[writeIdx].updateFrame	= messageBody[FeedbackFrame_Type];
@@ -202,9 +203,13 @@ void MainControllerReception_Handler(void){
 
 							feedbackFramesPending++;
 
-							if(!receivingBank)
+						if(!receivingBank)
 						{
 							receivingFeedbackData = false;
+							if(burstQueueOverflowed){
+								SendToMain(AUX_QUEUE_OVERFLOW);
+								burstQueueOverflowed = false;
+							}
 							// Only ACK individual frames when not in burst mode
 							//
 							SendToMain(ACK_CMD);
@@ -264,6 +269,10 @@ void MainControllerReception_Handler(void){
 
 					if(countValid){
 						updateBank = true;
+						if(burstQueueOverflowed){
+							SendToMain(AUX_QUEUE_OVERFLOW);
+							burstQueueOverflowed = false;
+						}
 						SendToMain(ACK_CMD);
 					}else{
 						failsPerSecond++;

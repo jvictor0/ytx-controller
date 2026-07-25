@@ -54,6 +54,7 @@ extern volatile uint8_t burstFrameIndex;
 extern volatile bool receivingBurstEndCount;
 extern volatile uint8_t burstEndCountBytes;
 extern volatile uint8_t burstEndCountFirst;
+extern volatile bool burstQueueOverflowed;
 extern volatile bool showNow;
 extern volatile bool timeToShow;
 extern volatile bool sendShowEnd;

@@ -299,6 +299,7 @@ void FeedbackClass::RecoverAuxControllerReset(){
   auxInitAckTagged = false;
   auxBurstTransmissionActive = false;
   auxBurstAckExpected = false;
+  auxQueueOverflowed = false;
   burstErrorOccurred = false;
   burstErrorIndex = 0;
   receivingErrorIndex = false;
@@ -402,6 +403,10 @@ void FeedbackClass::Update() {
     noInterrupts();
     bool resetPending = auxResetPending;
     bool ackPending = waitingForAck;
+    bool repaintRequired = auxQueueOverflowed;
+    if(!ackPending){
+      auxQueueOverflowed = false;
+    }
     interrupts();
 
     if(resetPending){
@@ -480,6 +485,9 @@ void FeedbackClass::Update() {
       RebuildCoalesceIndex();
     }else{
       burstRetryCount = 0;
+      if(repaintRequired){
+        SetBankChangeFeedback(FB_BANK_CHANGED);
+      }
     }
 
     burstErrorOccurred = false;

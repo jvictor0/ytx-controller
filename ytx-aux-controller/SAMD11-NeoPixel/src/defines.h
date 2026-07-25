@@ -65,7 +65,7 @@ SOFTWARE.
 #define SHOW_END                0xFA
 #define CMD_RAINBOW_START		0xFB
 #define RESET_HAPPENED			0xFC
-#define NEW_MIDI_FRAME_BYTE		0xFD
+#define AUX_QUEUE_OVERFLOW		0xFE
 #define END_OF_FRAME_BYTE       0xFF
 
 #define LED_BLINK_TICKS			ONE_SEC_TICKS
