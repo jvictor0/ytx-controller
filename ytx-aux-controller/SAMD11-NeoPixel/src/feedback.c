@@ -263,6 +263,21 @@ bool feedbackRainbow(){
 
 	if((uint32_t)(now - rainbowStartedAt) >= RAINBOW_MAX_DURATION_TICKS){
 		rainbowFrame = 256;
+		uint32_t primask = __get_PRIMASK();
+		__disable_irq();
+		bool requestOutstanding = showRequestKind == SHOW_KIND_ALL;
+		if(requestOutstanding){
+			showRequestKind = SHOW_KIND_NONE;
+			showGrantKind = SHOW_KIND_NONE;
+		}
+		if(!primask){
+			__enable_irq();
+		}
+		if(requestOutstanding){
+			// The animation will no longer retry this request. Release any
+			// main-side pending/granted state before dirty shows take over.
+			SendToMain(SHOW_END);
+		}
 		return true;
 	}
 
