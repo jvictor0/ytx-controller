@@ -88,7 +88,6 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   bankControlSlotReserved = false;
   recoveryBaselineActive = false;
   recoveryTransportBypass = false;
-  recoveryDeferredOverflowed = false;
   recoveryDeferredCount = 0;
   waitingMoreData = false;
   antMillisWaitMoreData = 0;
@@ -1741,7 +1740,6 @@ void FeedbackClass::DeferRecoveryFeedbackUpdate(const feedbackUpdateStruct &upda
   // This should be unreachable for supported layouts (the buffer covers two
   // complete transport queues). Preserve the newest wire state and surface
   // the capacity fault rather than silently losing it.
-  recoveryDeferredOverflowed = true;
   SetStatusLED(STATUS_BLINK, 3, STATUS_FB_ERROR);
   for(uint16_t i = 0; i < recoveryDeferredCount; i++){
     if(IsWireFeedbackType(recoveryDeferredBuffer[i].type)){
@@ -1758,7 +1756,6 @@ void FeedbackClass::StashTransportQueueForRecovery(){
 
   uint16_t pending = fbItemsToSend;
   if(pending + recoveryDeferredCount > RECOVERY_DEFERRED_BUFFER_SIZE){
-    recoveryDeferredOverflowed = true;
     SetStatusLED(STATUS_BLINK, 3, STATUS_FB_ERROR);
   }
 

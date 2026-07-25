@@ -231,7 +231,6 @@ private:
 	bool bankControlSlotReserved;
 	bool recoveryBaselineActive;
 	bool recoveryTransportBypass;
-	bool recoveryDeferredOverflowed;
 	uint16_t recoveryDeferredCount;
 	
 	feedbackUpdateStruct feedbackUpdateBuffer[FEEDBACK_UPDATE_BUFFER_SIZE];
