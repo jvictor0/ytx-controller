@@ -306,7 +306,12 @@ bool FeedbackClass::InitAuxController(bool resetHappened){
       waitingForRainbow = true;
       Serial.write9bit(CMD_RAINBOW_START);
       uint32_t startedAt = micros();
-      while(waitingForRainbow && (uint32_t)(micros() - startedAt) < AUX_RAINBOW_TIMEOUT_US);
+      while(waitingForRainbow &&
+            (uint32_t)(micros() - startedAt) < AUX_RAINBOW_TIMEOUT_US){
+        // Normal loop service has not started yet, but rainbow frames use the
+        // same request/grant exclusion as runtime shows.
+        ServiceAuxShowRequest();
+      }
       rainbowComplete = !waitingForRainbow;
     }
 
