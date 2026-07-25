@@ -30,6 +30,15 @@ SOFTWARE.
 // MAIN LOOP
 //----------------------------------------------------------------------------------------------------
 
+static void ServiceUsbMidi()
+{
+  for(uint8_t messagesRead = 0; messagesRead < USB_MIDI_MESSAGES_PER_LOOP; messagesRead++){
+    if(!MIDI.read()){
+      break;
+    }
+  }
+}
+
 void loop() { 
   antMicrosLoop = micros();
 
@@ -42,9 +51,7 @@ void loop() {
 
   // Parse USB MIDI in the main loop so feedback callbacks cannot race
   // feedbackHw.Update() from the periodic DIN transport interrupt.
-  if(feedbackHw.fbItemsToSend < FEEDBACK_UPDATE_BUFFER_SIZE && !feedbackHw.SendingData()){
-    MIDI.read();
-  }
+  ServiceUsbMidi();
 
   static uint32_t antMicrosTest = micros();  
 

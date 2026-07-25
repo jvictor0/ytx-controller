@@ -385,6 +385,7 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define FEEDBACK_UPDATE_BUFFER_SIZE   256 // = 256 dig + (32 rot + 32 enc) switch (analog has no fb yet)
 #define MSG_BUFFER_AUX                128
 #define FB_MAX_FRAMES_PER_UPDATE      8
+#define USB_MIDI_MESSAGES_PER_LOOP     8
 
 // COMMANDS
 #define ACK_CMD                 0xAA
