@@ -49,10 +49,8 @@ SOFTWARE.
 #define SYSTICK_COUNTS_PER_TICK		(system_gclk_gen_get_hz(GCLK_GENERATOR_0) / AUX_TICKS_PER_SECOND)
 #define WS2812_BYTE_TIME_US		10U
 
-_Static_assert(AUX_TICKS_PER_MILLISECOND > 0U,
-	"the aux tick rate must be nonzero");
-_Static_assert((1000U % AUX_TICKS_PER_MILLISECOND) == 0U,
-	"the aux tick period must be an integer number of microseconds");
+_Static_assert(AUX_TICKS_PER_MILLISECOND == 1U,
+	"the aux protocol requires a one-millisecond system tick");
 
 #define BAUD_RATE	2000000
 
