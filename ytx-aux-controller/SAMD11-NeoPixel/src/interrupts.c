@@ -74,7 +74,7 @@ void MainControllerReception_Handler(void){
 		burstEndCountBytes = 0;
 		burstEndCountFirst = 0;
 		burstFrameIndex = 0;
-		discardingBurst = burstWasActive;
+		discardingBurst = discardingBurst || burstWasActive;
 		lastReceiveMillis = millisTicks;
 
 		if(burstWasActive){
