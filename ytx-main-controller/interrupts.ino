@@ -88,6 +88,12 @@ void AuxControllerReception_Handler(){
     }
     else if(rcvByte == RESET_HAPPENED)
     {
+      fbShowInProgress = false;
+      waitingForAck = false;
+      receivingErrorIndex = false;
+      errorIndexBytesReceived = 0;
+      errorIndexByte1 = 0;
+      errorIndexByte2 = 0;
     }
     else if(rcvByte == END_OF_RAINBOW)
     {

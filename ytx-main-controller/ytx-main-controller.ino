@@ -96,7 +96,7 @@ bool keyboardEnable = false;
 bool rainbowFinished = false;
 
 uint32_t antMicrosLoop; 
-uint32_t antMicrosAuxShow; 
+volatile uint32_t antMicrosAuxShow;
 
 bool keyboardReleaseFlag = false;
 uint32_t millisKeyboardPress = 0;

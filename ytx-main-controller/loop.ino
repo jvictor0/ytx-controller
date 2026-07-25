@@ -39,6 +39,13 @@ static void ServiceUsbMidi()
   }
 }
 
+static void RecoverStaleAuxShow()
+{
+  if(fbShowInProgress && ((uint32_t)(micros() - antMicrosAuxShow) >= AUX_SHOW_TIMEOUT_US)){
+    fbShowInProgress = false;
+  }
+}
+
 void loop() { 
   antMicrosLoop = micros();
 
@@ -51,6 +58,7 @@ void loop() {
 
   // Parse USB MIDI in the main loop so feedback callbacks cannot race
   // feedbackHw.Update() from the periodic DIN transport interrupt.
+  RecoverStaleAuxShow();
   ServiceUsbMidi();
 
   static uint32_t antMicrosTest = micros();  
