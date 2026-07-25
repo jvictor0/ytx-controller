@@ -562,6 +562,7 @@ void FeedbackClass::Update() {
       if(fbMessagesSent == 0){
         burstInProgress = false;
         auxBurstTransmissionActive = false;
+        RebuildCoalesceIndex();
       }
       break;
     }
