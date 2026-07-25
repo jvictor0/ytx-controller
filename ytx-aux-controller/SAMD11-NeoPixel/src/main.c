@@ -81,7 +81,7 @@ int main (void)
 		}
 		
 		if(timeToShow){		
-			if(showNow && (!receivingBank || !receivingFeedbackData)){
+			if(showNow && !receivingBank && !receivingFeedbackData){
 				showNow = false;
 				SendToMain(SHOW_IN_PROGRESS);
 				
