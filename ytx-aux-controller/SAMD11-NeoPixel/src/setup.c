@@ -45,6 +45,8 @@ void configure_usart(void)
 
 	//! [setup_change_config]
 	config_usart.baudrate    = BAUD_RATE;
+	config_usart.parity      = USART_PARITY_ODD;
+	config_usart.stopbits    = USART_STOPBITS_2;
 	config_usart.mux_setting = EDBG_CDC_SERCOM_MUX_SETTING;
 	config_usart.pinmux_pad0 = EDBG_CDC_SERCOM_PINMUX_PAD0;
 	config_usart.pinmux_pad1 = EDBG_CDC_SERCOM_PINMUX_PAD1;
