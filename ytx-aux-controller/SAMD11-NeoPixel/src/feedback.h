@@ -34,6 +34,7 @@ bool feedbackRainbow();
 bool feedbackShowIfIdle();
 void feedbackShowAll();
 bool feedbackShowAllIfIdle();
+bool feedbackAllOnSequence();
 bool feedbackDataAvailable();
 void feedbackDataUpdate();
 void feedbackSetBrightness(uint8_t brightness);

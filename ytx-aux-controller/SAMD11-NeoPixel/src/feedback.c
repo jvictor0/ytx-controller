@@ -41,7 +41,6 @@ extern uint32_t antMillisAllocationError;
 extern char _end;
 extern char _sstack;
 
-uint8_t numStripsOn = 0;
 uint8_t numEncoders = 0;
 uint8_t numDigitals1 = 0;
 uint8_t numDigitals2 = 0;
@@ -181,6 +180,36 @@ bool feedbackShowAllIfIdle(){
 		__enable_irq();
 	}
 	SendToMain(SHOW_END);
+	return true;
+}
+
+bool feedbackAllOnSequence(){
+	switch(allOnSequenceStage){
+		case 0:
+			setAll(NP_ON*2, NP_OFF, NP_OFF);
+			break;
+		case 1:
+			setAll(NP_OFF, NP_ON*2, NP_OFF);
+			break;
+		case 2:
+			setAll(NP_OFF, NP_OFF, NP_ON*2);
+			break;
+		default:
+			setAll(NP_ON, NP_ON, NP_ON);
+			break;
+	}
+
+	if(!feedbackShowAllIfIdle()){
+		return false;
+	}
+
+	allOnSequenceStage++;
+	if(allOnSequenceStage < 4){
+		delay(1500);
+		return false;
+	}
+
+	allOnSequenceStage = 0;
 	return true;
 }
 

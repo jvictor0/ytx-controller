@@ -25,7 +25,7 @@ uint8_t
 	gOffset[MAX_STRIPS],       // Index of green byte
 	bOffset[MAX_STRIPS];       // Index of blue 
 uint32_t
-	endTime;       // Latch timing reference
+	allOnSequenceStage;
 bool
 	begun[MAX_STRIPS];
 int8_t

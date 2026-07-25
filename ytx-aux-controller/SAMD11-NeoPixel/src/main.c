@@ -138,25 +138,7 @@ int main (void)
 		}
 
 		if(turnAllOnFlag){
-			bool commandCompleted = true;
-			setAll(NP_ON*2, NP_OFF, NP_OFF);
-			commandCompleted = feedbackShowAllIfIdle();
-			if(commandCompleted){
-				delay(1500);
-				setAll(NP_OFF, NP_ON*2, NP_OFF);
-				commandCompleted = feedbackShowAllIfIdle();
-			}
-			if(commandCompleted){
-				delay(1500);
-				setAll(NP_OFF, NP_OFF, NP_ON*2);
-				commandCompleted = feedbackShowAllIfIdle();
-			}
-			if(commandCompleted){
-				delay(1500);
-				setAll(NP_ON, NP_ON, NP_ON);
-				commandCompleted = feedbackShowAllIfIdle();
-			}
-			if(commandCompleted){
+			if(feedbackAllOnSequence()){
 				turnAllOnFlag = false;
 			}
 		}
