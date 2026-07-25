@@ -75,11 +75,69 @@ static void ServiceAuxControllerReset()
   }
 }
 
+static bool ServiceAuxMemoryError()
+{
+  static uint8_t recoveryAttempts = 0;
+  static bool resetRequested = false;
+  static bool stabilizationPending = false;
+  static uint32_t stabilizationStartedAt = 0;
+
+  if(resetRequested){
+    if(feedbackHw.AuxRecoveryInProgress()){
+      resetRequested = false;
+      stabilizationPending = true;
+      stabilizationStartedAt = micros();
+      return false;
+    }
+    return true;
+  }
+
+  noInterrupts();
+  bool memoryError = auxMemoryError;
+  interrupts();
+
+  if(memoryError){
+    if(feedbackHw.AuxRecoveryInProgress()){
+      return false;
+    }
+
+    if(recoveryAttempts >= AUX_MEMORY_RECOVERY_MAX_RESETS){
+      // A failure that survives the bounded clean-reset attempts is treated as
+      // an unsupported layout or persistent allocator fault.
+      return true;
+    }
+
+    noInterrupts();
+    auxMemoryError = false;
+    auxMemoryErrorReportCount = 0;
+    auxMemoryErrorLastMicros = 0;
+    interrupts();
+
+    recoveryAttempts++;
+    stabilizationPending = false;
+    resetRequested = true;
+    ResetFBMicro();
+    return true;
+  }
+
+  if(stabilizationPending &&
+     !feedbackHw.AuxRecoveryInProgress() &&
+     (uint32_t)(micros() - stabilizationStartedAt) >= AUX_MEMORY_RECOVERY_STABLE_US){
+    // A supported layout that remains healthy after reinitialization restores
+    // the recovery budget for a later independent transient.
+    recoveryAttempts = 0;
+    stabilizationPending = false;
+  }
+
+  return false;
+}
+
 void loop() { 
   antMicrosLoop = micros();
   static bool auxMemoryErrorReported = false;
 
   ServiceAuxControllerReset();
+  bool pauseFeedbackForMemoryRecovery = ServiceAuxMemoryError();
 
   // Update status LED
   UpdateStatusLED();
@@ -99,7 +157,8 @@ void loop() {
   // Parse USB MIDI in the main loop so feedback callbacks cannot race
   // feedbackHw.Update() from the periodic DIN transport interrupt.
   ServiceUsbMidi();
-  if(enableProcessing || feedbackHw.AuxRecoveryInProgress()){
+  if(!pauseFeedbackForMemoryRecovery &&
+     (enableProcessing || feedbackHw.AuxRecoveryInProgress())){
     feedbackHw.Update();
   }
 
