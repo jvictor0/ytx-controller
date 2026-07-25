@@ -87,6 +87,7 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   bankControlSlotReserved = false;
   waitingMoreData = false;
   antMillisWaitMoreData = 0;
+  waitingMoreDataStartedAt = 0;
   encoderCoalesceSlots = NULL;
   digitalCoalesceSlots = NULL;
 
@@ -444,7 +445,11 @@ void FeedbackClass::Update() {
 
   if(auxResetPending || auxMemoryError) return;
 
-  if((waitingMoreData && (millis()-antMillisWaitMoreData > MAX_WAIT_MORE_DATA_MS)) || (fbItemsToSend >= MSG_BUFFER_AUX)){
+  uint32_t nowMillis = millis();
+  if((waitingMoreData &&
+      ((uint32_t)(nowMillis - antMillisWaitMoreData) > MAX_WAIT_MORE_DATA_MS ||
+       (uint32_t)(nowMillis - waitingMoreDataStartedAt) >= MAX_WAIT_MORE_DATA_TOTAL_MS)) ||
+     (fbItemsToSend >= MSG_BUFFER_AUX)){
     waitingMoreData = false;
   }
 
@@ -1812,7 +1817,11 @@ uint8_t FeedbackClass::NextFeedbackIndex(uint8_t index){
 
 void FeedbackClass::WaitForMIDI(bool externalFeedback){
   if(externalFeedback){
-    antMillisWaitMoreData = millis();
+    uint32_t now = millis();
+    if(!waitingMoreData){
+      waitingMoreDataStartedAt = now;
+    }
+    antMillisWaitMoreData = now;
     waitingMoreData = true;
   }
 }

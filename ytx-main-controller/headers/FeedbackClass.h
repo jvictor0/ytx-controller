@@ -237,6 +237,7 @@ private:
  	
  	bool waitingMoreData;
     uint32_t antMillisWaitMoreData;
+    uint32_t waitingMoreDataStartedAt;
 
 	encFeedbackData** encFbData;
 	digFeedbackData** digFbData;
