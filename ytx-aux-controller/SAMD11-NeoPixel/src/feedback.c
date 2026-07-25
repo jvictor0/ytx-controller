@@ -165,10 +165,13 @@ void feedbackDataUpdate()
 
 	while(feedbackFramesPending > 0 && framesProcessed < FEEDBACK_FRAMES_PER_UPDATE){
 		FeedbackFrameData frameData;
+		uint32_t primask = __get_PRIMASK();
 
 		__disable_irq();
 		if(feedbackFramesPending == 0){
-			__enable_irq();
+			if(!primask){
+				__enable_irq();
+			}
 			break;
 		}
 
@@ -176,17 +179,19 @@ void feedbackDataUpdate()
 		if(++readIdx >= FEEDBACK_BUFFER_LENGTH)
 			readIdx = 0;
 		feedbackFramesPending--;
-		__enable_irq();
+		if(!primask){
+			__enable_irq();
+		}
 
-			uint8_t frame = frameData.updateFrame;
-			uint8_t elementToChange = frameData.updateN;
-			uint8_t orientationMeta = frameData.updateO;
-			bool isBlendFrame = (frame == ENCODER_BLEND_FRAME);
-			bool vertical = isBlendFrame ? (orientationMeta & 0x01) : orientationMeta;
-			uint16_t newState = frameData.updateState;
-			uint8_t intR = frameData.updateR;
-			uint8_t intG = frameData.updateG;
-			uint8_t intB = frameData.updateB;
+		uint8_t frame = frameData.updateFrame;
+		uint8_t elementToChange = frameData.updateN;
+		uint8_t orientationMeta = frameData.updateO;
+		bool isBlendFrame = (frame == ENCODER_BLEND_FRAME);
+		bool vertical = isBlendFrame ? (orientationMeta & 0x01) : orientationMeta;
+		uint16_t newState = frameData.updateState;
+		uint8_t intR = frameData.updateR;
+		uint8_t intG = frameData.updateG;
+		uint8_t intB = frameData.updateB;
 							
 		//uint8_t brightnessMult = 1;
 		//uint8_t minMaxDif = abs(max-min);
