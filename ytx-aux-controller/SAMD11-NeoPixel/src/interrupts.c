@@ -170,15 +170,10 @@ void MainControllerReception_Handler(void){
 							uint8_t *messageBody = (uint8_t *)&ReceptionBuffer[0];
 
 							if(feedbackFramesPending >= FEEDBACK_BUFFER_LENGTH){
+								if(++readIdx >= FEEDBACK_BUFFER_LENGTH)
+									readIdx = 0;
+								feedbackFramesPending--;
 								failsPerSecond++;
-								SendToMain(CHECKSUM_ERROR);
-								SendDataToMain(burstFrameIndex);
-								SendDataToMain(burstFrameIndex);
-								receivedBytes = 0;
-								receivingBank = false;
-								receivingFeedbackData = false;
-								discardingBurst = true;
-								return;
 							}
 
 							FeedbackFramesBuffer[writeIdx].updateFrame	= messageBody[FeedbackFrame_Type];
