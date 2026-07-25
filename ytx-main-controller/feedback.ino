@@ -545,6 +545,13 @@ void FeedbackClass::Update() {
 
     int8_t processResult = ProcessQueuedFeedbackEntry(fbUpdateQueueIndex);
     if(processResult < 0){
+      // If the first frame was paused, the aux may never have observed the
+      // burst header. Abandon only the transmission attempt and reissue
+      // BURST_INIT after SHOW_END; no queue entry has been consumed.
+      if(fbMessagesSent == 0){
+        burstInProgress = false;
+        auxBurstTransmissionActive = false;
+      }
       break;
     }
 
@@ -577,10 +584,10 @@ void FeedbackClass::Update() {
   //
   waitingForAck = true;
   antMicrosAck = micros();
+  auxBurstAckExpected = true;
   Serial.write9bit(BURST_END);
   Serial.write(fbMessagesSent);
   Serial.write(fbMessagesSent);
-  auxBurstAckExpected = true;
   burstInProgress = false;
   burstAwaitingAck = true;
 }

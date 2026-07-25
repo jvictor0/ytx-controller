@@ -144,6 +144,21 @@ void MainControllerReception_Handler(void){
 				// LAST BYTE OF A DATA FRAME
 				//
 				if(receivingFeedbackData){
+					// The main controller only sends frames inside bursts. If
+					// BURST_INIT was lost, reject the frame and force the
+					// existing whole-burst retry instead of ACKing it as an
+					// unrelated standalone frame.
+					if(!receivingBank){
+						failsPerSecond++;
+						SendToMain(CHECKSUM_ERROR);
+						SendDataToMain(0);
+						SendDataToMain(0);
+						receivedBytes = 0;
+						receivingFeedbackData = false;
+						discardingBurst = true;
+						return;
+					}
+
 					if(receivedBytes != (FeedbackFrame_Size+CHECKSUM_BYTES)){
 						failsPerSecond++;
 						// Send error with frame index (twice for verification)
@@ -202,23 +217,8 @@ void MainControllerReception_Handler(void){
 
 						feedbackFramesPending++;
 
-						if(!receivingBank)
-						{
-							receivingFeedbackData = false;
-							if(burstQueueOverflowed){
-								SendToMain(AUX_QUEUE_OVERFLOW);
-								burstQueueOverflowed = false;
-							}
-							// Only ACK individual frames when not in burst mode
-							//
-							SendToMain(ACK_CMD);
-						}
-						else
-						{
-							// In burst mode, track successful frame count for error reporting
-							//
-							burstFrameIndex++;
-						}
+						// Valid feedback frames are always part of a burst.
+						burstFrameIndex++;
 					}else{
 						failsPerSecond++;
 						// Checksum mismatch - send error with frame index (twice for verification)
