@@ -840,11 +840,6 @@ int8_t FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
           }
         }
 
-        if(!nDigitals)
-        {
-          SendDataIfReady();
-        }
-
         // Set shifters feedback
         //
         SetShifterFeedback();
