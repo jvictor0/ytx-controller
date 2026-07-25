@@ -28,19 +28,27 @@ SOFTWARE.
 
 #include "main-controller-comms.h"
 
-static inline void waitForMainTxReady(void){
-	while(!SERCOM2->USART.INTFLAG.bit.DRE){
+static bool SendWordToMain(uint16_t word)
+{
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+
+	// Main- and ISR-context callers share the single DATA register. Keep the
+	// readiness check and write atomic so an RX interrupt cannot consume the
+	// DRE slot between them.
+	while(!SERCOM2->USART.INTFLAG.bit.DRE){}
+	SERCOM2->USART.DATA.reg = word;
+
+	if(!primask){
+		__enable_irq();
 	}
+	return true;
 }
 
 bool SendToMain(uint8_t command){
-	waitForMainTxReady();
-	SERCOM2->USART.DATA.reg = (((uint16_t)command) + 0x100);
-	return 1;
+	return SendWordToMain((uint16_t)command | 0x100U);
 }
 
 bool SendDataToMain(uint8_t data){
-	waitForMainTxReady();
-	SERCOM2->USART.DATA.reg = (uint16_t)data;
-	return 1;
+	return SendWordToMain(data);
 }
