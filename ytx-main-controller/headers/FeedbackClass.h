@@ -189,6 +189,9 @@ private:
 	void RebuildCoalesceIndex();
 	void RegisterCoalesceSlot(uint8_t);
 	void UnregisterCoalesceSlot(uint8_t);
+	void RequestBankRepaint();
+	void CaptureAuxQueueOverflow();
+	bool ServiceBankRepaint();
 	int16_t FindOldestReplaceableUnsentSlot();
 	int16_t FindNewestReplaceableUnsentSlot();
 	int16_t EncoderCoalesceTypeIndex(uint8_t);
@@ -221,6 +224,8 @@ private:
 	uint32_t antMicrosAuxInit;
 	bool updatingBankFeedback;
 	bool bankControlSlotReserved;
+	bool bankRepaintPending;
+	uint32_t bankRepaintRequestedAt;
 	
 	feedbackUpdateStruct feedbackUpdateBuffer[FEEDBACK_UPDATE_BUFFER_SIZE];
 	uint8_t feedbackUpdateReadIdx;

@@ -80,6 +80,8 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   auxInitResetCount = 0;
   antMicrosAuxInit = 0;
   bankControlSlotReserved = false;
+  bankRepaintPending = false;
+  bankRepaintRequestedAt = 0;
   waitingMoreData = false;
   antMillisWaitMoreData = 0;
   encoderCoalesceSlots = NULL;
@@ -327,6 +329,8 @@ void FeedbackClass::RecoverAuxControllerReset(){
   auxInitRetryCount = 0;
   auxInitResetCount = 0;
   feedbackDataToSend = false;
+  bankRepaintPending = false;
+  bankRepaintRequestedAt = 0;
 
   noInterrupts();
   fbShowInProgress = false;
@@ -430,6 +434,11 @@ void FeedbackClass::Update() {
 
   if(auxResetPending || auxMemoryError) return;
 
+  CaptureAuxQueueOverflow();
+  if(ServiceBankRepaint()){
+    return;
+  }
+
   if((waitingMoreData && (millis()-antMillisWaitMoreData > MAX_WAIT_MORE_DATA_MS)) || (fbItemsToSend >= MSG_BUFFER_AUX)){
     waitingMoreData = false;
   }
@@ -443,7 +452,6 @@ void FeedbackClass::Update() {
     bool ackPending = waitingForAck;
     bool burstFailed = burstErrorOccurred;
     uint8_t failedAtFrame = burstErrorIndex;
-    bool repaintRequired = auxQueueOverflowed;
     interrupts();
 
     if(resetPending){
@@ -521,12 +529,6 @@ void FeedbackClass::Update() {
       RebuildCoalesceIndex();
     }else{
       burstRetryCount = 0;
-      if(repaintRequired){
-        noInterrupts();
-        auxQueueOverflowed = false;
-        interrupts();
-        SetBankChangeFeedback(FB_BANK_CHANGED);
-      }
     }
 
     return;
@@ -1609,6 +1611,42 @@ void FeedbackClass::RebuildCoalesceIndex(){
   }
 }
 
+void FeedbackClass::RequestBankRepaint(){
+  bankRepaintPending = true;
+  bankRepaintRequestedAt = millis();
+}
+
+void FeedbackClass::CaptureAuxQueueOverflow(){
+  noInterrupts();
+  bool overflowReported = auxQueueOverflowed;
+  auxQueueOverflowed = false;
+  interrupts();
+
+  if(overflowReported){
+    RequestBankRepaint();
+  }
+}
+
+bool FeedbackClass::ServiceBankRepaint(){
+  if(!bankRepaintPending ||
+     updatingBankFeedback ||
+     burstInProgress ||
+     burstAwaitingAck ||
+     waitingMoreData ||
+     fbShowInProgress ||
+     fbItemsToSend){
+    return false;
+  }
+
+  if((uint32_t)(millis() - bankRepaintRequestedAt) < AUX_REPAINT_QUIET_MS){
+    return false;
+  }
+
+  bankRepaintPending = false;
+  SetBankChangeFeedback(FB_BANK_CHANGED);
+  return true;
+}
+
 int16_t FeedbackClass::FindPendingUpdate(uint8_t type, uint8_t indexChanged, bool isShifter){
   uint16_t *slotPtr = CoalesceSlotPtr(type, indexChanged, isShifter);
   if(slotPtr && *slotPtr){
@@ -1657,6 +1695,13 @@ void FeedbackClass::QueueFeedbackUpdate(uint8_t type, uint8_t indexChanged, uint
       return;
     }
     writeIndex = (uint8_t)replaceIndex;
+
+    if(feedbackUpdateBuffer[writeIndex].type != type ||
+       feedbackUpdateBuffer[writeIndex].indexChanged != indexChanged ||
+       feedbackUpdateBuffer[writeIndex].isShifter != isShifter){
+      RequestBankRepaint();
+    }
+
     UnregisterCoalesceSlot(writeIndex);
     replacingUnsentEntry = true;
   }
