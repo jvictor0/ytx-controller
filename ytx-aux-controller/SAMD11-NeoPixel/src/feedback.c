@@ -201,8 +201,9 @@ bool feedbackShowIfIdle(){
 }
 
 void feedbackShowAllAtBoot(){
-	// The main controller is synchronously waiting for initialization here,
-	// so its main-context grant service is not running and no burst can exist.
+	// The aux runtime loop has not started, so no feedback burst can exist.
+	// Main may be in synchronous boot or asynchronous reset recovery; this
+	// initial physical baseline intentionally bypasses runtime arbitration.
 	showAll();
 }
 
