@@ -525,8 +525,20 @@ void FeedbackClass::Update() {
     burstEntriesBeforeFirstFrame = 0;
     burstSendIdx = feedbackUpdateReadIdx;
     burstItemsRemaining = fbItemsToSend;
-    auxBurstTransmissionActive = true;
-    auxBurstAckExpected = false;
+
+    noInterrupts();
+    bool showStarted = fbShowInProgress;
+    if(!showStarted){
+      auxBurstTransmissionActive = true;
+      auxBurstAckExpected = false;
+    }
+    interrupts();
+
+    if(showStarted){
+      burstInProgress = false;
+      return;
+    }
+
     Serial.write9bit(BURST_INIT);
   }
 
