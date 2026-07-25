@@ -31,7 +31,7 @@ SOFTWARE.
 
 bool feedbackBegin();
 bool feedbackRainbow();
-void feedbackShow();
+bool feedbackShowIfIdle();
 void feedbackShowAll();
 bool feedbackShowAllIfIdle();
 bool feedbackDataAvailable();

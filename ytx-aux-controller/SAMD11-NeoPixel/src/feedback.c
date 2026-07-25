@@ -125,7 +125,18 @@ bool feedbackBegin(){
 	return true;
 }
 
-void feedbackShow(){
+bool feedbackShowIfIdle(){
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+
+	if(receivingBank || receivingFeedbackData ||
+	   SERCOM2->USART.INTFLAG.bit.RXC || SERCOM2->USART.INTFLAG.bit.ERROR){
+		if(!primask){
+			__enable_irq();
+		}
+		return false;
+	}
+
 	SendToMain(SHOW_IN_PROGRESS);
 
 	for (int i = 0; i < LED_STRIP_COUNT; i++){
@@ -135,7 +146,11 @@ void feedbackShow(){
 	}
 
 	whichStripToShow = 0;
+	if(!primask){
+		__enable_irq();
+	}
 	SendToMain(SHOW_END);
+	return true;
 }
 
 void feedbackShowAll(){

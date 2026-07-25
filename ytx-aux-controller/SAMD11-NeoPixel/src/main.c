@@ -117,9 +117,8 @@ int main (void)
 		}
 		
 		if(timeToShow){		
-			if(showNow && !receivingBank && !receivingFeedbackData){
+			if(showNow && feedbackShowIfIdle()){
 				showNow = false;
-				feedbackShow();
 				timeToShow = false;
 			}
 		}
