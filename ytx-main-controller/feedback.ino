@@ -589,6 +589,12 @@ void FeedbackClass::Update() {
     return;
   }
 
+  // A show can begin after the last payload frame. Keep the burst open until
+  // SHOW_END so the aux can receive the terminator and both count bytes.
+  if(fbShowInProgress){
+    return;
+  }
+
   // Burst payload is done, now wait ACK asynchronously
   //
   waitingForAck = true;
