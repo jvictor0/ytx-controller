@@ -170,7 +170,7 @@ int main (void)
 		if(millis()-antMillisShowEnd > SHOW_END_REFRESH_TICKS){
 			antMillisShowEnd = millis();
 
-			if(!receivingFeedbackData && !receivingBank && !timeToShow)
+			if(!receivingFeedbackData && !receivingBank && !(timeToShow && showNow))
 				sendShowEnd = true;
 		}
 
