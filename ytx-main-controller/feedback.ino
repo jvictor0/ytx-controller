@@ -415,9 +415,6 @@ void FeedbackClass::Update() {
     bool burstFailed = burstErrorOccurred;
     uint8_t failedAtFrame = burstErrorIndex;
     bool repaintRequired = auxQueueOverflowed;
-    if(!ackPending){
-      auxQueueOverflowed = false;
-    }
     interrupts();
 
     if(resetPending){
@@ -491,6 +488,9 @@ void FeedbackClass::Update() {
     }else{
       burstRetryCount = 0;
       if(repaintRequired){
+        noInterrupts();
+        auxQueueOverflowed = false;
+        interrupts();
         SetBankChangeFeedback(FB_BANK_CHANGED);
       }
     }
