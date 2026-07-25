@@ -89,6 +89,9 @@ CFLAGS = \
 	-fdata-sections \
 	-fno-strict-aliasing \
 	-fcommon \
+	-MMD \
+	-MP \
+	-fstack-usage \
 	-Wall \
 	-Wno-strict-prototypes \
 	-Wno-missing-prototypes \
@@ -142,6 +145,7 @@ SOURCES = \
 
 # Object files (in build directory, preserving structure)
 OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
+DEPFILES = $(OBJECTS:.o=.d)
 
 # Default target
 all: $(BUILD_DIR)/$(PROJECT).bin $(BUILD_DIR)/$(PROJECT).hex
@@ -159,7 +163,7 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Link
-$(BUILD_DIR)/$(PROJECT).elf: $(OBJECTS)
+$(BUILD_DIR)/$(PROJECT).elf: $(OBJECTS) $(LDSCRIPT)
 	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
 
 # Create binary
@@ -203,3 +207,4 @@ help:
 
 .PHONY: all clean install size help
 
+-include $(DEPFILES)
