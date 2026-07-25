@@ -49,9 +49,47 @@ uint32_t failsPerSecond = 0;
 uint32_t framesPerSecond = 0;
 
 void MainControllerReception_Handler(void){
+	uint16_t receiveStatus = SERCOM2->USART.STATUS.reg &
+	                         (SERCOM_USART_STATUS_BUFOVF |
+	                          SERCOM_USART_STATUS_FERR |
+	                          SERCOM_USART_STATUS_PERR);
+	if(receiveStatus || SERCOM2->USART.INTFLAG.bit.ERROR){
+		// Read and discard any errored character before clearing the sticky
+		// status/interrupt flags.
+		if(SERCOM2->USART.INTFLAG.bit.RXC){
+			(void)SERCOM2->USART.DATA.reg;
+		}
+		SERCOM2->USART.STATUS.reg = receiveStatus;
+		SERCOM2->USART.INTFLAG.reg = SERCOM_USART_INTFLAG_ERROR;
+
+		sercomReceiveErrorCount++;
+		if(receiveStatus & SERCOM_USART_STATUS_BUFOVF){
+			sercomBufferOverflowCount++;
+		}
+
+		bool burstWasActive = receivingBank || receivingFeedbackData;
+		receivedBytes = 0;
+		receivingFeedbackData = false;
+		receivingBank = false;
+		receivingInit = false;
+		receivingBrightness = false;
+		receivingBurstEndCount = false;
+		burstEndCountBytes = 0;
+		burstEndCountFirst = 0;
+		burstFrameIndex = 0;
+		discardingBurst = burstWasActive;
+		lastReceiveMillis = millisTicks;
+
+		if(burstWasActive){
+			SendToMain(CHECKSUM_ERROR);
+			SendDataToMain(0);
+			SendDataToMain(0);
+		}
+		return;
+	}
+
 	if(SERCOM2->USART.INTFLAG.bit.RXC){					// if RX interrupt flag is set
 		uint16_t rcvWord = SERCOM2->USART.DATA.reg;		// get data from register
-		SERCOM2->USART.INTFLAG.bit.RXC = 0;				// clear interrupt flag
 		lastReceiveMillis = millisTicks;
 
 	  	bool isCommand = (rcvWord&0x100) ? true : false;

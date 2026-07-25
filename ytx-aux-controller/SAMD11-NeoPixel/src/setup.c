@@ -78,7 +78,8 @@ void configure_usart(void)
 	//usart_enable_transceiver(&usart_instance, USART_TRANSCEIVER_RX);
 	//! [setup_enable]
 	/* receive complete interrupt set */
-	SERCOM2->USART.INTENSET.reg = SERCOM_USART_INTFLAG_RXC;
+	SERCOM2->USART.INTENSET.reg = SERCOM_USART_INTFLAG_RXC |
+	                             SERCOM_USART_INTFLAG_ERROR;
 }
 
 
