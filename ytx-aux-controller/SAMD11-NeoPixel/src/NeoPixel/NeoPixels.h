@@ -33,6 +33,7 @@ int8_t
 
  bool pixelsBegin(uint8_t nStrip, uint16_t n, uint8_t stripPin, uint8_t t);
  void
+	pixelsEndAll(void),
 	pixelsShow(uint8_t nStrip),
 	showAll(void),
 	setPin(uint8_t nStrip, uint8_t p),

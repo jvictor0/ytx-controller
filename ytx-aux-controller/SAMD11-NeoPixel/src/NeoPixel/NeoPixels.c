@@ -40,6 +40,19 @@ bool pixelsBegin(uint8_t nStrip, uint16_t n, uint8_t stripPin, uint8_t t) {
 	return true;
 }
 
+void pixelsEndAll(void){
+	for(uint8_t strip = 0; strip < MAX_STRIPS; strip++){
+		if(pixels[strip]){
+			free(pixels[strip]);
+			pixels[strip] = NULL;
+		}
+		numLEDs[strip] = 0;
+		numBytes[strip] = 0;
+		begun[strip] = false;
+	}
+	nStrips = 0;
+}
+
 void pixelsShow(uint8_t nStrip){
 	if(nStrip >= MAX_STRIPS) return;
 	if(!pixels[nStrip]) return;
@@ -433,4 +446,3 @@ void delay(int delay_time){
 		//delay(SpeedDelay);
 	//}
 //}
-

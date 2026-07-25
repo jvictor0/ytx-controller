@@ -96,21 +96,25 @@ bool feedbackBegin(){
 		if(numEncoders>16){
 			if(!pixelsBegin(ENCODER1_STRIP, NUM_LEDS_ENCODER*16, ENC1_STRIP_PIN, NEO_GRB + NEO_KHZ800) ||
 			   !pixelsBegin(ENCODER2_STRIP, NUM_LEDS_ENCODER*(numEncoders-16), ENC2_STRIP_PIN, NEO_GRB + NEO_KHZ800)){
+				pixelsEndAll();
 				return false;
 			}
 		}else{
 			if(!pixelsBegin(ENCODER1_STRIP, NUM_LEDS_ENCODER*numEncoders, ENC1_STRIP_PIN, NEO_GRB + NEO_KHZ800)){
+				pixelsEndAll();
 				return false;
 			}
 		}
 	}
 	if(numDigitals1){
 		if(!pixelsBegin(DIGITAL1_STRIP, numDigitals1, DIG1_STRIP_PIN, NEO_GRB + NEO_KHZ800)){
+			pixelsEndAll();
 			return false;
 		}
 	}
 	if(numDigitals2){
 		if(!pixelsBegin(DIGITAL2_STRIP, numDigitals2, DIG2_STRIP_PIN, NEO_GRB + NEO_KHZ800)){
+			pixelsEndAll();
 			return false;
 		}
 	}
