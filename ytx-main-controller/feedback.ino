@@ -43,6 +43,7 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
 
   noInterrupts();
   fbShowInProgress = false;
+  auxShowRequestKind = SHOW_KIND_NONE;
   antMicrosAuxShow = 0;
   waitingForAck = false;
   auxAckReceived = false;
@@ -336,6 +337,7 @@ void FeedbackClass::RecoverAuxControllerReset(){
 
   noInterrupts();
   fbShowInProgress = false;
+  auxShowRequestKind = SHOW_KIND_NONE;
   waitingForAck = false;
   auxAckReceived = false;
   auxInitAckTagged = false;
@@ -548,6 +550,10 @@ void FeedbackClass::Update() {
     return;
   }
 
+  if(!burstInProgress && ServiceAuxShowRequest()){
+    return;
+  }
+
   // Start a new burst only when we're not in "wait for more data" window and show isn't busy
   //
   if(!burstInProgress){
@@ -669,8 +675,8 @@ void FeedbackClass::Update() {
     return;
   }
 
-  // A show can begin after the last payload frame. Keep the burst open until
-  // SHOW_END so the aux can receive the terminator and both count bytes.
+  // Defensively keep the burst open while a granted show owns the link.
+  // Normal grants are issued only between completed bursts.
   if(fbShowInProgress){
     return;
   }
@@ -691,6 +697,34 @@ void FeedbackClass::Update() {
 
 bool FeedbackClass::IsBegun(){
   return begun;
+}
+
+bool FeedbackClass::ServiceAuxShowRequest(){
+  noInterrupts();
+  uint8_t requestedKind = auxShowRequestKind;
+  bool requestValid = requestedKind == SHOW_KIND_DIRTY ||
+                      requestedKind == SHOW_KIND_ALL;
+  bool canGrant = requestValid &&
+                  !fbShowInProgress &&
+                  !burstInProgress &&
+                  !burstAwaitingAck &&
+                  !auxBurstTransmissionActive &&
+                  !waitingForAck;
+  if(canGrant){
+    auxShowRequestKind = SHOW_KIND_NONE;
+    fbShowInProgress = true;
+    antMicrosAuxShow = micros();
+  }
+  interrupts();
+
+  if(!canGrant){
+    return false;
+  }
+
+  Serial.write9bit(requestedKind == SHOW_KIND_ALL
+                 ? SHOW_GRANT_ALL
+                 : SHOW_GRANT_DIRTY);
+  return true;
 }
 
 bool FeedbackClass::AuxRecoveryInProgress(){

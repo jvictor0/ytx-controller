@@ -178,6 +178,7 @@ private:
 	void PrepareAuxAckWait();
 	bool SendAuxInitializationWithRetry(uint8_t, uint32_t);
 	bool SendAuxCommandWithRetry(uint8_t, int16_t);
+	bool ServiceAuxShowRequest();
 	void SetShifterFeedback();
 	void WaitForMIDI(bool);
 	uint8_t NextFeedbackIndex(uint8_t);

@@ -164,7 +164,10 @@ int main (void)
 		if(millis()-antMillisShowEnd > SHOW_END_REFRESH_TICKS){
 			antMillisShowEnd = millis();
 
-			if(!receivingFeedbackData && !receivingBank && !(timeToShow && showNow))
+			if(showRequestKind == SHOW_KIND_NONE &&
+			   showGrantKind == SHOW_KIND_NONE &&
+			   !receivingFeedbackData && !receivingBank &&
+			   !(timeToShow && showNow))
 				sendShowEnd = true;
 		}
 

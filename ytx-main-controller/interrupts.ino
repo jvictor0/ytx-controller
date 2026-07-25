@@ -68,14 +68,20 @@ void AuxControllerReception_Handler(){
 
   if(isCommand)
   {
-    if(rcvByte == SHOW_IN_PROGRESS)
+    if(rcvByte == SHOW_REQUEST_DIRTY)
     {
-      fbShowInProgress = true;
-      antMicrosAuxShow = micros();
+      auxShowRequestKind = SHOW_KIND_DIRTY;
+    }
+    else if(rcvByte == SHOW_REQUEST_ALL)
+    {
+      auxShowRequestKind = SHOW_KIND_ALL;
     }
     else if(rcvByte == SHOW_END)
     {
       fbShowInProgress = false;
+      // Any request observed while the matching grant was in flight was a
+      // retry of the show that just ended, not a new physical-show request.
+      auxShowRequestKind = SHOW_KIND_NONE;
     }
     else if(rcvByte == INIT_VALUES)
     {
@@ -108,6 +114,7 @@ void AuxControllerReception_Handler(){
     else if(rcvByte == RESET_HAPPENED)
     {
       fbShowInProgress = false;
+      auxShowRequestKind = SHOW_KIND_NONE;
       waitingForAck = false;
       auxAckReceived = false;
       auxInitAckTagged = false;

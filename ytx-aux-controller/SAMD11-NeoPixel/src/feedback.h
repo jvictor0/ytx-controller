@@ -32,7 +32,7 @@ SOFTWARE.
 bool feedbackBegin();
 bool feedbackRainbow();
 bool feedbackShowIfIdle();
-void feedbackShowAll();
+void feedbackShowAllAtBoot();
 bool feedbackShowAllIfIdle();
 bool feedbackAllOnSequence();
 bool feedbackDataAvailable();

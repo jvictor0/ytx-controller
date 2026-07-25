@@ -413,13 +413,20 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define CHANGE_BRIGHTNESS       0xF6
 #define END_OF_RAINBOW          0xF7
 #define CHECKSUM_ERROR          0xF8
-#define SHOW_IN_PROGRESS        0xF9
+#define SHOW_REQUEST_DIRTY      0xF9
 #define SHOW_END                0xFA
 #define CMD_RAINBOW_START       0xFB
 #define RESET_HAPPENED          0xFC
 #define AUX_MEMORY_ERROR        0xFD
 #define AUX_QUEUE_FULL          0xFE
 #define END_OF_FRAME_BYTE       0xFF
+#define SHOW_REQUEST_ALL        0xEF
+#define SHOW_GRANT_DIRTY        0xEE
+#define SHOW_GRANT_ALL          0xED
+
+#define SHOW_KIND_NONE             0
+#define SHOW_KIND_DIRTY            1
+#define SHOW_KIND_ALL              2
 
 
 #define ENCODER_CHANGE_FRAME            0x00

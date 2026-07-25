@@ -148,12 +148,22 @@ void MainControllerReception_Handler(void){
 				receivingBurstEndCount = false;
 				burstEndCountBytes = 0;
 				receivedBytes = 0;
+				showRequestKind = SHOW_KIND_NONE;
+				showGrantKind = SHOW_KIND_NONE;
 			}else if (rcvByte == CMD_ALL_LEDS_OFF){		// TURN ALL LEDS OFF COMMAND
 				turnAllOffFlag = true;
 			}else if (rcvByte == CMD_ALL_LEDS_ON){		// TURN ALL LEDS OFF COMMAND
 				turnAllOnFlag = true;
 			}else if (rcvByte == CMD_RAINBOW_START){		// START RAINBOW
 				rainbowStart = true;
+			}else if(rcvByte == SHOW_GRANT_DIRTY){
+				if(showRequestKind == SHOW_KIND_DIRTY){
+					showGrantKind = SHOW_KIND_DIRTY;
+				}
+			}else if(rcvByte == SHOW_GRANT_ALL){
+				if(showRequestKind == SHOW_KIND_ALL){
+					showGrantKind = SHOW_KIND_ALL;
+				}
 			}else if (rcvByte == CHANGE_BRIGHTNESS && !receivingBrightness)	{
 				// CHANGE BRIGHTNESS COMMAND
 				receivingBrightness = true;

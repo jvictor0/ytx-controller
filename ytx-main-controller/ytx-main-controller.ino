@@ -173,6 +173,7 @@ bool lastStatusLEDState;
 uint32_t millisStatusPrev;
 bool firstTime;
 volatile bool fbShowInProgress = false;
+volatile uint8_t auxShowRequestKind = SHOW_KIND_NONE;
 volatile bool waitingForAck = false;
 volatile bool auxAckReceived = false;
 volatile bool auxInitAckTagged = false;

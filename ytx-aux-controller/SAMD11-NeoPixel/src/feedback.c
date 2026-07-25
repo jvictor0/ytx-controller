@@ -120,67 +120,92 @@ bool feedbackBegin(){
 	}
 	
 	setAll(NP_OFF,NP_OFF,NP_OFF);
-	feedbackShowAll();
+	feedbackShowAllAtBoot();
 	return true;
+}
+
+static bool feedbackShowWithGrant(uint8_t requestedKind){
+	uint32_t now = millis();
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+
+	if(showRequestKind == requestedKind && showGrantKind == requestedKind){
+		bool receiveBusy = receivingBank || receivingFeedbackData ||
+			receivingInit || receivingBrightness ||
+			receivingBurstEndCount || discardingBurst ||
+			SERCOM2->USART.INTFLAG.bit.RXC || SERCOM2->USART.INTFLAG.bit.ERROR;
+		showRequestKind = SHOW_KIND_NONE;
+		showGrantKind = SHOW_KIND_NONE;
+
+		if(receiveBusy){
+			if(!primask){
+				__enable_irq();
+			}
+			// Release the main-side gate when the atomic recheck rejects a
+			// grant. The caller will issue a fresh request for the same work.
+			SendToMain(SHOW_END);
+			return false;
+		}
+
+		if(requestedKind == SHOW_KIND_ALL){
+			showAll();
+		}else{
+			for (int i = 0; i < LED_STRIP_COUNT; i++){
+				if(whichStripToShow&(1<<i)){
+					pixelsShow(i);
+				}
+			}
+			whichStripToShow = 0;
+		}
+
+		if(!primask){
+			__enable_irq();
+		}
+		SendToMain(SHOW_END);
+		return true;
+	}
+
+	bool sendRequest = false;
+	if(showRequestKind == SHOW_KIND_NONE){
+		showRequestKind = requestedKind;
+		showGrantKind = SHOW_KIND_NONE;
+		showRequestMillis = now;
+		sendShowEnd = false;
+		sendRequest = true;
+	}else if(showRequestKind == requestedKind &&
+	         (uint32_t)(now - showRequestMillis) >= SHOW_REQUEST_RETRY_TICKS){
+		showRequestMillis = now;
+		sendShowEnd = false;
+		sendRequest = true;
+	}
+
+	if(!primask){
+		__enable_irq();
+	}
+
+	if(sendRequest){
+		if(requestedKind == SHOW_KIND_ALL){
+			SendToMain(SHOW_REQUEST_ALL);
+		}else{
+			SendToMain(SHOW_REQUEST_DIRTY);
+		}
+	}
+
+	return false;
 }
 
 bool feedbackShowIfIdle(){
-	uint32_t primask = __get_PRIMASK();
-	__disable_irq();
-
-	if(receivingBank || receivingFeedbackData ||
-	   SERCOM2->USART.INTFLAG.bit.RXC || SERCOM2->USART.INTFLAG.bit.ERROR){
-		if(!primask){
-			__enable_irq();
-		}
-		return false;
-	}
-
-	SendToMain(SHOW_IN_PROGRESS);
-
-	for (int i = 0; i < LED_STRIP_COUNT; i++){
-		if(whichStripToShow&(1<<i)){
-			pixelsShow(i);
-		}
-	}
-
-	whichStripToShow = 0;
-	if(!primask){
-		__enable_irq();
-	}
-	SendToMain(SHOW_END);
-	return true;
+	return feedbackShowWithGrant(SHOW_KIND_DIRTY);
 }
 
-void feedbackShowAll(){
-	SendToMain(SHOW_IN_PROGRESS);
+void feedbackShowAllAtBoot(){
+	// The main controller is synchronously waiting for initialization here,
+	// so its main-context grant service is not running and no burst can exist.
 	showAll();
-	SendToMain(SHOW_END);
 }
 
 bool feedbackShowAllIfIdle(){
-	uint32_t primask = __get_PRIMASK();
-	__disable_irq();
-
-	if(receivingBank || receivingFeedbackData ||
-	   SERCOM2->USART.INTFLAG.bit.RXC || SERCOM2->USART.INTFLAG.bit.ERROR){
-		if(!primask){
-			__enable_irq();
-		}
-		return false;
-	}
-
-	// Hold receive state stable from the idle check through the physical show.
-	// pixelsShow() preserves the caller's PRIMASK, so showAll() cannot reopen
-	// the burst-start race between strips.
-	SendToMain(SHOW_IN_PROGRESS);
-	showAll();
-
-	if(!primask){
-		__enable_irq();
-	}
-	SendToMain(SHOW_END);
-	return true;
+	return feedbackShowWithGrant(SHOW_KIND_ALL);
 }
 
 bool feedbackAllOnSequence(){
