@@ -181,11 +181,13 @@ void FeedbackClass::SendAuxInitializationFrame(){
   Serial.write9bit(END_OF_FRAME_BYTE);
 }
 
-void FeedbackClass::PrepareAuxAckWait(){
+void FeedbackClass::PrepareAuxAckWait(bool preparingForInit){
   noInterrupts();
   waitingForAck = true;
   auxAckReceived = false;
-  auxInitAckTagged = false;
+  if(preparingForInit){
+    auxInitAckTagged = false;
+  }
   auxResetPending = false;
   interrupts();
 }
@@ -213,14 +215,16 @@ bool FeedbackClass::WaitForAuxAck(uint32_t timeoutUs, bool acceptTaggedInitAck){
   noInterrupts();
   waitingForAck = false;
   auxAckReceived = false;
-  auxInitAckTagged = false;
+  if(acceptTaggedInitAck){
+    auxInitAckTagged = false;
+  }
   interrupts();
   return false;
 }
 
 bool FeedbackClass::SendAuxInitializationWithRetry(uint8_t maxRetries, uint32_t ackTimeoutUs){
   for(uint8_t attempt = 0; attempt < maxRetries; attempt++){
-    PrepareAuxAckWait();
+    PrepareAuxAckWait(true);
     SendAuxInitializationFrame();
     if(WaitForAuxAck(ackTimeoutUs, true)){
       return true;
@@ -231,7 +235,7 @@ bool FeedbackClass::SendAuxInitializationWithRetry(uint8_t maxRetries, uint32_t 
 
 bool FeedbackClass::SendAuxCommandWithRetry(uint8_t command, int16_t data){
   for(uint8_t attempt = 0; attempt < AUX_COMMAND_MAX_RETRIES; attempt++){
-    PrepareAuxAckWait();
+    PrepareAuxAckWait(false);
     Serial.write9bit(command);
     if(data >= 0){
       Serial.write((uint8_t)data);

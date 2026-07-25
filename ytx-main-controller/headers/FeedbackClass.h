@@ -175,7 +175,7 @@ private:
 	bool IsWireFeedbackType(uint8_t);
 	void SendAuxInitializationFrame();
 	bool WaitForAuxAck(uint32_t, bool);
-	void PrepareAuxAckWait();
+	void PrepareAuxAckWait(bool);
 	bool SendAuxInitializationWithRetry(uint8_t, uint32_t);
 	bool SendAuxCommandWithRetry(uint8_t, int16_t);
 	void SetShifterFeedback();
