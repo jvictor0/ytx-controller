@@ -48,9 +48,12 @@ SOFTWARE.
 #define AUX_MILLISECONDS(ms)		((uint32_t)(ms) * AUX_TICKS_PER_MILLISECOND)
 #define SYSTICK_COUNTS_PER_TICK		(system_gclk_gen_get_hz(GCLK_GENERATOR_0) / AUX_TICKS_PER_SECOND)
 #define WS2812_BYTE_TIME_US		10U
+#define WS2812_BYTES_PER_AUX_TICK	(AUX_MICROSECONDS_PER_TICK / WS2812_BYTE_TIME_US)
 
 _Static_assert(AUX_TICKS_PER_MILLISECOND == 1U,
 	"the aux protocol requires a one-millisecond system tick");
+_Static_assert((AUX_MICROSECONDS_PER_TICK % WS2812_BYTE_TIME_US) == 0U,
+	"the WS2812 byte estimate must divide evenly into one aux tick");
 
 #define BAUD_RATE	2000000
 
