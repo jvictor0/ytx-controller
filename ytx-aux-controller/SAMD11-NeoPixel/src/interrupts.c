@@ -63,11 +63,6 @@ void MainControllerReception_Handler(void){
 		SERCOM2->USART.STATUS.reg = receiveStatus;
 		SERCOM2->USART.INTFLAG.reg = SERCOM_USART_INTFLAG_ERROR;
 
-		sercomReceiveErrorCount++;
-		if(receiveStatus & SERCOM_USART_STATUS_BUFOVF){
-			sercomBufferOverflowCount++;
-		}
-
 		bool burstWasActive = receivingBank || receivingFeedbackData;
 		receivedBytes = 0;
 		receivingFeedbackData = false;

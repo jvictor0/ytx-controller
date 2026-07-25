@@ -139,7 +139,7 @@ SECTIONS
         _ezero = .;
     } > ram
 
-    . = ALIGN(4);
+    . = ALIGN(8);
     _end = . ;
 
     /* Stack at top of RAM, grows downward. _sstack is the minimum floor;
