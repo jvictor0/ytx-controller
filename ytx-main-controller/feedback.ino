@@ -374,7 +374,9 @@ void FeedbackClass::RecoverAuxControllerReset(){
 
   RebuildCoalesceIndex();
   auxInitRecoveryInProgress = true;
+  noInterrupts();
   waitingForAck = true;
+  interrupts();
   SendAuxInitializationFrame();
   antMicrosAuxInit = micros();
 }
