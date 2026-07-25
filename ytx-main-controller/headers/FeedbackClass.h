@@ -147,7 +147,6 @@ public:
 	void SetEncoderRingLedColorDirect(uint8_t encIndex, uint8_t r, uint8_t g, uint8_t b);
 	void SetBankChangeFeedback(uint8_t);
 	uint8_t GetVumeterValue(uint8_t);
-	bool SendingData();
 	void SendCommand(uint8_t);
 	void SendResetToBootloader();
 	void *GetEncoderFBPtr();

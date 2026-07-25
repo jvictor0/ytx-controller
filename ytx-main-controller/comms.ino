@@ -1089,21 +1089,6 @@ void SearchMsgInConfigAndUpdate(byte fbType, byte msgType, byte channel, uint16_
   }
 }
 
-void CheckSerialSAMD11(){
-  if(Serial.available()){
-    byte cmd = Serial.read();
-    if(cmd == SHOW_IN_PROGRESS){
-      fbShowInProgress = true;
-      feedbackHw.SendCommand(ACK_CMD);
-    }else if(cmd == SHOW_END){
-      fbShowInProgress = false;
-      feedbackHw.SendCommand(ACK_CMD);
-    }else if(cmd == RESET_HAPPENED){
-      feedbackHw.RecoverAuxControllerReset();
-    }
-  }
-}
-
 void CheckSerialUSB(){
   if(SerialUSB.available()){
     char cmd = SerialUSB.read();

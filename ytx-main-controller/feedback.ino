@@ -55,7 +55,6 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   auxInitRetryCount = 0;
   auxInitResetCount = 0;
   antMicrosAuxInit = 0;
-  sendingFbData = false;
   waitingMoreData = false;
   antMillisWaitMoreData = 0;
   encoderCoalesceSlots = NULL;
@@ -1658,10 +1657,6 @@ void FeedbackClass::WaitForMIDI(bool externalFeedback){
     antMillisWaitMoreData = millis();
     waitingMoreData = true;
   }
-}
-
-bool FeedbackClass::SendingData(void){
-  return sendingFbData;
 }
 
 int8_t FeedbackClass::SendDataIfReady(){
