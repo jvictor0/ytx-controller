@@ -41,10 +41,10 @@ callbacks.
 The 7 kHz timer remains dedicated to low-latency DIN
 Clock/Start/Continue/Stop forwarding.
 
-If the main feedback queue fills while a burst is in flight, the oldest unsent
-wire entry is replaced in place. Already-transmitted entries and queued
-bank-control sentinels are never moved, so ACK retirement remains ordered while
-the newest host state is retained.
+If the main feedback queue fills, the oldest replaceable wire entry is replaced
+in place. Already-transmitted entries and queued bank-control sentinels are
+never moved, so ACK retirement remains ordered and bank-update state cannot
+lose its clearing sentinel while the newest host state is retained.
 
 ## Stale Aux-Show Recovery
 
