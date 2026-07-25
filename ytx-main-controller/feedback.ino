@@ -566,9 +566,7 @@ void FeedbackClass::Update() {
       break;
     }
 
-    if(++burstSendIdx >= FEEDBACK_UPDATE_BUFFER_SIZE){
-      burstSendIdx = 0;
-    }
+    burstSendIdx = NextFeedbackIndex(burstSendIdx);
 
     burstItemsRemaining--;
     burstEntriesProcessed++;
@@ -1545,9 +1543,7 @@ void FeedbackClass::RebuildCoalesceIndex(){
   uint8_t idx = feedbackUpdateReadIdx;
   for(uint16_t pending = 0; pending < fbItemsToSend; pending++){
     RegisterCoalesceSlot(idx);
-    if(++idx >= FEEDBACK_UPDATE_BUFFER_SIZE){
-      idx = 0;
-    }
+    idx = NextFeedbackIndex(idx);
   }
 }
 
@@ -1629,9 +1625,7 @@ int16_t FeedbackClass::FindOldestReplaceableUnsentSlot(){
     if(IsWireFeedbackType(feedbackUpdateBuffer[scanIndex].type)){
       return scanIndex;
     }
-    if(++scanIndex >= FEEDBACK_UPDATE_BUFFER_SIZE){
-      scanIndex = 0;
-    }
+    scanIndex = NextFeedbackIndex(scanIndex);
   }
 
   return -1;
@@ -1649,7 +1643,7 @@ int16_t FeedbackClass::FindNewestReplaceableUnsentSlot(){
     if(IsWireFeedbackType(feedbackUpdateBuffer[scanIndex].type)){
       newestReplaceable = scanIndex;
     }
-    scanIndex++;
+    scanIndex = NextFeedbackIndex(scanIndex);
   }
 
   return newestReplaceable;
@@ -1681,14 +1675,12 @@ void FeedbackClass::SetBankChangeFeedback(uint8_t type){
 void FeedbackClass::IncreaseBufferIndex(bool indexType){
   if(indexType == READ_INDEX){
     UnregisterCoalesceSlot(feedbackUpdateReadIdx);
-    if(++feedbackUpdateReadIdx >= FEEDBACK_UPDATE_BUFFER_SIZE)
-      feedbackUpdateReadIdx = 0;
+    feedbackUpdateReadIdx = NextFeedbackIndex(feedbackUpdateReadIdx);
     fbItemsToSend--;
     // SERIALPRINT("R IDX: ");
     // SERIALPRINTLN(fbItemsToSend);
   }else if(indexType == WRITE_INDEX){
-    if(++feedbackUpdateWriteIdx >= FEEDBACK_UPDATE_BUFFER_SIZE)
-      feedbackUpdateWriteIdx = 0;
+    feedbackUpdateWriteIdx = NextFeedbackIndex(feedbackUpdateWriteIdx);
     fbItemsToSend++;  
     // SERIALPRINT("W IDX: ");
     // SERIALPRINTLN(fbItemsToSend);
@@ -1696,6 +1688,12 @@ void FeedbackClass::IncreaseBufferIndex(bool indexType){
   
 // SERIALPRINTLN(fbItemsToSend);
 
+}
+
+uint8_t FeedbackClass::NextFeedbackIndex(uint8_t index){
+  static_assert(FEEDBACK_UPDATE_BUFFER_SIZE <= 256,
+                "feedback queue indices require at most 256 entries");
+  return index == (FEEDBACK_UPDATE_BUFFER_SIZE - 1) ? 0 : index + 1;
 }
 
 void FeedbackClass::WaitForMIDI(bool externalFeedback){

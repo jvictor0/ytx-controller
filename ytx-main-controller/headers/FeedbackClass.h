@@ -180,6 +180,7 @@ private:
 	bool SendAuxCommandWithRetry(uint8_t, int16_t);
 	void SetShifterFeedback();
 	void WaitForMIDI(bool);
+	uint8_t NextFeedbackIndex(uint8_t);
 	void IncreaseBufferIndex(bool);
 	void QueueFeedbackUpdate(uint8_t, uint8_t, uint16_t, uint8_t, bool, bool, bool, bool, bool);
 	bool IsCoalescableType(uint8_t);
