@@ -73,9 +73,10 @@ a resynchronization point. The main controller bounds boot and runtime retries,
 accepts tagged initialization ACKs without allowing them to complete unrelated
 commands, and escalates repeated runtime failure through bounded aux resets.
 
-Feedback servicing runs even while normal input processing is disabled. Reset
+Aux recovery servicing runs even while normal input processing is disabled;
+ordinary LED bursts remain paused while configuration is being replaced. Reset
 notifications remain pending until the feedback object is initialized and
-repeat notifications do not restart an active recovery.
+repeat notifications do not restart or suppress an active recovery.
 
 ## Aux Feedback Scheduling
 
@@ -99,12 +100,14 @@ This policy is deliberately lossy under overload but preserves the newest LED
 state, bounds memory, and is self-damping. It sends no multi-byte error response
 from the full-queue ISR path.
 
-The same behavior is valid for burst and individual frames: individual frames
-are accepted after making capacity and receive their normal ACK.
+The main controller never sends standalone feedback frames. A frame received
+outside an active burst is rejected with the existing index-zero retry response,
+so a lost `BURST_INIT` cannot degrade into individually acknowledged data.
 
-The aux emits `AUX_QUEUE_OVERFLOW` before the successful ACK. The main
-controller then schedules a coalesced full-bank repaint, repairing the element
-whose older pending frame was discarded.
+The aux emits `AUX_QUEUE_OVERFLOW` before the successful ACK. The request
+survives any checksum retry; after a successful ACK the main schedules a
+coalesced full-bank repaint, repairing the element whose older pending frame was
+discarded.
 
 ## Show/Burst Exclusion
 
@@ -120,16 +123,31 @@ and removes the main controller's silent mid-burst frame-loss path.
 
 Every payload send reports whether a frame was actually written. A show that
 begins immediately before a burst pauses the same queue entry rather than
-retiring it. `BURST_END` is followed by the expected frame count twice; the aux
-ACKs only when both count bytes agree with its received-frame count. A mismatch
-uses the existing retry response with index zero because a count alone cannot
-identify a contiguous successful prefix. The whole burst is replayed, while a
-checksum failure may still retire its verified prefix. Queue-retirement
-accounting spans all 256 main-controller entries. Retry exhaustion
-reinitializes the aux without dropping queued entries.
+retiring it. If the first frame is paused, the main abandons only that
+transmission attempt and reissues `BURST_INIT` after `SHOW_END`. `BURST_END` is
+followed by the expected frame count twice; the aux ACKs only when both count
+bytes agree with its received-frame count. A mismatch uses the existing retry
+response with index zero because a count alone cannot identify a contiguous
+successful prefix. The whole burst is replayed, while a checksum failure may
+still retire its verified prefix. Queue-retirement accounting spans all 256
+main-controller entries. Retry exhaustion reinitializes the aux without
+dropping queued entries.
 
 Control-only bank entries are expanded outside wire bursts, preserving a
 one-to-one mapping between acknowledged frame counts and retired queue entries.
+Expansion reserves the final queue slot for its next stage sentinel; a sentinel
+inserted into a full queue replaces only the newest unsent wire entry so it
+cannot overtake the payload it stages.
+
+Every live NeoPixel transmission, including startup, command, and rainbow
+shows, is bracketed by `SHOW_IN_PROGRESS` and `SHOW_END`. Long animations
+announce each physical show separately so the main's stale-show timeout remains
+valid. The aux serial transmitter saves PRIMASK across its DRE wait and DATA
+write, making main- and ISR-context responses atomic.
+
+The aux SysTick is configured for one millisecond, matching all `*_TICKS`
+constants. NeoPixel output accounts for elapsed SysTick periods before restoring
+interrupts, so aux timeouts continue to measure wall time during long strips.
 
 ## Aux Memory Boundary
 
@@ -137,8 +155,9 @@ The 512-byte stack floor remains unchanged. Before allocating NeoPixel buffers,
 the aux validates the actual encoder/digital layout against `_end.._sstack`,
 including allocator overhead and a safety margin. An unsupported layout or
 allocation failure blinks the aux status LED and emits `AUX_MEMORY_ERROR`;
-the main controller stops feedback transmission and reports a status error
-instead of silently running with dead strips.
+the main controller confirms two reports in a bounded window before stopping
+feedback transmission and reporting a status error. A partial allocation is
+fully rolled back so later command handlers cannot drive a half-created layout.
 
 ## Error Handling
 
@@ -149,6 +168,9 @@ instead of silently running with dead strips.
   recovering.
 - Burst ACKs validate the repeated protocol-level frame count.
 - Aux allocation failure is explicit on both controllers.
+- Aux USART parity, framing, and overflow errors are cleared and counted. An
+  error during a burst requests a complete retry instead of parsing a corrupted
+  command or payload byte.
 
 ## Verification
 

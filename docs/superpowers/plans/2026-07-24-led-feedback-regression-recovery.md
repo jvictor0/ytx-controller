@@ -20,6 +20,23 @@
 - Use native Codex implementers and xagent Claude Opus reviewers.
 - Final review must cover the entire resulting branch, not only the reported regression.
 
+## Whole-Firmware Re-Review Corrective Addendum
+
+The final whole-firmware re-review extends the plan with these independently
+committed corrections:
+
+1. Configure the aux SysTick at one millisecond and preserve elapsed time across
+   interrupt-masked NeoPixel output.
+2. Reject out-of-burst frames, guard/reissue `BURST_INIT`, and retain overflow
+   repaint requests through retries.
+3. Announce every live LED show and serialize aux TX register access across ISR
+   and main contexts.
+4. Service reset recovery ahead of ordinary processing/memory-error gates and
+   confirm memory errors before latching them.
+5. Preserve bank-stage sentinel order under full-queue pressure.
+6. Handle and count aux SERCOM receive errors, roll back partial pixel
+   allocation, make 256-entry wrapping explicit, and remove obsolete state.
+
 ---
 
 ### Task 1: Keep USB MIDI Responsive During LED Backlog
