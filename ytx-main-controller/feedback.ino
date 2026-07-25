@@ -651,9 +651,11 @@ void FeedbackClass::Update() {
 
   // Burst payload is done, now wait ACK asynchronously
   //
-  waitingForAck = true;
   antMicrosAck = micros();
+  noInterrupts();
+  waitingForAck = true;
   auxBurstAckExpected = true;
+  interrupts();
   Serial.write9bit(BURST_END);
   Serial.write(fbMessagesSent);
   Serial.write(fbMessagesSent);
