@@ -275,9 +275,13 @@ void MainControllerReception_Handler(void){
 						SendToMain(ACK_CMD);
 					}else{
 						failsPerSecond++;
+						// A delivery-count mismatch proves that at least one
+						// frame was lost, but it does not identify a contiguous
+						// successful prefix. Retry the complete burst so an
+						// earlier wholly-lost frame cannot be retired.
 						SendToMain(CHECKSUM_ERROR);
-						SendDataToMain(receivedFrameCount);
-						SendDataToMain(receivedFrameCount);
+						SendDataToMain(0);
+						SendDataToMain(0);
 					}
 				}
 				return;
