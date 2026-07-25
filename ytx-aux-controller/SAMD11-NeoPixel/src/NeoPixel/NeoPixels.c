@@ -10,11 +10,37 @@
 
 extern volatile uint32_t millisTicks;
 
-static void accountForMaskedShowTime(uint16_t bytes, uint32_t startValue)
+static uint32_t sampleSysTickStart(void)
+{
+	for(;;){
+		(void)SysTick->CTRL;
+		uint32_t value = SysTick->VAL;
+		if(!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk)){
+			return value;
+		}
+	}
+}
+
+static bool sampleSysTickEnd(uint32_t *value)
+{
+	bool tickWrapped = false;
+
+	for(;;){
+		tickWrapped |= (SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) != 0;
+		uint32_t sampledValue = SysTick->VAL;
+		uint32_t afterSample = SysTick->CTRL;
+		tickWrapped |= (afterSample & SysTick_CTRL_COUNTFLAG_Msk) != 0;
+		if(!(afterSample & SysTick_CTRL_COUNTFLAG_Msk)){
+			*value = sampledValue;
+			return tickWrapped;
+		}
+	}
+}
+
+static void accountForMaskedShowTime(uint16_t bytes, uint32_t startValue,
+	                                  uint32_t endValue, bool tickWrapped)
 {
 	uint32_t period = SysTick->LOAD + 1U;
-	uint32_t endValue = SysTick->VAL;
-	bool tickWrapped = (SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) != 0;
 
 	if(!tickWrapped || period == 0){
 		return;
@@ -93,8 +119,7 @@ void pixelsShow(uint8_t nStrip){
 	
 	uint32_t primask = __get_PRIMASK();
 	__disable_irq();
-	(void)SysTick->CTRL;
-	uint32_t systickStart = SysTick->VAL;
+	uint32_t systickStart = sampleSysTickStart();
 	// Data latch = 300+ microsecond pause in the output stream.  Rather than
 	// put a delay at the end of the function, the ending time is noted and
 	// the function will simply hold off (if needed) on issuing the
@@ -150,7 +175,9 @@ void pixelsShow(uint8_t nStrip){
 			bitMask = 0x80;
 		}
 	}
-	accountForMaskedShowTime(numBytes[nStrip], systickStart);
+	uint32_t systickEnd;
+	bool tickWrapped = sampleSysTickEnd(&systickEnd);
+	accountForMaskedShowTime(numBytes[nStrip], systickStart, systickEnd, tickWrapped);
 	if(!primask){
 		__enable_irq();
 	}
