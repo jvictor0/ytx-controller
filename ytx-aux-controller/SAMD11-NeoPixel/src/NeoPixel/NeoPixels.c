@@ -7,6 +7,37 @@
 
 #include <NeoPixels.h>
 
+extern volatile uint32_t millisTicks;
+
+static void accountForMaskedShowTime(uint16_t bytes, uint32_t startValue)
+{
+	uint32_t period = SysTick->LOAD + 1U;
+	uint32_t endValue = SysTick->VAL;
+	bool tickWrapped = (SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) != 0;
+
+	if(!tickWrapped || period == 0){
+		return;
+	}
+
+	// An 800 kHz strip consumes 10 us per RGB byte. The start/end counter
+	// values provide the sub-millisecond phase; the byte count disambiguates
+	// how many full SysTick periods elapsed while interrupts were masked.
+	uint32_t expectedCycles = ((uint32_t)bytes * period) / 100U;
+	int32_t wrapNumerator = (int32_t)expectedCycles -
+	                        (int32_t)startValue +
+	                        (int32_t)endValue;
+	uint32_t elapsedTicks = 1;
+	if(wrapNumerator > 0){
+		elapsedTicks = ((uint32_t)wrapNumerator + (period / 2U)) / period;
+		if(elapsedTicks == 0){
+			elapsedTicks = 1;
+		}
+	}
+
+	millisTicks += elapsedTicks;
+	SCB->ICSR = SCB_ICSR_PENDSTCLR_Msk;
+}
+
 bool pixelsBegin(uint8_t nStrip, uint16_t n, uint8_t stripPin, uint8_t t) {
 	if(nStrip >= MAX_STRIPS) return false;
 	
@@ -58,7 +89,10 @@ void pixelsShow(uint8_t nStrip){
 	if(!pixels[nStrip]) return;
 	if(!begun[nStrip]) return;
 	
+	uint32_t primask = __get_PRIMASK();
 	__disable_irq();
+	(void)SysTick->CTRL;
+	uint32_t systickStart = SysTick->VAL;
 	// Data latch = 300+ microsecond pause in the output stream.  Rather than
 	// put a delay at the end of the function, the ending time is noted and
 	// the function will simply hold off (if needed) on issuing the
@@ -114,7 +148,10 @@ void pixelsShow(uint8_t nStrip){
 			bitMask = 0x80;
 		}
 	}
-	__enable_irq();
+	accountForMaskedShowTime(numBytes[nStrip], systickStart);
+	if(!primask){
+		__enable_irq();
+	}
 	//endTime = micros(); // Save EOD time for latch on next call
 }
 
