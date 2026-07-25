@@ -86,10 +86,15 @@ void MainControllerReception_Handler(void){
 
 	if(SERCOM2->USART.INTFLAG.bit.RXC){					// if RX interrupt flag is set
 		uint16_t rcvWord = SERCOM2->USART.DATA.reg;		// get data from register
-		lastReceiveMillis = millisTicks;
 
 	  	bool isCommand = (rcvWord&0x100) ? true : false;
 	  	uint8_t rcvByte = (uint8_t)(rcvWord&0x00FF);
+		// Show grants are out-of-band arbitration, not progress on a partial
+		// receive frame. Let stale receive state age out even if grants repeat.
+		if(!isCommand ||
+		   (rcvByte != SHOW_GRANT_DIRTY && rcvByte != SHOW_GRANT_ALL)){
+			lastReceiveMillis = millisTicks;
+		}
 
 		// When discarding burst after error, ignore data bytes and burst-related commands
 		// until a fresh BURST_INIT or some other non-burst command arrives.
