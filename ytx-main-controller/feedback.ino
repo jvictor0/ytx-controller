@@ -79,6 +79,7 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   burstSendIdx = 0;
   burstInProgress = false;
   burstAwaitingAck = false;
+  burstPriorityAfterShowGrant = false;
   auxInitRecoveryInProgress = false;
   auxInitWaitingForBoot = false;
   auxInitRetryCount = 0;
@@ -349,6 +350,7 @@ void FeedbackClass::RecoverAuxControllerReset(){
   burstSendIdx = feedbackUpdateReadIdx;
   burstInProgress = false;
   burstAwaitingAck = false;
+  burstPriorityAfterShowGrant = false;
   auxInitRecoveryInProgress = false;
   auxInitWaitingForBoot = false;
   auxInitRetryCount = 0;
@@ -595,7 +597,9 @@ void FeedbackClass::Update() {
     return;
   }
 
-  if(!burstInProgress && ServiceAuxShowRequest()){
+  if(!burstInProgress &&
+     (!burstPriorityAfterShowGrant || fbItemsToSend == 0) &&
+     ServiceAuxShowRequest()){
     return;
   }
 
@@ -628,6 +632,7 @@ void FeedbackClass::Update() {
     }
 
     burstInProgress = true;
+    burstPriorityAfterShowGrant = false;
     fbMessagesSent = 0;
     burstEntriesProcessed = 0;
     burstEntriesBeforeFirstFrame = 0;
@@ -752,6 +757,10 @@ bool FeedbackClass::ServiceAuxShowRequest(){
   if(canGrant){
     auxShowRequestKind = SHOW_KIND_NONE;
     fbShowInProgress = true;
+    // A pending request may immediately recur if the aux rejects this grant.
+    // Force one queued transport attempt before granting again so neither
+    // side of the protocol can starve the other.
+    burstPriorityAfterShowGrant = true;
     antMicrosAuxShow = micros();
   }
   interrupts();

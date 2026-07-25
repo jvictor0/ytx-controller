@@ -221,6 +221,7 @@ private:
 	uint8_t burstSendIdx;
 	bool burstInProgress;
 	bool burstAwaitingAck;
+	bool burstPriorityAfterShowGrant;
 	bool auxInitRecoveryInProgress;
 	bool auxInitWaitingForBoot;
 	uint8_t auxInitRetryCount;
