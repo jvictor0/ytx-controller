@@ -577,6 +577,13 @@ void FeedbackClass::Update() {
   uint8_t framesSentNow = 0;
   while(burstItemsRemaining && fbMessagesSent < MSG_BUFFER_AUX &&
         framesSentNow < FB_MAX_FRAMES_PER_UPDATE && !auxResetPending){
+    noInterrupts();
+    bool burstFailedDuringPayload = burstErrorOccurred;
+    interrupts();
+    if(burstFailedDuringPayload){
+      break;
+    }
+
     uint8_t fbUpdateQueueIndex = burstSendIdx;
 
     if(!IsWireFeedbackType(feedbackUpdateBuffer[fbUpdateQueueIndex].type)){
@@ -618,18 +625,18 @@ void FeedbackClass::Update() {
     return;
   }
 
-  if(burstItemsRemaining && fbMessagesSent < MSG_BUFFER_AUX){
-    return;
-  }
-
   noInterrupts();
   bool burstFailedBeforeTail = burstErrorOccurred;
   interrupts();
   if(burstFailedBeforeTail){
-    // The aux has already rejected this burst. Enter the retry stage without
-    // sending a terminator or re-arming the ACK timeout.
+    // The aux has already rejected this burst. Stop transmitting immediately
+    // and enter the retry stage without re-arming the ACK timeout.
     burstInProgress = false;
     burstAwaitingAck = true;
+    return;
+  }
+
+  if(burstItemsRemaining && fbMessagesSent < MSG_BUFFER_AUX){
     return;
   }
 
