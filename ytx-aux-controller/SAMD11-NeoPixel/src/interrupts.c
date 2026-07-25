@@ -45,9 +45,6 @@ uint32_t millis(){
 	return millisTicks;
 }
 
-uint32_t failsPerSecond = 0;
-uint32_t framesPerSecond = 0;
-
 void MainControllerReception_Handler(void){
 	uint16_t receiveStatus = SERCOM2->USART.STATUS.reg &
 	                         (SERCOM_USART_STATUS_BUFOVF |
@@ -173,7 +170,6 @@ void MainControllerReception_Handler(void){
 				// FIRST BYTE OF A DATA FRAME
 				//
 				receivedBytes = 0;
-				framesPerSecond++;
 				if(!receivingBank)
 				{
 					receivingFeedbackData = true;
@@ -187,7 +183,6 @@ void MainControllerReception_Handler(void){
 					// existing whole-burst retry instead of ACKing it as an
 					// unrelated standalone frame.
 					if(!receivingBank){
-						failsPerSecond++;
 						SendToMain(CHECKSUM_ERROR);
 						SendDataToMain(0);
 						SendDataToMain(0);
@@ -198,7 +193,6 @@ void MainControllerReception_Handler(void){
 					}
 
 					if(receivedBytes != (FeedbackFrame_Size+CHECKSUM_BYTES)){
-						failsPerSecond++;
 						// Send error with frame index (twice for verification)
 						//
 						SendToMain(CHECKSUM_ERROR);
@@ -224,7 +218,6 @@ void MainControllerReception_Handler(void){
 							if(++readIdx >= FEEDBACK_BUFFER_LENGTH)
 								readIdx = 0;
 							feedbackFramesPending--;
-							failsPerSecond++;
 							burstQueueOverflowed = true;
 						}
 
@@ -258,7 +251,6 @@ void MainControllerReception_Handler(void){
 						// Valid feedback frames are always part of a burst.
 						burstFrameIndex++;
 					}else{
-						failsPerSecond++;
 						// Checksum mismatch - send error with frame index (twice for verification)
 						//
 						SendToMain(CHECKSUM_ERROR);
@@ -305,14 +297,12 @@ void MainControllerReception_Handler(void){
 					burstFrameIndex = 0;
 
 					if(countValid){
-						updateBank = true;
 						if(burstQueueOverflowed){
 							SendToMain(AUX_QUEUE_OVERFLOW);
 							burstQueueOverflowed = false;
 						}
 						SendToMain(ACK_CMD);
 					}else{
-						failsPerSecond++;
 						// A delivery-count mismatch proves that at least one
 						// frame was lost, but it does not identify a contiguous
 						// successful prefix. Retry the complete burst so an

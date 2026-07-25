@@ -37,7 +37,6 @@ extern volatile bool rcvdInitValues;
 extern volatile bool auxReady;
 extern volatile bool receivingInit;
 extern volatile bool receivingBrightness;
-extern volatile bool updateBank;
 
 extern volatile uint8_t readIdx;
 extern volatile uint8_t writeIdx;

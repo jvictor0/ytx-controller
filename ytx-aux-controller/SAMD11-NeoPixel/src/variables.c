@@ -34,7 +34,6 @@ volatile bool rcvdInitValues = false;
 volatile bool auxReady = false;
 volatile bool receivingInit = false;
 volatile bool receivingBrightness = false;
-volatile bool updateBank = false;
 
 volatile uint8_t readIdx = 0;
 volatile uint8_t writeIdx = 0;
