@@ -176,6 +176,7 @@ volatile bool fbShowInProgress = false;
 volatile bool waitingForAck = false;
 volatile bool auxAckReceived = false;
 volatile bool auxInitAckTagged = false;
+volatile bool auxCommandAckTagged = false;
 volatile bool auxBurstTransmissionActive = false;
 volatile bool auxBurstAckExpected = false;
 volatile bool auxQueueOverflowed = false;

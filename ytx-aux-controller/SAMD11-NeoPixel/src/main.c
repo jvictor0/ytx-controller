@@ -171,6 +171,7 @@ int main (void)
 		if(changeBrightnessFlag && !receivingBank && !receivingFeedbackData){
 			changeBrightnessFlag = false;
 			feedbackSetBrightness(currentBrightness);
+			SendToMain(CHANGE_BRIGHTNESS);
 			SendToMain(ACK_CMD);
 		}
 

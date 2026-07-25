@@ -79,12 +79,19 @@ void AuxControllerReception_Handler(){
     {
       auxInitAckTagged = true;
     }
+    else if(rcvByte == CHANGE_BRIGHTNESS)
+    {
+      auxCommandAckTagged = true;
+    }
     else if(rcvByte == ACK_CMD)
     {
       if(auxInitAckTagged){
         auxInitAckTagged = false;
         auxAckReceived = true;
-      }else if(!auxBurstTransmissionActive || auxBurstAckExpected){
+      }else if(auxCommandAckTagged && !auxBurstTransmissionActive){
+        auxCommandAckTagged = false;
+        waitingForAck = false;
+      }else if(auxBurstTransmissionActive && auxBurstAckExpected){
         waitingForAck = false;
       }
     }
@@ -101,6 +108,7 @@ void AuxControllerReception_Handler(){
       waitingForAck = false;
       auxAckReceived = false;
       auxInitAckTagged = false;
+      auxCommandAckTagged = false;
       auxBurstTransmissionActive = false;
       auxBurstAckExpected = false;
       auxMemoryErrorReportCount = 0;

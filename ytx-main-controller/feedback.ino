@@ -47,6 +47,7 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   waitingForAck = false;
   auxAckReceived = false;
   auxInitAckTagged = false;
+  auxCommandAckTagged = false;
   auxBurstTransmissionActive = false;
   auxBurstAckExpected = false;
   auxQueueOverflowed = false;
@@ -211,13 +212,12 @@ void FeedbackClass::SendAuxInitializationFrame(){
   Serial.write9bit(END_OF_FRAME_BYTE);
 }
 
-void FeedbackClass::PrepareAuxAckWait(bool preparingForInit){
+void FeedbackClass::PrepareAuxAckWait(){
   noInterrupts();
   waitingForAck = true;
   auxAckReceived = false;
-  if(preparingForInit){
-    auxInitAckTagged = false;
-  }
+  auxInitAckTagged = false;
+  auxCommandAckTagged = false;
   auxResetPending = false;
   interrupts();
 }
@@ -245,6 +245,7 @@ bool FeedbackClass::WaitForAuxAck(uint32_t timeoutUs, bool acceptTaggedInitAck){
   noInterrupts();
   waitingForAck = false;
   auxAckReceived = false;
+  auxCommandAckTagged = false;
   if(acceptTaggedInitAck){
     auxInitAckTagged = false;
   }
@@ -254,7 +255,7 @@ bool FeedbackClass::WaitForAuxAck(uint32_t timeoutUs, bool acceptTaggedInitAck){
 
 bool FeedbackClass::SendAuxInitializationWithRetry(uint8_t maxRetries, uint32_t ackTimeoutUs){
   for(uint8_t attempt = 0; attempt < maxRetries; attempt++){
-    PrepareAuxAckWait(true);
+    PrepareAuxAckWait();
     SendAuxInitializationFrame();
     if(WaitForAuxAck(ackTimeoutUs, true)){
       return true;
@@ -265,7 +266,7 @@ bool FeedbackClass::SendAuxInitializationWithRetry(uint8_t maxRetries, uint32_t 
 
 bool FeedbackClass::SendAuxCommandWithRetry(uint8_t command, int16_t data){
   for(uint8_t attempt = 0; attempt < AUX_COMMAND_MAX_RETRIES; attempt++){
-    PrepareAuxAckWait(false);
+    PrepareAuxAckWait();
     Serial.write9bit(command);
     if(data >= 0){
       Serial.write((uint8_t)data);
@@ -337,6 +338,7 @@ void FeedbackClass::RecoverAuxControllerReset(){
   waitingForAck = false;
   auxAckReceived = false;
   auxInitAckTagged = false;
+  auxCommandAckTagged = false;
   auxBurstTransmissionActive = false;
   auxBurstAckExpected = false;
   auxQueueOverflowed = false;
@@ -564,6 +566,7 @@ void FeedbackClass::Update() {
     errorIndexByte2 = 0;
     bool showStarted = fbShowInProgress;
     if(!showStarted){
+      auxCommandAckTagged = false;
       auxBurstTransmissionActive = true;
       auxBurstAckExpected = false;
     }
