@@ -94,9 +94,10 @@ void loop() {
     return;
   }
 
+  RecoverStaleAuxShow();
+
   // Parse USB MIDI in the main loop so feedback callbacks cannot race
   // feedbackHw.Update() from the periodic DIN transport interrupt.
-  RecoverStaleAuxShow();
   ServiceUsbMidi();
   feedbackHw.Update();
 

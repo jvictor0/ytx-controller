@@ -160,48 +160,47 @@ void MainControllerReception_Handler(void){
 						return;
 					}
 
-					// checksum to encoded frame, from 2nd byte, and length is total length without length and checksum bytes (msb and lsb)
+					// Checksum the encoded frame body.
 					uint16_t checkSumCalc = (2019 + checkSum((const uint8_t *)ReceptionBuffer, FeedbackFrame_Size))&0x00FF;
 					uint16_t checkSumRecv = ReceptionBuffer[receivedBytes-CHECKSUM_BYTES];
 
-						if(checkSumCalc==checkSumRecv){
-							uint8_t *messageBody = (uint8_t *)&ReceptionBuffer[0];
+					if(checkSumCalc==checkSumRecv){
+						uint8_t *messageBody = (uint8_t *)&ReceptionBuffer[0];
 
-							if(feedbackFramesPending >= FEEDBACK_BUFFER_LENGTH){
-								if(++readIdx >= FEEDBACK_BUFFER_LENGTH)
-									readIdx = 0;
-								feedbackFramesPending--;
-								failsPerSecond++;
-								burstQueueOverflowed = true;
-							}
-
-							FeedbackFramesBuffer[writeIdx].updateFrame	= messageBody[FeedbackFrame_Type];
-					
-							if(	FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_CHANGE_FRAME ||
-								FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_BLEND_FRAME  ||
-								FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_DOUBLE_FRAME ||
-								FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_VUMETER_FRAME ||
-								FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
-
-							FeedbackFramesBuffer[writeIdx].updateN		=	messageBody[FeedbackFrame_nRing];
-							FeedbackFramesBuffer[writeIdx].updateO		=	messageBody[FeedbackFrame_Orientation];
-							FeedbackFramesBuffer[writeIdx].updateState	=	messageBody[FeedbackFrame_RingStateH] << 8 | messageBody[FeedbackFrame_RingStateL];
-
-						}else if(	FeedbackFramesBuffer[writeIdx].updateFrame == DIGITAL1_CHANGE_FRAME ||
-									FeedbackFramesBuffer[writeIdx].updateFrame == DIGITAL2_CHANGE_FRAME){
-
-							FeedbackFramesBuffer[writeIdx].updateN		=	messageBody[FeedbackFrame_nDigital];
-							FeedbackFramesBuffer[writeIdx].updateState	=	messageBody[FeedbackFrame_DigitalState];
+						if(feedbackFramesPending >= FEEDBACK_BUFFER_LENGTH){
+							if(++readIdx >= FEEDBACK_BUFFER_LENGTH)
+								readIdx = 0;
+							feedbackFramesPending--;
+							failsPerSecond++;
+							burstQueueOverflowed = true;
 						}
-						
-						FeedbackFramesBuffer[writeIdx].updateR			=	messageBody[FeedbackFrame_R];
-						FeedbackFramesBuffer[writeIdx].updateG			=	messageBody[FeedbackFrame_G];
-						FeedbackFramesBuffer[writeIdx].updateB			=	messageBody[FeedbackFrame_B];
 
-							if(++writeIdx >= FEEDBACK_BUFFER_LENGTH)
-								writeIdx = 0;
+						FeedbackFramesBuffer[writeIdx].updateFrame = messageBody[FeedbackFrame_Type];
 
-							feedbackFramesPending++;
+						if(FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_CHANGE_FRAME ||
+						   FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_BLEND_FRAME ||
+						   FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_DOUBLE_FRAME ||
+						   FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_VUMETER_FRAME ||
+						   FeedbackFramesBuffer[writeIdx].updateFrame == ENCODER_SWITCH_CHANGE_FRAME){
+							FeedbackFramesBuffer[writeIdx].updateN = messageBody[FeedbackFrame_nRing];
+							FeedbackFramesBuffer[writeIdx].updateO = messageBody[FeedbackFrame_Orientation];
+							FeedbackFramesBuffer[writeIdx].updateState =
+								messageBody[FeedbackFrame_RingStateH] << 8 |
+								messageBody[FeedbackFrame_RingStateL];
+						}else if(FeedbackFramesBuffer[writeIdx].updateFrame == DIGITAL1_CHANGE_FRAME ||
+						         FeedbackFramesBuffer[writeIdx].updateFrame == DIGITAL2_CHANGE_FRAME){
+							FeedbackFramesBuffer[writeIdx].updateN = messageBody[FeedbackFrame_nDigital];
+							FeedbackFramesBuffer[writeIdx].updateState = messageBody[FeedbackFrame_DigitalState];
+						}
+
+						FeedbackFramesBuffer[writeIdx].updateR = messageBody[FeedbackFrame_R];
+						FeedbackFramesBuffer[writeIdx].updateG = messageBody[FeedbackFrame_G];
+						FeedbackFramesBuffer[writeIdx].updateB = messageBody[FeedbackFrame_B];
+
+						if(++writeIdx >= FEEDBACK_BUFFER_LENGTH)
+							writeIdx = 0;
+
+						feedbackFramesPending++;
 
 						if(!receivingBank)
 						{
@@ -284,9 +283,9 @@ void MainControllerReception_Handler(void){
 				return;
 			}
 
-	    	if(receivedBytes >= (sizeof(ReceptionBuffer)-1)){
-	    		receivedBytes = 0;
-	    	}
+			if(receivedBytes >= (sizeof(ReceptionBuffer)-1)){
+				receivedBytes = 0;
+			}
 			
 			ReceptionBuffer[receivedBytes] = rcvByte;	
 

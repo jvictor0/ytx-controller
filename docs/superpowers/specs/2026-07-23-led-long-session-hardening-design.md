@@ -1,5 +1,10 @@
 # LED Long-Session Hardening Design
 
+> **Superseded queue policy:** The later
+> [LED feedback regression recovery design](2026-07-24-led-feedback-regression-recovery-design.md)
+> replaces this document's full-queue checksum retry with drop-oldest,
+> keep-newest behavior plus an explicit repaint request.
+
 ## Goal
 
 Remove the main-controller feedback-queue race that can accumulate hidden LED
@@ -44,8 +49,8 @@ defines `_sstack` 512 bytes below it. This replaces the current fixed 256-byte
 stack section placed immediately after BSS.
 
 The `_sbrk` implementation treats `_sstack` as a hard heap ceiling. A request
-that would cross the reserved stack floor fails with `ENOMEM` and returns
-`(caddr_t)-1`; successful requests retain the existing behavior.
+that would cross the reserved stack floor returns `(caddr_t)-1`; successful
+requests retain the existing behavior.
 
 Only the linker and syscall changes from upstream commit `04ebe3d` are ported.
 The stale Microchip project reference to a nonexistent `fault-handlers.c` file
@@ -60,10 +65,10 @@ The aux ring keeps its existing 128-frame storage and read/write indices. A
 - full: `feedbackFramesPending == FEEDBACK_BUFFER_LENGTH`
 
 The serial receive ISR is the only producer. After validating and copying a
-frame, it advances `writeIdx` and increments the pending count. If the queue is
-already full, it must not overwrite unread data. It reports the existing burst
-frame error, resets the receive state, and enters the existing discard/retry
-path.
+frame, it advances `writeIdx` and increments the pending count. The later
+recovery design supersedes the original full-queue behavior: the aux drops the
+oldest unread frame, keeps the newest frame, reports the overload to the main
+controller, and requests a full repaint after the burst completes.
 
 The main loop is the only consumer. For each frame, it briefly disables
 interrupts, copies the queued structure into a local value, advances
@@ -77,8 +82,8 @@ indices. No protocol constants, frame layouts, or buffer capacity change.
 
 ## Error Handling
 
-- A full aux queue is treated as a recoverable burst failure rather than
-  silently overwriting an unread frame.
+- A full aux queue preserves the newest state and triggers a main-controller
+  repaint so the dropped element is repaired.
 - Existing checksum retry and fresh-`BURST_INIT` resynchronization remain the
   recovery mechanism.
 - Heap growth into the reserved stack area fails explicitly instead of
