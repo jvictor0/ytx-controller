@@ -100,8 +100,8 @@ void setup(void){
 	configure_usart();
 
 	
-	/*Configure system tick to generate periodic interrupts */
-	SysTick_Config(ONE_SEC/1000);
+	/* Configure a 1 ms system tick. All *_TICKS intervals are milliseconds. */
+	SysTick_Config(SYSTICK_COUNTS_PER_MS);
 	//uint16_t clockRate = system_gclk_gen_get_hz(GCLK_GENERATOR_0);
 	/* Enable Interrupts */
 	__enable_irq();	

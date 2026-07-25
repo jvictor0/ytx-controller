@@ -42,10 +42,7 @@ SOFTWARE.
 #define DIG1_STRIP_PIN			PIN_PA08
 #define DIG2_STRIP_PIN			PIN_PA09
 
-// 	system_gclk_gen_get_hz(GCLK_GENERATOR_0) -> 32768 KHz
-//	32768*366 = ~12 MHz
-//	48 MHz / 12MHz = 4 veces por segundo entra a la interrupcion => 250ms
-#define ONE_SEC					system_gclk_gen_get_hz(GCLK_GENERATOR_0)/1000
+#define SYSTICK_COUNTS_PER_MS	system_gclk_gen_get_hz(GCLK_GENERATOR_0)/1000
 #define ONE_SEC_TICKS			1000
 #define QUARTER_SEC_TICKS		250
 
