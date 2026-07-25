@@ -136,6 +136,7 @@ public:
 	void InitFb();
 	bool InitAuxController(bool);
 	void RecoverAuxControllerReset();
+	void RecoverStaleAuxShow();
 	bool IsBegun();
 	bool AuxRecoveryInProgress();
 	void Update();

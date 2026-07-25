@@ -2207,7 +2207,7 @@ bool EncoderInputs::CaptureEncoderDiagnostics(uint8_t encNo, uint16_t durationMs
       }
       ServiceAuxControllerReset();
       bool pauseFeedbackForMemoryRecovery = ServiceAuxMemoryError();
-      RecoverStaleAuxShow();
+      feedbackHw.RecoverStaleAuxShow();
       if(!pauseFeedbackForMemoryRecovery &&
          (enableProcessing || feedbackHw.AuxRecoveryInProgress())){
         feedbackHw.Update();

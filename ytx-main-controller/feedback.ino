@@ -310,6 +310,7 @@ bool FeedbackClass::InitAuxController(bool resetHappened){
             (uint32_t)(micros() - startedAt) < AUX_RAINBOW_TIMEOUT_US){
         // Normal loop service has not started yet, but rainbow frames use the
         // same request/grant exclusion as runtime shows.
+        RecoverStaleAuxShow();
         ServiceAuxShowRequest();
       }
       rainbowComplete = !waitingForRainbow;
@@ -773,6 +774,20 @@ bool FeedbackClass::ServiceAuxShowRequest(){
                  ? SHOW_GRANT_ALL
                  : SHOW_GRANT_DIRTY);
   return true;
+}
+
+void FeedbackClass::RecoverStaleAuxShow(){
+  uint32_t observedTimestamp = antMicrosAuxShow;
+  uint32_t now = micros();
+
+  if(fbShowInProgress &&
+     (uint32_t)(now - observedTimestamp) >= AUX_SHOW_TIMEOUT_US){
+    noInterrupts();
+    if(fbShowInProgress && antMicrosAuxShow == observedTimestamp){
+      fbShowInProgress = false;
+    }
+    interrupts();
+  }
 }
 
 bool FeedbackClass::AuxRecoveryInProgress(){

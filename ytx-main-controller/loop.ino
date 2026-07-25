@@ -39,20 +39,6 @@ static void ServiceUsbMidi()
   }
 }
 
-static void RecoverStaleAuxShow()
-{
-  uint32_t observedTimestamp = antMicrosAuxShow;
-  uint32_t now = micros();
-
-  if(fbShowInProgress && ((uint32_t)(now - observedTimestamp) >= AUX_SHOW_TIMEOUT_US)){
-    noInterrupts();
-    if(fbShowInProgress && antMicrosAuxShow == observedTimestamp){
-      fbShowInProgress = false;
-    }
-    interrupts();
-  }
-}
-
 static void ServiceAuxControllerReset()
 {
   if(!feedbackHw.IsBegun()){
@@ -152,7 +138,7 @@ void loop() {
     return;
   }
 
-  RecoverStaleAuxShow();
+  feedbackHw.RecoverStaleAuxShow();
 
   // Parse USB MIDI in the main loop so feedback callbacks cannot race
   // feedbackHw.Update() from the periodic DIN transport interrupt.
