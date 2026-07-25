@@ -1553,29 +1553,56 @@ void FeedbackClass::QueueFeedbackUpdate(uint8_t type, uint8_t indexChanged, uint
     return;
   }
 
-  // When queue is full and there is no coalescing match, drop oldest pending update.
-  //
-  if(fbItemsToSend >= FEEDBACK_UPDATE_BUFFER_SIZE){
-    // If there are in-flight frames waiting ACK, keep queue ordering stable.
-    // In this case, if we couldn't coalesce, drop the new update.
-    //
-    if((burstInProgress || burstAwaitingAck) && fbMessagesSent){
-      return;
-    }
+  uint8_t writeIndex = feedbackUpdateWriteIdx;
+  bool replacingUnsentEntry = false;
 
-    IncreaseBufferIndex(READ_INDEX);
+  // Never move the read index beneath entries already transmitted in a burst.
+  // Replace the oldest unsent wire entry in place so the newest host state is
+  // retained without disturbing the ACK retirement order.
+  if(fbItemsToSend >= FEEDBACK_UPDATE_BUFFER_SIZE){
+    if(burstInProgress || burstAwaitingAck){
+      int16_t replaceIndex = FindOldestReplaceableUnsentSlot();
+      if(replaceIndex < 0){
+        return;
+      }
+      writeIndex = (uint8_t)replaceIndex;
+      UnregisterCoalesceSlot(writeIndex);
+      replacingUnsentEntry = true;
+    }else{
+      IncreaseBufferIndex(READ_INDEX);
+      writeIndex = feedbackUpdateWriteIdx;
+    }
   }
 
-  feedbackUpdateBuffer[feedbackUpdateWriteIdx].type               = type;
-  feedbackUpdateBuffer[feedbackUpdateWriteIdx].indexChanged       = indexChanged;
-  feedbackUpdateBuffer[feedbackUpdateWriteIdx].newValue           = newValue;
-  feedbackUpdateBuffer[feedbackUpdateWriteIdx].newOrientation     = newOrientation;
-  feedbackUpdateBuffer[feedbackUpdateWriteIdx].isShifter          = isShifter;
-  feedbackUpdateBuffer[feedbackUpdateWriteIdx].updatingBank       = bankUpdate;
-  feedbackUpdateBuffer[feedbackUpdateWriteIdx].rotaryValueToColor = rotaryValueToColor;
-  feedbackUpdateBuffer[feedbackUpdateWriteIdx].valueToIntensity   = valueToIntensity;
-  RegisterCoalesceSlot(feedbackUpdateWriteIdx);
-  IncreaseBufferIndex(WRITE_INDEX);
+  feedbackUpdateBuffer[writeIndex].type               = type;
+  feedbackUpdateBuffer[writeIndex].indexChanged       = indexChanged;
+  feedbackUpdateBuffer[writeIndex].newValue           = newValue;
+  feedbackUpdateBuffer[writeIndex].newOrientation     = newOrientation;
+  feedbackUpdateBuffer[writeIndex].isShifter          = isShifter;
+  feedbackUpdateBuffer[writeIndex].updatingBank       = bankUpdate;
+  feedbackUpdateBuffer[writeIndex].rotaryValueToColor = rotaryValueToColor;
+  feedbackUpdateBuffer[writeIndex].valueToIntensity   = valueToIntensity;
+  RegisterCoalesceSlot(writeIndex);
+
+  if(!replacingUnsentEntry){
+    IncreaseBufferIndex(WRITE_INDEX);
+  }
+}
+
+int16_t FeedbackClass::FindOldestReplaceableUnsentSlot(){
+  uint16_t entriesToScan = fbItemsToSend - burstEntriesProcessed;
+  uint8_t scanIndex = burstSendIdx;
+
+  while(entriesToScan--){
+    if(IsWireFeedbackType(feedbackUpdateBuffer[scanIndex].type)){
+      return scanIndex;
+    }
+    if(++scanIndex >= FEEDBACK_UPDATE_BUFFER_SIZE){
+      scanIndex = 0;
+    }
+  }
+
+  return -1;
 }
 
 void FeedbackClass::SetChangeEncoderFeedback(uint8_t type, uint8_t encIndex, uint16_t val, uint8_t encoderOrientation, 
