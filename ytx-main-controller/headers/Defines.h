@@ -379,7 +379,6 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define NUM_STATUS_LED            0
 
 #define MAX_WAIT_MORE_DATA_MS     5
-#define AUX_REPAINT_QUIET_MS      50
 #define EXTERNAL_FEEDBACK         true
 
 // ELEMENT FEEDBACK
