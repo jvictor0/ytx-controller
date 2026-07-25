@@ -431,7 +431,7 @@ void FeedbackClass::Update() {
     }
 
     uint8_t framesSucceeded = 0;
-    uint8_t entriesSucceeded = 0;
+    uint16_t entriesSucceeded = 0;
     bool shouldRetry = false;
 
     if(burstFailed){
@@ -465,7 +465,7 @@ void FeedbackClass::Update() {
       entriesSucceeded = fbItemsToSend;
     }
 
-    for(uint8_t i = 0; i < entriesSucceeded; i++){
+    for(uint16_t i = 0; i < entriesSucceeded; i++){
       IncreaseBufferIndex(READ_INDEX);
     }
 

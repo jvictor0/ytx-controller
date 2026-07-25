@@ -204,9 +204,9 @@ private:
 	
 	volatile bool feedbackDataToSend;
 	uint8_t fbMessagesSent;
-	uint8_t burstEntriesProcessed;
-	uint8_t burstEntriesBeforeFirstFrame;
-	uint8_t burstFrameEntryCounts[MSG_BUFFER_AUX];
+	uint16_t burstEntriesProcessed;
+	uint16_t burstEntriesBeforeFirstFrame;
+	uint16_t burstFrameEntryCounts[MSG_BUFFER_AUX];
 	uint8_t burstRetryCount;
 	uint16_t burstItemsRemaining;
 	uint8_t burstSendIdx;
