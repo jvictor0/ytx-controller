@@ -476,7 +476,8 @@ void FeedbackClass::Update() {
      fbItemsToSend == 0){
     recoveryBaselineActive = false;
   }
-  if(!recoveryBaselineActive && recoveryDeferredCount){
+  if(!recoveryBaselineActive && !updatingBankFeedback &&
+     recoveryDeferredCount){
     ServiceRecoveryDeferredFeedback();
   }
 
