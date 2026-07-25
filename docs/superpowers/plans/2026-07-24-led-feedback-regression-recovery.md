@@ -37,6 +37,23 @@ committed corrections:
 6. Handle and count aux SERCOM receive errors, roll back partial pixel
    allocation, make 256-entry wrapping explicit, and remove obsolete state.
 
+## Confirmation Review Corrective Addendum
+
+The final confirmation review adds these independently committed corrections:
+
+1. Preserve the idle `SHOW_END` heartbeat when a show-rate interval is latched
+   but no changed pixels are waiting.
+2. Stop a rejected burst between payload frames and enter retry immediately.
+3. Complete both main-side and ISR-side feedback state reset before every
+   `Init()` exit.
+4. Require the explicit one-millisecond aux tick unit and retain the original
+   masked-show arithmetic headroom.
+5. Arm burst ACK state atomically before transmitting the terminator.
+6. Defer command-driven physical shows until aux reception is atomically
+   verified idle, retaining the command across deferral.
+7. Record the 200-millisecond stale-pixel tradeoff and the exact limits of the
+   tick-unit compile-time and linked-image checks.
+
 ---
 
 ### Task 1: Keep USB MIDI Responsive During LED Backlog

@@ -53,6 +53,10 @@ This is longer than two aux `SHOW_END` refresh periods and comfortably longer
 than the maximum expected NeoPixel transmission. The main loop will clear a
 stale `fbShowInProgress` before servicing MIDI or feedback.
 
+The aux continues emitting the 100-millisecond `SHOW_END` heartbeat whenever
+receive state is idle and no physical show is actually pending. A latched
+rate-limit interval with no changed pixels does not suppress the heartbeat.
+
 `antMicrosAuxShow` will be volatile because it is written by the aux receive
 callback and read by the main loop. Receiving `RESET_HAPPENED` will also clear
 show and acknowledgement state so an aux reset cannot preserve stale protocol
@@ -64,7 +68,10 @@ clear the flag immediately.
 The aux also times out incomplete receive state after 200 milliseconds without
 a byte. This clears truncated init, frame, burst-end-count, and discard state so
 the strict show exclusion cannot become permanent while leaving ample margin
-for a multi-pass burst interrupted by an announced full-surface show.
+for a multi-pass burst interrupted by an announced full-surface show. The
+intentional cost is that, if the main goes silent in the middle of a truncated
+burst, already-received pixel changes can remain unrendered for up to 200
+milliseconds before the aux abandons that receive state.
 
 ## Aux Reset and Initialization
 
@@ -78,6 +85,10 @@ Aux recovery servicing runs even while normal input processing is disabled;
 ordinary LED bursts remain paused while configuration is being replaced. Reset
 notifications remain pending until the feedback object is initialized and
 repeat notifications do not restart or suppress an active recovery.
+
+`FeedbackClass::Init()` is currently boot-only, so its full protocol reset is
+defensive hardening rather than a runtime recovery path. Its main-side and
+ISR-side state resets both complete before the zero-bank early exit.
 
 ## Aux Feedback Scheduling
 
@@ -134,6 +145,11 @@ still retire its verified prefix. Queue-retirement accounting spans all 256
 main-controller entries. Retry exhaustion reinitializes the aux without
 dropping queued entries.
 
+If the aux rejects a burst, the main samples that error between payload frames,
+stops transmitting the rejected payload, and enters whole-burst retry without
+an ACK delay. The ACK-wait and burst-ACK-eligibility flags are armed together
+in one critical section before the terminator is written.
+
 Control-only bank entries are expanded outside wire bursts, preserving a
 one-to-one mapping between acknowledged frame counts and retired queue entries.
 Expansion reserves the final queue slot for its next stage sentinel; a sentinel
@@ -143,18 +159,25 @@ cannot overtake the payload it stages.
 Every live NeoPixel transmission, including startup, command, and rainbow
 shows, is bracketed by `SHOW_IN_PROGRESS` and `SHOW_END`. Long animations
 announce each physical show separately so the main's stale-show timeout remains
-valid. The aux serial transmitter saves PRIMASK across its DRE wait and DATA
-write, making main- and ISR-context responses atomic. At 2 Mbaud this masks
-interrupts for at most about one character time (approximately 5.5 microseconds);
-that bounded latency is an accepted trade for preventing interleaved words.
+valid. Command-driven physical shows atomically verify that receive state and
+hardware receive/error flags are idle; command flags remain pending and
+multi-frame commands retry if a burst begins between their physical shows.
+The aux serial transmitter saves PRIMASK across its DRE wait and DATA write,
+making main- and ISR-context responses atomic. At 2 Mbaud this masks interrupts
+for at most about one character time (approximately 5.5 microseconds); that
+bounded latency is an accepted trade for preventing interleaved words.
 
 The aux SysTick setup, all millisecond intervals, and the masked-show conversion
-derive from one explicit tick-unit macro, with compile-time checks on the unit.
-NeoPixel output accounts for elapsed SysTick periods before restoring
-interrupts. The conversion deliberately uses the nominal 10-microsecond
-WS2812 RGB-byte time as a conservative estimate: it can advance the software
-clock slightly early, but does not undercount time spent with interrupts masked.
-It is an estimate rather than a runtime-calibrated measurement.
+derive from one explicit tick-unit macro. A compile-time assertion fixes that
+unit at one tick per millisecond; linked-image inspection remains the check that
+the runtime clock query is divided by the derived 1000-tick rate at the
+`SysTick_Config()` call. NeoPixel output accounts for elapsed SysTick periods
+before restoring interrupts. The conversion uses the nominal 10-microsecond
+WS2812 RGB-byte time and preserves multiplication headroom by reducing the
+unit ratio before multiplying. It is an estimate rather than a
+runtime-calibrated measurement, so a small residual timing error in either
+direction remains possible; the 200/250-millisecond recovery margins do not
+depend on exact calibration.
 
 ## Aux Memory Boundary
 
