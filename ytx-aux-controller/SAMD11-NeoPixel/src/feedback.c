@@ -116,7 +116,9 @@ bool feedbackDataAvailable(){
 
 void feedbackDataUpdate()
 {
-	while(feedbackFramesPending > 0){
+	uint8_t framesProcessed = 0;
+
+	while(feedbackFramesPending > 0 && framesProcessed < FEEDBACK_FRAMES_PER_UPDATE){
 		FeedbackFrameData frameData;
 
 		__disable_irq();
@@ -412,5 +414,6 @@ void feedbackDataUpdate()
 			}else if (frameData.updateFrame == DIGITAL2_CHANGE_FRAME){
 				whichStripToShow |= (1<<DIGITAL2_STRIP);
 			}
+			framesProcessed++;
 		}
 	}

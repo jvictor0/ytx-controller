@@ -108,5 +108,6 @@ enum FeedbackFrame{
 #define CHECKSUM_BYTES	1
 
 #define FEEDBACK_BUFFER_LENGTH	128
+#define FEEDBACK_FRAMES_PER_UPDATE	8
 
 #endif /* DEFINES_H_ */
