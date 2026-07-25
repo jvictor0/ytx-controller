@@ -36,6 +36,8 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   nEncoders = maxEncoders;
   nDigitals = maxDigital;
   nIndependent = maxIndependent;
+  begun = false;
+  feedbackDataToSend = false;
   updatingBankFeedback = false;
   antMicrosAck = 0;
 
@@ -61,8 +63,6 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   errorIndexByte2 = 0;
   interrupts();
 
-  if(!nBanks) return;    // If number of encoders is zero, return;
-  
   feedbackUpdateWriteIdx = 0;
   feedbackUpdateReadIdx = 0;
   fbItemsToSend = 0;
@@ -101,6 +101,9 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   statusLEDfbType = 0;
   lastStatusLEDState = LOW;
   millisStatusPrev = 0;
+  ClearCoalesceIndex();
+
+  if(!nBanks) return;    // If the number of banks is zero, initialization is complete.
     
   // First dimension is an array of pointers, each pointing to a column - https://www.eskimo.com/~scs/cclass/int/sx9b.html
 
