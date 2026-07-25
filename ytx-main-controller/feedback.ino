@@ -371,7 +371,9 @@ void FeedbackClass::Update() {
       if(auxInitRetryCount >= AUX_INIT_MAX_RETRIES){
         if(auxInitResetCount >= AUX_INIT_MAX_RESET_ATTEMPTS){
           auxInitRecoveryInProgress = false;
+          noInterrupts();
           waitingForAck = false;
+          interrupts();
           SetStatusLED(STATUS_BLINK, 3, STATUS_FB_ERROR);
           return;
         }
@@ -468,15 +470,20 @@ void FeedbackClass::Update() {
     fbMessagesSent = 0;
     burstEntriesProcessed = 0;
     burstEntriesBeforeFirstFrame = 0;
+    burstInProgress = false;
+    burstAwaitingAck = false;
+
+    noInterrupts();
     waitingForAck = false;
     auxBurstTransmissionActive = false;
     auxBurstAckExpected = false;
-    burstInProgress = false;
-    burstAwaitingAck = false;
     receivingErrorIndex = false;
     errorIndexBytesReceived = 0;
     errorIndexByte1 = 0;
     errorIndexByte2 = 0;
+    burstErrorOccurred = false;
+    burstErrorIndex = 0;
+    interrupts();
 
     if(shouldRetry){
       burstRetryCount++;
@@ -495,7 +502,6 @@ void FeedbackClass::Update() {
       }
     }
 
-    burstErrorOccurred = false;
     return;
   }
 
@@ -514,12 +520,6 @@ void FeedbackClass::Update() {
     }
 
     burstInProgress = true;
-    burstErrorOccurred = false;
-    burstErrorIndex = 0;
-    receivingErrorIndex = false;
-    errorIndexBytesReceived = 0;
-    errorIndexByte1 = 0;
-    errorIndexByte2 = 0;
     fbMessagesSent = 0;
     burstEntriesProcessed = 0;
     burstEntriesBeforeFirstFrame = 0;
@@ -527,6 +527,12 @@ void FeedbackClass::Update() {
     burstItemsRemaining = fbItemsToSend;
 
     noInterrupts();
+    burstErrorOccurred = false;
+    burstErrorIndex = 0;
+    receivingErrorIndex = false;
+    errorIndexBytesReceived = 0;
+    errorIndexByte1 = 0;
+    errorIndexByte2 = 0;
     bool showStarted = fbShowInProgress;
     if(!showStarted){
       auxBurstTransmissionActive = true;
@@ -561,7 +567,9 @@ void FeedbackClass::Update() {
       // BURST_INIT after SHOW_END; no queue entry has been consumed.
       if(fbMessagesSent == 0){
         burstInProgress = false;
+        noInterrupts();
         auxBurstTransmissionActive = false;
+        interrupts();
         RebuildCoalesceIndex();
       }
       break;
