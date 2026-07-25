@@ -962,8 +962,8 @@ int8_t FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){
         // Set shifters feedback
         //
         SetShifterFeedback();
+        updatingBankFeedback = false;
       }
-      updatingBankFeedback = false;
     }
     break;
     case FB_BANK_DIGITAL2:
