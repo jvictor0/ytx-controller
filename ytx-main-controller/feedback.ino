@@ -589,6 +589,17 @@ void FeedbackClass::Update() {
     return;
   }
 
+  noInterrupts();
+  bool burstFailedBeforeTail = burstErrorOccurred;
+  interrupts();
+  if(burstFailedBeforeTail){
+    // The aux has already rejected this burst. Enter the retry stage without
+    // sending a terminator or re-arming the ACK timeout.
+    burstInProgress = false;
+    burstAwaitingAck = true;
+    return;
+  }
+
   // A show can begin after the last payload frame. Keep the burst open until
   // SHOW_END so the aux can receive the terminator and both count bytes.
   if(fbShowInProgress){
