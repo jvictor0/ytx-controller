@@ -61,9 +61,10 @@ state.
 This timeout is recovery, not normal flow: a valid `SHOW_END` continues to
 clear the flag immediately.
 
-The aux also times out incomplete receive state after 20 milliseconds without
+The aux also times out incomplete receive state after 200 milliseconds without
 a byte. This clears truncated init, frame, burst-end-count, and discard state so
-the strict show exclusion cannot become permanent.
+the strict show exclusion cannot become permanent while leaving ample margin
+for a multi-pass burst interrupted by an announced full-surface show.
 
 ## Aux Reset and Initialization
 
@@ -143,11 +144,17 @@ Every live NeoPixel transmission, including startup, command, and rainbow
 shows, is bracketed by `SHOW_IN_PROGRESS` and `SHOW_END`. Long animations
 announce each physical show separately so the main's stale-show timeout remains
 valid. The aux serial transmitter saves PRIMASK across its DRE wait and DATA
-write, making main- and ISR-context responses atomic.
+write, making main- and ISR-context responses atomic. At 2 Mbaud this masks
+interrupts for at most about one character time (approximately 5.5 microseconds);
+that bounded latency is an accepted trade for preventing interleaved words.
 
-The aux SysTick is configured for one millisecond, matching all `*_TICKS`
-constants. NeoPixel output accounts for elapsed SysTick periods before restoring
-interrupts, so aux timeouts continue to measure wall time during long strips.
+The aux SysTick setup, all millisecond intervals, and the masked-show conversion
+derive from one explicit tick-unit macro, with compile-time checks on the unit.
+NeoPixel output accounts for elapsed SysTick periods before restoring
+interrupts. The conversion deliberately uses the nominal 10-microsecond
+WS2812 RGB-byte time as a conservative estimate: it can advance the software
+clock slightly early, but does not undercount time spent with interrupts masked.
+It is an estimate rather than a runtime-calibrated measurement.
 
 ## Aux Memory Boundary
 
@@ -163,6 +170,9 @@ fully rolled back so later command handlers cannot drive a half-created layout.
 
 - Checksum and malformed-frame failures retain the existing retry protocol.
 - Queue capacity is no longer reported as a checksum failure.
+- Existing receive-error counters remain available to a debugger. Exposing
+  optional long-session observability to the host can be designed separately;
+  this recovery change intentionally adds no diagnostic wire protocol.
 - Stale show state recovers locally without resetting either controller.
 - USB MIDI parsing continues even if the LED queue is saturated or the aux is
   recovering.
