@@ -59,14 +59,18 @@ static void RecoverStaleReceiveState(void)
 	uint32_t now = millis();
 
 	if((receivingFeedbackData || receivingBank || receivingInit ||
+	    receivingBrightness ||
 	    receivingBurstEndCount || discardingBurst) &&
 	   (uint32_t)(now - lastReceiveMillis) >= RECEIVE_STATE_TIMEOUT_TICKS){
 		receivedBytes = 0;
 		receivingFeedbackData = false;
 		receivingBank = false;
 		receivingInit = false;
+		receivingBrightness = false;
 		receivingBurstEndCount = false;
 		burstEndCountBytes = 0;
+		burstEndCountFirst = 0;
+		burstFrameIndex = 0;
 		discardingBurst = false;
 	}
 
