@@ -77,11 +77,18 @@ static void ServiceAuxControllerReset()
 
 void loop() { 
   antMicrosLoop = micros();
+  static bool auxMemoryErrorReported = false;
 
   ServiceAuxControllerReset();
 
   // Update status LED
   UpdateStatusLED();
+  if(auxMemoryError && !auxMemoryErrorReported){
+    SetStatusLED(STATUS_BLINK, 3, STATUS_FB_ERROR);
+    auxMemoryErrorReported = true;
+  }else if(!auxMemoryError){
+    auxMemoryErrorReported = false;
+  }
 
   if(RunPendingEncoderDiagnostics()){
     return;

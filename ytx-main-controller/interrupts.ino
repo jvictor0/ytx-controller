@@ -113,6 +113,10 @@ void AuxControllerReception_Handler(){
     {
       auxQueueOverflowed = true;
     }
+    else if(rcvByte == AUX_MEMORY_ERROR)
+    {
+      auxMemoryError = true;
+    }
     else if(rcvByte == END_OF_RAINBOW)
     {
       waitingForRainbow = false;

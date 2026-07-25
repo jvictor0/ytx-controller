@@ -249,6 +249,9 @@ bool FeedbackClass::InitAuxController(bool resetHappened){
   if(!SendAuxInitializationWithRetry(AUX_BOOT_INIT_MAX_RETRIES, AUX_BOOT_INIT_ACK_TIMEOUT_US)){
     return false;
   }
+  if(auxMemoryError){
+    return true;
+  }
 
   if(makeRainbowAnimation){
     if(!SendAuxCommandWithRetry(CHANGE_BRIGHTNESS, currentBrightness)){
@@ -300,6 +303,7 @@ void FeedbackClass::RecoverAuxControllerReset(){
   auxBurstTransmissionActive = false;
   auxBurstAckExpected = false;
   auxQueueOverflowed = false;
+  auxMemoryError = false;
   burstErrorOccurred = false;
   burstErrorIndex = 0;
   receivingErrorIndex = false;
@@ -318,6 +322,7 @@ void FeedbackClass::RecoverAuxControllerReset(){
 void FeedbackClass::Update() {
 
   if(!begun || auxResetPending) return;    // If didn't go through INIT or aux reset, return;
+  if(auxMemoryError) return;
 
   if(auxInitRecoveryInProgress){
     uint32_t now = micros();

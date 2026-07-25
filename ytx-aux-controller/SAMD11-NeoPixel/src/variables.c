@@ -52,6 +52,7 @@ volatile bool receivingBurstEndCount = false;
 volatile uint8_t burstEndCountBytes = 0;
 volatile uint8_t burstEndCountFirst = 0;
 volatile bool burstQueueOverflowed = false;
+volatile bool feedbackAllocationFailed = false;
 volatile bool showNow = false;
 volatile bool timeToShow = false;
 volatile bool sendShowEnd = false;

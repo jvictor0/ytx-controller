@@ -31,8 +31,8 @@ bool
 int8_t
 	pin[MAX_STRIPS];           // Output pin number (-1 if not yet set)
 
+ bool pixelsBegin(uint8_t nStrip, uint16_t n, uint8_t stripPin, uint8_t t);
  void
-	pixelsBegin(uint8_t nStrip, uint16_t n, uint8_t stripPin, uint8_t t),
 	pixelsShow(uint8_t nStrip),
 	showAll(void),
 	setPin(uint8_t nStrip, uint8_t p),

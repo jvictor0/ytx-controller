@@ -7,8 +7,8 @@
 
 #include <NeoPixels.h>
 
-void pixelsBegin(uint8_t nStrip, uint16_t n, uint8_t stripPin, uint8_t t) {
-	if(nStrip >= MAX_STRIPS) return;
+bool pixelsBegin(uint8_t nStrip, uint16_t n, uint8_t stripPin, uint8_t t) {
+	if(nStrip >= MAX_STRIPS) return false;
 	
 	pin[nStrip] = stripPin;
 
@@ -28,6 +28,7 @@ void pixelsBegin(uint8_t nStrip, uint16_t n, uint8_t stripPin, uint8_t t) {
 		numLEDs[nStrip] = n;
 	} else {
 		numLEDs[nStrip] = numBytes[nStrip] = 0;
+		return false;
 	}
 
 	rOffset[nStrip] = (t >> 4) & 0b11; // regarding R/G/B/W offsets
@@ -36,6 +37,7 @@ void pixelsBegin(uint8_t nStrip, uint16_t n, uint8_t stripPin, uint8_t t) {
 
 	begun[nStrip] = true;
 	nStrips++;
+	return true;
 }
 
 void pixelsShow(uint8_t nStrip){
@@ -431,5 +433,4 @@ void delay(int delay_time){
 		//delay(SpeedDelay);
 	//}
 //}
-
 

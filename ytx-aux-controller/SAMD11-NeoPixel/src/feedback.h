@@ -29,7 +29,7 @@ SOFTWARE.
 #ifndef FEEDBACK_H_
 #define FEEDBACK_H_
 
-void feedbackBegin();
+bool feedbackBegin();
 void feedbackRainbow();
 void feedbackShow();
 bool feedbackDataAvailable();

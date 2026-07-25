@@ -180,6 +180,7 @@ volatile bool auxInitAckTagged = false;
 volatile bool auxBurstTransmissionActive = false;
 volatile bool auxBurstAckExpected = false;
 volatile bool auxQueueOverflowed = false;
+volatile bool auxMemoryError = false;
 volatile bool waitingForRainbow = true;    // At startup, wait for rainbow animation to finish
 volatile bool auxResetPending = false;
 uint32_t antMicrosAck = 0;

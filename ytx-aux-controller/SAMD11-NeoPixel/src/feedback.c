@@ -37,6 +37,8 @@ SOFTWARE.
 #include "main-controller-comms.h"
 
 extern uint32_t millis(void);
+extern char _end;
+extern char _sstack;
 
 uint8_t numStripsOn = 0;
 uint8_t numEncoders = 0;
@@ -47,7 +49,28 @@ uint8_t whichStripToShow = 0;
 
 uint16_t indexChanged = 0;
 
-void feedbackBegin(){
+static uint16_t PixelAllocationBytes(uint8_t encoders, uint8_t digitals1, uint8_t digitals2)
+{
+	uint16_t bytes = 0;
+	uint8_t allocations = 0;
+
+	if(encoders){
+		bytes += (uint16_t)NUM_LEDS_ENCODER * encoders * 3U;
+		allocations += (encoders > N_ENCODERS_STRIP_1) ? 2 : 1;
+	}
+	if(digitals1){
+		bytes += (uint16_t)digitals1 * 3U;
+		allocations++;
+	}
+	if(digitals2){
+		bytes += (uint16_t)digitals2 * 3U;
+		allocations++;
+	}
+
+	return bytes + ((uint16_t)allocations * MALLOC_CHUNK_OVERHEAD_BYTES);
+}
+
+bool feedbackBegin(){
 	uint32_t lastResetAnnouncement = millis() - RESET_ANNOUNCE_TICKS;
 
 	while(!rcvdInitValues){
@@ -62,23 +85,39 @@ void feedbackBegin(){
 	numDigitals1 = ReceptionBuffer[nDigitals1];
 	numDigitals2 = ReceptionBuffer[nDigitals2];
 
-		if(numEncoders){
+	uint16_t heapBytes = (uint16_t)(&_sstack - &_end);
+	uint16_t allocationBytes = PixelAllocationBytes(numEncoders, numDigitals1, numDigitals2);
+	if(numEncoders > MAX_SUPPORTED_ENCODERS ||
+	   allocationBytes + PIXEL_HEAP_SAFETY_BYTES > heapBytes){
+		return false;
+	}
+
+	if(numEncoders){
 		if(numEncoders>16){
-			pixelsBegin(ENCODER1_STRIP, NUM_LEDS_ENCODER*16, ENC1_STRIP_PIN, NEO_GRB + NEO_KHZ800);
-			pixelsBegin(ENCODER2_STRIP, NUM_LEDS_ENCODER*(numEncoders-16), ENC2_STRIP_PIN, NEO_GRB + NEO_KHZ800);
+			if(!pixelsBegin(ENCODER1_STRIP, NUM_LEDS_ENCODER*16, ENC1_STRIP_PIN, NEO_GRB + NEO_KHZ800) ||
+			   !pixelsBegin(ENCODER2_STRIP, NUM_LEDS_ENCODER*(numEncoders-16), ENC2_STRIP_PIN, NEO_GRB + NEO_KHZ800)){
+				return false;
+			}
 		}else{
-			pixelsBegin(ENCODER1_STRIP, NUM_LEDS_ENCODER*numEncoders, ENC1_STRIP_PIN, NEO_GRB + NEO_KHZ800);
+			if(!pixelsBegin(ENCODER1_STRIP, NUM_LEDS_ENCODER*numEncoders, ENC1_STRIP_PIN, NEO_GRB + NEO_KHZ800)){
+				return false;
+			}
 		}
 	}
 	if(numDigitals1){
-		pixelsBegin(DIGITAL1_STRIP, numDigitals1, DIG1_STRIP_PIN, NEO_GRB + NEO_KHZ800);
+		if(!pixelsBegin(DIGITAL1_STRIP, numDigitals1, DIG1_STRIP_PIN, NEO_GRB + NEO_KHZ800)){
+			return false;
+		}
 	}
 	if(numDigitals2){
-		pixelsBegin(DIGITAL2_STRIP, numDigitals2, DIG2_STRIP_PIN, NEO_GRB + NEO_KHZ800);
+		if(!pixelsBegin(DIGITAL2_STRIP, numDigitals2, DIG2_STRIP_PIN, NEO_GRB + NEO_KHZ800)){
+			return false;
+		}
 	}
 	
 	setAll(NP_OFF,NP_OFF,NP_OFF);
 	showAll();
+	return true;
 }
 
 void feedbackShow(){

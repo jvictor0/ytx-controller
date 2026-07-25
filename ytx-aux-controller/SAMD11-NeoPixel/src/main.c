@@ -50,6 +50,7 @@ extern uint32_t millis();
 
 uint32_t antMillisShowBegin;
 uint32_t antMillisShowEnd;
+uint32_t antMillisAllocationError;
 
 static void RecoverStaleReceiveState(void)
 {
@@ -87,20 +88,24 @@ int main (void)
 	
 	port_pin_set_output_level(LED_YTX_PIN, LED_0_ACTIVE);
 
-	feedbackBegin();	
+	feedbackAllocationFailed = !feedbackBegin();
 	auxReady = true;
 
 	port_pin_set_output_level(LED_YTX_PIN, LED_0_INACTIVE);
 
+	if(feedbackAllocationFailed){
+		SendToMain(AUX_MEMORY_ERROR);
+	}
 	SendToMain(ACK_CMD);
 
 	antMillisShowBegin = millis();
 	antMillisShowEnd = millis();
+	antMillisAllocationError = millis();
 
 	while (1) {		
 		RecoverStaleReceiveState();
 
-		if(feedbackDataAvailable()){
+		if(!feedbackAllocationFailed && feedbackDataAvailable()){
 			feedbackDataUpdate();
 			showNow = true;
 		}
@@ -165,6 +170,13 @@ int main (void)
 
 			if(!receivingFeedbackData && !receivingBank && !timeToShow)
 				sendShowEnd = true;
+		}
+
+		if(feedbackAllocationFailed &&
+		   millis()-antMillisAllocationError > SHOW_END_REFRESH_TICKS){
+			antMillisAllocationError = millis();
+			port_pin_toggle_output_level(LED_YTX_PIN);
+			SendToMain(AUX_MEMORY_ERROR);
 		}
 	}
 }
