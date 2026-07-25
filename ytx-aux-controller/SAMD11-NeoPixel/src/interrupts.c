@@ -299,15 +299,15 @@ void MainControllerReception_Handler(void){
 									system_reset();
 								}
 								// Tag the following ACK so a late init ACK cannot
-							// complete an unrelated burst on the main controller.
-							SendToMain(INIT_VALUES);
-							SendToMain(ACK_CMD);
+								// complete an unrelated burst on the main controller.
+								SendToMain(INIT_VALUES);
+								SendToMain(ACK_CMD);
+							}
 						}
 					}
 				}
-			}
-		//not a command byte -> write to reception buffer
-	    }else{
+			//not a command byte -> write to reception buffer
+			}else{
 			if(receivingBurstEndCount){
 				if(burstEndCountBytes == 0){
 					burstEndCountFirst = rcvByte;
