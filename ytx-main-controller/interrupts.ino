@@ -94,6 +94,7 @@ void AuxControllerReception_Handler(){
       errorIndexBytesReceived = 0;
       errorIndexByte1 = 0;
       errorIndexByte2 = 0;
+      auxResetPending = true;
     }
     else if(rcvByte == END_OF_RAINBOW)
     {

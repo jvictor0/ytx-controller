@@ -135,6 +135,7 @@ public:
 	void Init(uint8_t, uint8_t, uint16_t, uint16_t);
 	void InitFb();
 	void InitAuxController(bool);
+	void RecoverAuxControllerReset();
 	void Update();
 	void SetChangeEncoderFeedback(uint8_t, uint8_t, uint16_t, uint8_t, bool, bool, bool colorSwitchMsg = false, bool valToIntensity = false, bool externalFeedback = false);
 	void SetChangeDigitalFeedback(uint16_t, uint16_t, bool, bool, bool, bool externalFeedback = false, bool valToIntensity = false);

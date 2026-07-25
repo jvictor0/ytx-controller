@@ -196,9 +196,37 @@ void FeedbackClass::InitAuxController(bool resetHappened){
   }
 }
 
+void FeedbackClass::RecoverAuxControllerReset(){
+  if(!begun) return;
+
+  fbMessagesSent = 0;
+  burstRetryCount = 0;
+  burstItemsRemaining = 0;
+  burstSendIdx = feedbackUpdateReadIdx;
+  burstInProgress = false;
+  burstAwaitingAck = false;
+  sendingFbData = false;
+  feedbackDataToSend = false;
+
+  noInterrupts();
+  fbShowInProgress = false;
+  waitingForAck = false;
+  burstErrorOccurred = false;
+  burstErrorIndex = 0;
+  receivingErrorIndex = false;
+  errorIndexBytesReceived = 0;
+  errorIndexByte1 = 0;
+  errorIndexByte2 = 0;
+  interrupts();
+
+  RebuildCoalesceIndex();
+  InitAuxController(true);
+  SetBankChangeFeedback(FB_BANK_CHANGED);
+}
+
 void FeedbackClass::Update() {
 
-  if(!begun) return;    // If didn't go through INIT, return;
+  if(!begun || auxResetPending) return;    // If didn't go through INIT or aux reset, return;
 
   if((waitingMoreData && (millis()-antMillisWaitMoreData > MAX_WAIT_MORE_DATA_MS)) || (fbItemsToSend >= MSG_BUFFER_AUX)){
     waitingMoreData = false;
@@ -207,8 +235,18 @@ void FeedbackClass::Update() {
   // Non-blocking ACK stage
   //
   if(burstAwaitingAck){
-    bool ackTimedOut = waitingForAck && ((micros() - antMicrosAck) >= 5000);
-    if(waitingForAck && !ackTimedOut){
+    uint32_t now = micros();
+    noInterrupts();
+    bool resetPending = auxResetPending;
+    bool ackPending = waitingForAck;
+    interrupts();
+
+    if(resetPending){
+      return;
+    }
+
+    bool ackTimedOut = ackPending && ((uint32_t)(now - antMicrosAck) >= 5000);
+    if(ackPending && !ackTimedOut){
       return;
     }
 
@@ -218,7 +256,7 @@ void FeedbackClass::Update() {
     if(burstErrorOccurred){
       framesSucceeded = burstErrorIndex;
       shouldRetry = true;
-    }else if(waitingForAck){
+    }else if(ackPending){
       // Timeout
       framesSucceeded = 0;
       shouldRetry = true;
@@ -293,7 +331,8 @@ void FeedbackClass::Update() {
   //
   sendingFbData = true;
   uint8_t framesSentNow = 0;
-  while(burstItemsRemaining && fbMessagesSent < MSG_BUFFER_AUX && framesSentNow < FB_MAX_FRAMES_PER_UPDATE){
+  while(burstItemsRemaining && fbMessagesSent < MSG_BUFFER_AUX &&
+        framesSentNow < FB_MAX_FRAMES_PER_UPDATE && !auxResetPending){
     uint8_t fbUpdateQueueIndex = burstSendIdx;
 
     if(++burstSendIdx >= FEEDBACK_UPDATE_BUFFER_SIZE){
@@ -307,6 +346,10 @@ void FeedbackClass::Update() {
     framesSentNow++;
   }
   sendingFbData = false;
+
+  if(auxResetPending){
+    return;
+  }
 
   if(burstItemsRemaining && fbMessagesSent < MSG_BUFFER_AUX){
     return;
