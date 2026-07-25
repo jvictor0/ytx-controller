@@ -49,6 +49,9 @@ void FeedbackClass::Init(uint8_t maxBanks, uint8_t maxEncoders, uint16_t maxDigi
   burstInProgress = false;
   burstAwaitingAck = false;
   auxInitRecoveryInProgress = false;
+  auxInitWaitingForBoot = false;
+  auxInitRetryCount = 0;
+  auxInitResetCount = 0;
   antMicrosAuxInit = 0;
   sendingFbData = false;
   waitingMoreData = false;
@@ -157,9 +160,10 @@ void FeedbackClass::InitFb(){
   // Set External ISR for the power adapter detector pin
   attachInterrupt(digitalPinToInterrupt(externalVoltagePin), ChangeBrightnessISR, CHANGE);
                             
-  InitAuxController(false);
-
   begun = true;
+  if(!InitAuxController(false)){
+    auxResetPending = true;
+  }
 }
 
 void FeedbackClass::SendAuxInitializationFrame(){
@@ -176,31 +180,97 @@ void FeedbackClass::SendAuxInitializationFrame(){
   Serial.write9bit(END_OF_FRAME_BYTE);
 }
 
-void FeedbackClass::InitAuxController(bool resetHappened){
+void FeedbackClass::PrepareAuxAckWait(){
+  noInterrupts();
+  waitingForAck = true;
+  auxAckReceived = false;
+  auxInitAckTagged = false;
+  auxResetPending = false;
+  interrupts();
+}
+
+bool FeedbackClass::WaitForAuxAck(uint32_t timeoutUs){
+  uint32_t startedAt = micros();
+
+  while((uint32_t)(micros() - startedAt) < timeoutUs){
+    noInterrupts();
+    bool taggedAck = auxAckReceived;
+    bool ordinaryAck = !waitingForAck && !auxResetPending;
+    if(taggedAck){
+      auxAckReceived = false;
+      waitingForAck = false;
+    }
+    interrupts();
+
+    if(taggedAck || ordinaryAck){
+      return true;
+    }
+  }
+
+  noInterrupts();
+  waitingForAck = false;
+  auxAckReceived = false;
+  auxInitAckTagged = false;
+  interrupts();
+  return false;
+}
+
+bool FeedbackClass::SendAuxInitializationWithRetry(uint8_t maxRetries, uint32_t ackTimeoutUs){
+  for(uint8_t attempt = 0; attempt < maxRetries; attempt++){
+    PrepareAuxAckWait();
+    SendAuxInitializationFrame();
+    if(WaitForAuxAck(ackTimeoutUs)){
+      return true;
+    }
+  }
+  return false;
+}
+
+bool FeedbackClass::SendAuxCommandWithRetry(uint8_t command, int16_t data){
+  for(uint8_t attempt = 0; attempt < AUX_COMMAND_MAX_RETRIES; attempt++){
+    PrepareAuxAckWait();
+    Serial.write9bit(command);
+    if(data >= 0){
+      Serial.write((uint8_t)data);
+    }
+    if(WaitForAuxAck(AUX_COMMAND_ACK_TIMEOUT_US)){
+      return true;
+    }
+  }
+  return false;
+}
+
+bool FeedbackClass::InitAuxController(bool resetHappened){
   // SEND INITIAL VALUES AND LED BRIGHTNESS TO SAMD11
   bool makeRainbowAnimation = resetHappened ? 0 : config->board.rainbowOn;
 
-  SendAuxInitializationFrame();
-
-  waitingForAck = true;
-  while(waitingForAck);
+  if(!SendAuxInitializationWithRetry(AUX_BOOT_INIT_MAX_RETRIES, AUX_BOOT_INIT_ACK_TIMEOUT_US)){
+    return false;
+  }
 
   if(makeRainbowAnimation){
-    Serial.write9bit(CHANGE_BRIGHTNESS);
-    Serial.write(currentBrightness);
-    waitingForAck = true;
-    while(waitingForAck);
+    if(!SendAuxCommandWithRetry(CHANGE_BRIGHTNESS, currentBrightness)){
+      return false;
+    }
 
-    Serial.write9bit(CMD_RAINBOW_START);
-    // Wait for rainbow animation to end
-    waitingForAck = true; 
-    while(waitingForRainbow);
+    bool rainbowComplete = false;
+    for(uint8_t attempt = 0; attempt < AUX_RAINBOW_MAX_RETRIES && !rainbowComplete; attempt++){
+      waitingForRainbow = true;
+      Serial.write9bit(CMD_RAINBOW_START);
+      uint32_t startedAt = micros();
+      while(waitingForRainbow && (uint32_t)(micros() - startedAt) < AUX_RAINBOW_TIMEOUT_US);
+      rainbowComplete = !waitingForRainbow;
+    }
 
-    Serial.write9bit(CHANGE_BRIGHTNESS);
-    Serial.write(255);
-    waitingForAck = true;
-    while(waitingForAck);
+    if(!SendAuxCommandWithRetry(CHANGE_BRIGHTNESS, 255)){
+      return false;
+    }
   }
+
+  noInterrupts();
+  auxResetPending = false;
+  interrupts();
+  return true;
 }
 
 void FeedbackClass::RecoverAuxControllerReset(){
@@ -213,7 +283,9 @@ void FeedbackClass::RecoverAuxControllerReset(){
   burstInProgress = false;
   burstAwaitingAck = false;
   auxInitRecoveryInProgress = false;
-  sendingFbData = false;
+  auxInitWaitingForBoot = false;
+  auxInitRetryCount = 0;
+  auxInitResetCount = 0;
   feedbackDataToSend = false;
 
   noInterrupts();
@@ -263,11 +335,40 @@ void FeedbackClass::Update() {
 
     if(initAckReceived){
       auxInitRecoveryInProgress = false;
+      auxInitWaitingForBoot = false;
+      auxInitRetryCount = 0;
+      auxInitResetCount = 0;
       SetBankChangeFeedback(FB_BANK_CHANGED);
       return;
     }
 
+    if(auxInitWaitingForBoot){
+      if((uint32_t)(now - antMicrosAuxInit) < AUX_RESET_BOOT_GRACE_US){
+        return;
+      }
+      auxInitWaitingForBoot = false;
+      auxInitRetryCount = 0;
+      SendAuxInitializationFrame();
+      antMicrosAuxInit = micros();
+      return;
+    }
+
     if((uint32_t)(now - antMicrosAuxInit) >= AUX_INIT_ACK_TIMEOUT_US){
+      if(auxInitRetryCount >= AUX_INIT_MAX_RETRIES){
+        if(auxInitResetCount >= AUX_INIT_MAX_RESET_ATTEMPTS){
+          auxInitRecoveryInProgress = false;
+          waitingForAck = false;
+          SetStatusLED(STATUS_BLINK, 3, STATUS_FB_ERROR);
+          return;
+        }
+
+        ResetFBMicro();
+        auxInitResetCount++;
+        auxInitWaitingForBoot = true;
+        antMicrosAuxInit = micros();
+        return;
+      }
+
       noInterrupts();
       waitingForAck = true;
       burstErrorOccurred = false;
@@ -278,6 +379,7 @@ void FeedbackClass::Update() {
       errorIndexByte2 = 0;
       interrupts();
       SendAuxInitializationFrame();
+      auxInitRetryCount++;
       antMicrosAuxInit = micros();
     }
     return;
@@ -417,6 +519,14 @@ void FeedbackClass::Update() {
   antMicrosAck = micros();
   burstInProgress = false;
   burstAwaitingAck = true;
+}
+
+bool FeedbackClass::IsBegun(){
+  return begun;
+}
+
+bool FeedbackClass::AuxRecoveryInProgress(){
+  return auxInitRecoveryInProgress;
 }
 
 void FeedbackClass::ProcessQueuedFeedbackEntry(uint8_t fbUpdateQueueIndex){

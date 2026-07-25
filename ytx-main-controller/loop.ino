@@ -55,16 +55,22 @@ static void RecoverStaleAuxShow()
 
 static void ServiceAuxControllerReset()
 {
-  bool resetPending = false;
+  if(!feedbackHw.IsBegun()){
+    return;
+  }
 
   noInterrupts();
-  if(auxResetPending){
+  bool resetPending = auxResetPending;
+  bool recoveryInProgress = feedbackHw.AuxRecoveryInProgress();
+  if(resetPending && recoveryInProgress){
     auxResetPending = false;
-    resetPending = true;
   }
   interrupts();
 
-  if(resetPending){
+  if(resetPending && !recoveryInProgress){
+    noInterrupts();
+    auxResetPending = false;
+    interrupts();
     feedbackHw.RecoverAuxControllerReset();
   }
 }
@@ -85,6 +91,7 @@ void loop() {
   // feedbackHw.Update() from the periodic DIN transport interrupt.
   RecoverStaleAuxShow();
   ServiceUsbMidi();
+  feedbackHw.Update();
 
   static uint32_t antMicrosTest = micros();  
 
@@ -104,9 +111,6 @@ void loop() {
     
     digitalHw.Read();       
        
-    // and update feedback
-    feedbackHw.Update();  
-    
     // Release keys that 
     if(keyboardReleaseFlag && millis() > millisKeyboardPress){
       keyboardReleaseFlag = false;

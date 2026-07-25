@@ -134,8 +134,10 @@ public:
 
 	void Init(uint8_t, uint8_t, uint16_t, uint16_t);
 	void InitFb();
-	void InitAuxController(bool);
+	bool InitAuxController(bool);
 	void RecoverAuxControllerReset();
+	bool IsBegun();
+	bool AuxRecoveryInProgress();
 	void Update();
 	void SetChangeEncoderFeedback(uint8_t, uint8_t, uint16_t, uint8_t, bool, bool, bool colorSwitchMsg = false, bool valToIntensity = false, bool externalFeedback = false);
 	void SetChangeDigitalFeedback(uint16_t, uint16_t, bool, bool, bool, bool externalFeedback = false, bool valToIntensity = false);
@@ -172,6 +174,10 @@ private:
 	void FillFrameWithDigitalData(byte);
 	void ProcessQueuedFeedbackEntry(uint8_t);
 	void SendAuxInitializationFrame();
+	bool WaitForAuxAck(uint32_t);
+	void PrepareAuxAckWait();
+	bool SendAuxInitializationWithRetry(uint8_t, uint32_t);
+	bool SendAuxCommandWithRetry(uint8_t, int16_t);
 	void SetShifterFeedback();
 	void WaitForMIDI(bool);
 	void IncreaseBufferIndex(bool);
@@ -203,6 +209,9 @@ private:
 	bool burstInProgress;
 	bool burstAwaitingAck;
 	bool auxInitRecoveryInProgress;
+	bool auxInitWaitingForBoot;
+	uint8_t auxInitRetryCount;
+	uint8_t auxInitResetCount;
 	uint32_t antMicrosAuxInit;
 	bool updatingBankFeedback;
 	

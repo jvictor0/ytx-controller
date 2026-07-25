@@ -81,9 +81,9 @@ void AuxControllerReception_Handler(){
     }
     else if(rcvByte == ACK_CMD)
     {
-      auxAckReceived = true;
       if(auxInitAckTagged){
         auxInitAckTagged = false;
+        auxAckReceived = true;
       }else{
         waitingForAck = false;
       }

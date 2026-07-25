@@ -388,6 +388,15 @@ uint8_t encoderAccelSpeed[][ENCODER_MAX_SPEED] =   {{1, 2, 3, 3, 4, 5},
 #define USB_MIDI_MESSAGES_PER_LOOP     8
 #define AUX_SHOW_TIMEOUT_US            250000UL
 #define AUX_INIT_ACK_TIMEOUT_US         5000UL
+#define AUX_BOOT_INIT_ACK_TIMEOUT_US   20000UL
+#define AUX_BOOT_INIT_MAX_RETRIES          50
+#define AUX_INIT_MAX_RETRIES               20
+#define AUX_INIT_MAX_RESET_ATTEMPTS         3
+#define AUX_RESET_BOOT_GRACE_US        500000UL
+#define AUX_COMMAND_ACK_TIMEOUT_US     100000UL
+#define AUX_COMMAND_MAX_RETRIES             3
+#define AUX_RAINBOW_TIMEOUT_US        5000000UL
+#define AUX_RAINBOW_MAX_RETRIES             2
 
 // COMMANDS
 #define ACK_CMD                 0xAA
