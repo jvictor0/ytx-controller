@@ -123,6 +123,8 @@ public:
 	inline void epBank0ResetReady(ep_t ep) { usb.DeviceEndpoint[ep].EPSTATUSCLR.bit.BK0RDY = 1; }
 	inline void epBank1ResetReady(ep_t ep) { usb.DeviceEndpoint[ep].EPSTATUSCLR.bit.BK1RDY = 1; }
 
+	inline void epBank0ResetDataToggle(ep_t ep) { usb.DeviceEndpoint[ep].EPSTATUSCLR.reg = USB_DEVICE_EPSTATUSCLR_DTGLOUT; }
+
 	inline void epBank0SetStallReq(ep_t ep)   { usb.DeviceEndpoint[ep].EPSTATUSSET.bit.STALLRQ0 = 1; }
 	inline void epBank1SetStallReq(ep_t ep)   { usb.DeviceEndpoint[ep].EPSTATUSSET.bit.STALLRQ1 = 1; }
 	inline void epBank0ResetStallReq(ep_t ep) { usb.DeviceEndpoint[ep].EPSTATUSCLR.bit.STALLRQ0 = 1; }
@@ -228,6 +230,7 @@ private:
 
 class EPHandler {
 public:
+	virtual void reset() = 0;
 	virtual void handleEndpoint() = 0;
 	virtual uint32_t recv(void *_data, uint32_t len) = 0;
 	virtual uint32_t available() const = 0;
@@ -237,25 +240,38 @@ class DoubleBufferedEPOutHandler : public EPHandler {
 public:
 	DoubleBufferedEPOutHandler(USBDevice_SAMD21G18x &usbDev, uint32_t endPoint, uint32_t bufferSize) :
 		usbd(usbDev),
-		ep(endPoint), size(bufferSize),
-		current(0), incoming(0),
-		first0(0), last0(0), ready0(false),
-		first1(0), last1(0), ready1(false),
-		notify(false)
+		ep(endPoint), size(bufferSize)
 	{
 		data0 = reinterpret_cast<uint8_t *>(malloc(size));
 		data1 = reinterpret_cast<uint8_t *>(malloc(size));
+		reset();
+	}
+
+	virtual void reset()
+	{
+		__Guard guard;
+		// Bus reset clears EPCFG and endpoint interrupts, but retains SRAM.
+		// Quiesce OUT before replacing its descriptor and software buffer state.
+		usbd.epBank0SetType(ep, 0);
+		usbd.epBank0SetReady(ep);
+		current = incoming = 0;
+		first0 = last0 = first1 = last1 = 0;
+		ready0 = ready1 = notify = false;
 
 		usbd.epBank0SetSize(ep, 64);
-		usbd.epBank0SetType(ep, 3); // BULK OUT
-
 		usbd.epBank0SetAddress(ep, const_cast<uint8_t *>(data0));
-
+		usbd.epBank0AckTransferComplete(ep);
+		// Every configuration starts a new DATA0 sequence, including without EORST.
+		usbd.epBank0ResetDataToggle(ep);
+		usbd.epBank0SetType(ep, 3); // BULK OUT
 		release();
 	}
 
 	virtual uint32_t recv(void *_data, uint32_t len)
 	{
+		// SET_CONFIGURATION can reset both buffers from the USB ISR. Keep the
+		// selection, bounded copy (at most size bytes), and release atomic.
+		__Guard guard;
 		uint8_t *data = reinterpret_cast<uint8_t *>(_data);
 
 		// R/W: current, first0/1, ready0/1, notify
@@ -355,6 +371,8 @@ public:
 
 	// Returns how many bytes are stored in the buffers
 	virtual uint32_t available() const {
+		// Snapshot readiness and both indexes together across reconfiguration.
+		__Guard guard;
 		if (current == 0) {
 			bool ready = false;
 			synchronized {

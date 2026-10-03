@@ -115,25 +115,16 @@ uint32_t MIDI_::available(void)
 
 midiEventPacket_t MIDI_::read(void)
 {
-        midiEventPacket_t c;
-	ring_bufferMIDI   *buffer = &midi_rx_buffer;
+	midiEventPacket_t c = {0, 0, 0, 0};
+	ring_bufferMIDI *buffer = &midi_rx_buffer;
 
-	if(((uint32_t)(MIDI_BUFFER_SIZE + buffer->head - buffer->tail) % MIDI_BUFFER_SIZE) > 0) {
-	    c = buffer->midiEvent[buffer->tail];
-	} else {
-            if (USB_Available(MIDI_RX)) {
-	        accept();
-	        c = buffer->midiEvent[buffer->tail];
-	    } else {
-	        c.header = 0;
-	        c.byte1 = 0;
-	        c.byte2 = 0;
-	        c.byte3 = 0;
-	    }
+	if (buffer->head == buffer->tail && USB_Available(MIDI_RX)) {
+		accept();
 	}
-	// if the head isn't ahead of the tail, we don't have any characters
-	if (buffer->head != buffer->tail)
-	{
+	// Reset/reconfiguration can invalidate USB_Available before accept().
+	// Only return an event if accept actually put one in the ring.
+	if (buffer->head != buffer->tail) {
+		c = buffer->midiEvent[buffer->tail];
 		buffer->tail = (uint32_t)(buffer->tail + 1) % MIDI_BUFFER_SIZE;
 	}
 	return c;
