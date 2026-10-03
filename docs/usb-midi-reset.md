@@ -53,14 +53,20 @@ Trial image: `/private/tmp/wrld-usb-reset-build/final-output/ytx-main-controller
 
 SHA-256: `96579c17b96c7b5bc6e61fc162d8d642799a3d3256406a2ee631c73fee8ddb53`
 
-No firmware was flashed. No controller/iPad/app restart or USB-connection change was performed. AUX firmware and the globally installed Arduino core were not changed.
+During implementation and offline verification, the failed hardware state was preserved. Deployment was performed later with explicit user approval, as recorded below. AUX firmware and the globally installed Arduino core were not changed.
 
-## Physical trial still required — separate approval
+## Deployment and hardware validation
 
-1. Preserve the currently failed setup and existing diagnostics until approval to end that observation. Record the trial image hash when approval is given.
-2. Under the separately approved deployment procedure, install the MAIN image, then establish a working baseline: controller controls reach the iPad, and known iPad feedback messages change the expected WRLD indicators. Keep the app and powered hub configuration consistent with the reproduction.
+On 2026-10-03, the user approved deployment to the connected WB. The existing installer functions uploaded only MAIN firmware: all 870 blocks were acknowledged, the controller restarted, and its `WRLD.BLDR` MIDI ports returned. The application acknowledged a handshake and answered a firmware-version request over the Mac connection. The deployed image has the SHA-256 recorded above; the firmware version remains 0.24. A local deployment receipt is saved alongside the build artifacts. Flash readback was not performed.
+
+After deployment, the user reported that it works and requested landing the fix. The exact number of reconnect cycles and host-log results were not reported. The repeatable procedure below remains useful for extended validation.
+
+## Repeatable reconnect check
+
+1. Record the installed image hash and the initial USB setup. Preserve diagnostics if beginning from a failed state.
+2. Establish a working baseline: controller controls reach the iPad, and known iPad feedback messages change the expected WRLD indicators. Keep the app and powered hub configuration consistent with the reproduction.
 3. With WRLD continuously powered, unplug and reconnect **only the iPad-to-powered-hub cable**. Do not restart the app or power-cycle WRLD to recover. After ports reopen, verify both directions, including a known feedback message and a sustained feedback sequence.
 4. Repeat at least ten times, including idle and active MIDI traffic. Record reconnect times, successful feedback receipt, and host OUT completion errors. Success requires recovery on every cycle without an app restart or WRLD power cycle, and absence of the previous sustained OUT-error condition.
 5. If the fault returns, preserve that state and collect new app/host evidence before any additional restart. Host “pipe stalled” is an OS completion status, not proof of a literal USB STALL handshake. Maya audio faults remain a separate investigation.
 
-The local code defect is established and covered by regression tests. Only this physical trial can establish whether the patch resolves the observed WRLD/iPad failure.
+The local defect is covered by regression tests, deployment was acknowledged, and the user reports successful hardware behavior. An extended reconnect run with host logs would provide stronger evidence of repeated recovery.
