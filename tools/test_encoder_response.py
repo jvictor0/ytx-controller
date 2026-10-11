@@ -18,12 +18,14 @@ def main():
                         '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
                         '-I', str(ROOT / 'ytx-main-controller/headers'), str(ROOT / 'tools/encoder_response/cases.cpp'),
                         '-o', str(binary)], check=True)
-        for invalid in ['nan', 'infinity', 'oversize', 'bad_remainder', 'negative_magnitude']:
+        for invalid in ['nan', 'infinity', 'oversize', 'bad_remainder', 'negative_magnitude', 'bad_direction', 'bad_frame']:
             result = subprocess.run([str(binary), invalid], capture_output=True, text=True)
             assert result.returncode != 0, invalid
         values = subprocess.check_output([str(binary)], text=True)
         lines = values.splitlines()
-        assert len(lines) == 129
+        assert len(lines) == 130
+        response_summary = lines.pop(0)
+        assert response_summary.startswith("Response recurrence")
         vectors = json.loads((ROOT / 'tools/encoder_response/protocol-v1-vectors.json').read_text())
         for vector in vectors['vectors']:
             assert math.isclose(float(lines[vector['value']]), vector['delta'],
@@ -35,6 +37,7 @@ def main():
             expected = math.copysign(math.expm1(math.log(2) * abs(z) / 8)
                                      / math.expm1(math.log(2) / 8) / 65536, z)
             assert math.isclose(actual, expected, rel_tol=2e-14, abs_tol=1e-18), code
+        print(response_summary)
         print('\n'.join(lines[128:]))
         print('128 independent Python decoder vectors passed (ASan/UBSan).')
 

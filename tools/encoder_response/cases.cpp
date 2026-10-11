@@ -1,4 +1,5 @@
 #include "ExponentialRelativeCodec.h"
+#include "EncoderResponse.h"
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -33,10 +34,161 @@ static size_t CheckDrain(ExponentialRelativeCodec& codec, double delta)
     return sink.m_values.size();
 }
 
+struct MovementSink
+{
+    EncoderResponse* m_response;
+    std::vector<double> m_deltas;
+    std::vector<uint32_t> m_times;
+    void AddMovement(double delta)
+    {
+        m_deltas.push_back(delta);
+        m_times.push_back(m_response->m_boundaryUs);
+    }
+};
+
+static void CheckResponse()
+{
+    EncoderResponse response;
+    response.Reset(0);
+    const int frames[] = {1, 2, 2, 2, -2};
+    const int movement[] = {1, 2, 8, 16, -2};
+    const int acceleration[] = {0, 4, 8, 12, -4};
+    for (unsigned i = 0; i < 5; ++i)
+    {
+        assert(response.ApplyFrame(frames[i]) == movement[i] / 1024.0);
+        assert(response.m_acceleration == acceleration[i]);
+    }
+    response.Reset(0);
+    response.m_acceleration = 12;
+    MovementSink sink{&response, {}, {}};
+    const int decay[] = {8, 5, 3, 2, 1, 0};
+    for (unsigned i = 0; i < 6; ++i)
+    {
+        response.Advance((i + 1) * 10000, sink);
+        assert(response.m_acceleration == decay[i]);
+        assert(sink.m_deltas.empty());
+    }
+}
+
+struct PipelineSink
+{
+    ExponentialRelativeCodec m_codec;
+    Sink m_wire;
+    double m_requested = 0.0;
+    void AddMovement(double delta)
+    {
+        m_requested += delta;
+        m_codec.Add(delta, m_wire);
+        assert(std::abs(m_wire.m_sum + m_codec.m_remainder - m_requested) < 2e-14);
+    }
+};
+
+static MovementSink Trace(EncoderResponse& response, bool frequent, uint32_t origin)
+{
+    response.Reset(origin);
+    MovementSink sink{&response, {}, {}};
+    const uint32_t times[] = {0, 1000, 2000, 7000, 8000, 9000, 15000, 16000,
+                              17000, 18000, 24000, 25000, 39000, 40000, 41000,
+                              42000, 43000, 48000, 200000, 201000};
+    uint32_t previous = 0;
+    for (uint32_t time : times)
+    {
+        if (frequent)
+        {
+            for (uint32_t t = previous; t < time; t += 137)
+            {
+                response.Advance(origin + t, sink);
+            }
+        }
+        response.Pulse(time >= 41000 && time < 200000 ? -1 : 1, origin + time, sink);
+        previous = time;
+    }
+    response.Flush(origin + 202000, sink);
+    response.Advance(origin + 0xffff0000U, sink);
+    assert(response.m_acceleration == 0 && response.m_framePulses == 0);
+    return sink;
+}
+
+static void CheckTiming()
+{
+    EncoderResponse a, b;
+    MovementSink frequent = Trace(a, true, 0);
+    MovementSink delayed = Trace(b, false, 0);
+    assert(frequent.m_deltas == delayed.m_deltas);
+    assert(frequent.m_times == delayed.m_times);
+    assert(frequent.m_deltas[0] == 4.0 / 1024);
+    assert(frequent.m_deltas[1] > 3.0 / 1024);
+    assert(frequent.m_deltas.back() == 2.0 / 1024);
+    MovementSink wrapped = Trace(b, false, UINT32_MAX - 19000);
+    assert(frequent.m_deltas == wrapped.m_deltas);
+    for (size_t i = 0; i < wrapped.m_times.size(); ++i)
+    {
+        assert(wrapped.m_times[i] - (UINT32_MAX - 19000) == frequent.m_times[i]);
+    }
+    a.Reset(0);
+    MovementSink sink{&a, {}, {}};
+    a.Pulse(1, 0, sink);
+    a.Pulse(1, 8000, sink);
+    assert(a.m_initialized && sink.m_times[0] == 8000);
+    a.Advance(16000, sink);
+    assert(sink.m_deltas == std::vector<double>({1.0 / 1024, 1.0 / 1024}));
+    a.Reset(0);
+    sink.m_deltas.clear(); sink.m_times.clear();
+    a.m_acceleration = 12;
+    a.Pulse(1, 39000, sink);
+    const int32_t before = a.m_acceleration;
+    a.Advance(40000, sink);
+    assert(sink.m_deltas.back() == (2 * before / 3) / 1024.0);
+    a.Reset(0);
+    sink.m_deltas.clear(); sink.m_times.clear();
+    a.m_acceleration = 12;
+    a.Pulse(1, 1, sink);
+    a.Pulse(-1, 2, sink);
+    a.Flush(3, sink);
+    assert(sink.m_deltas == std::vector<double>({12.0 / 1024, -1.0 / 1024}));
+    assert(sink.m_times == std::vector<uint32_t>({2, 3}));
+    assert(a.m_acceleration == 0);
+    a.Reset(0);
+    sink.m_deltas.clear(); sink.m_times.clear();
+    a.Pulse(1, 1, sink);
+    a.Advance(1000000000, sink);
+    a.Pulse(1, 1000000001, sink);
+    a.Flush(1000000002, sink);
+    assert(sink.m_deltas == std::vector<double>({1.0 / 1024, 1.0 / 1024}));
+    PipelineSink pipeline;
+    a.Reset(0); b.Reset(0);
+    for (uint32_t t = 0; t < 1000000; t += 1000)
+    {
+        a.Pulse(t < 500000 ? 1 : -1, t, pipeline);
+        assert(std::abs(a.m_acceleration) <= EncoderResponseConfig::x_maxGain);
+        assert(b.m_acceleration == 0 && b.m_framePulses == 0);
+    }
+    a.Flush(1000000, pipeline);
+    for (int i = 0; i < 100; ++i)
+    {
+        assert(a.ApplyFrame(-9) == -9 * 16.0 / 1024);
+        assert(a.m_acceleration == -16);
+    }
+    assert(a.ApplyFrame(0) == 0.0 && a.m_acceleration == -16);
+    std::printf("Response recurrence, timing, rollover, idle, independence and pipeline passed; sizeof = %zu, pulse bound = %d.\n",
+                sizeof(EncoderResponse), EncoderResponseConfig::x_maxFramePulses);
+}
+
 int main(int argc, char** argv)
 {
     if (argc > 1)
     {
+        if (std::strcmp(argv[1], "bad_direction") == 0)
+        {
+            EncoderResponse response;
+            MovementSink sink{&response, {}, {}};
+            response.Pulse(0, 0, sink);
+        }
+        if (std::strcmp(argv[1], "bad_frame") == 0)
+        {
+            EncoderResponse response;
+            response.ApplyFrame(EncoderResponseConfig::x_maxFramePulses + 1);
+        }
         ExponentialRelativeCodec invalidCodec;
         Sink invalidSink;
         if (std::strcmp(argv[1], "nan") == 0) invalidCodec.Add(NAN, invalidSink);
@@ -53,6 +205,8 @@ int main(int argc, char** argv)
         }
         return 0;
     }
+    CheckResponse();
+    CheckTiming();
     const double minimum = 1.0 / 65536.0;
     assert(ExponentialRelativeCodec::Decode(64) == 0.0);
     assert(ExponentialRelativeCodec::Decode(65) == minimum);
