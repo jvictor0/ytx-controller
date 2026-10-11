@@ -19,6 +19,9 @@ struct EncoderResponseConfig
                   ExponentialRelativeCodec::x_maximumInput, "Revalidate codec bound after tuning");
 };
 
+// Service this clock at least once per half uint32 range (about 35 minutes).
+// Retained boundaries can predate the previous call; longer gaps are not supported.
+//
 struct EncoderResponse
 {
     int32_t m_acceleration = 0;
@@ -109,6 +112,9 @@ struct EncoderResponse
         EmitFrame(nowUs, sink);
     }
 
+    // The adapter must supply exactly -1/+1 and at most x_maxFramePulses
+    // same-direction pulses per frame, including any receipt-time scheduling jitter.
+    //
     template<typename Sink> void Pulse(int8_t direction, uint32_t nowUs, Sink& sink)
     {
         assert(direction == -1 || direction == 1);
