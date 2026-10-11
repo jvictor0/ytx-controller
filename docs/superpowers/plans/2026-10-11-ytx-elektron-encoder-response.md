@@ -1,6 +1,6 @@
 # YTX Elektron-inspired encoder response implementation plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. The user has already requested implementation in a separate Codex chat; proceed with that handoff without another design-approval round.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking. The user has already requested implementation in a separate Codex chat; proceed with that handoff without another design-approval round.
 
 **Goal:** Give WRLD.BLDR's endless pots one tunable, controller-side acceleration profile inspired by Digitone II filter cutoff, transmitting normalized relative movement over an analytic exponential MIDI encoding.
 
@@ -135,8 +135,8 @@ YTX paths below are relative to its new worktree, not this SmartGrid worktree.
 
 **Interfaces:** Public struct `ExponentialRelativeCodec` exposes `static double Decode(uint8_t value)`, `static uint8_t EncodeFloor(double magnitude, bool positive)`, `void Reset()`, and `template<typename Sink> void Add(double delta, Sink& sink)`. `Decode(64)` returns zero for arithmetic/testing convenience, but receiver parsing still ignores 64 entirely. `EncodeFloor` returns 64 when the magnitude is below minimum; `Add` never forwards it. `Sink` provides `void Emit(uint8_t value)`. A new codec object starts with zero remainder; the signed remainder is public `double m_remainder`.
 
-- [ ] Add a host C++ runner using `clang++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined`, following the existing USB-test runner's subprocess/temp-directory pattern. Compile actual headers rather than a duplicated C++ model. The first run, `python3 tools/test_encoder_response.py`, should fail because the codec does not yet exist.
-- [ ] Add exact boundary and qualitative assertions. Example test body:
+- [x] Add a host C++ runner using `clang++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined`, following the existing USB-test runner's subprocess/temp-directory pattern. Compile actual headers rather than a duplicated C++ model. The first run, `python3 tools/test_encoder_response.py`, should fail because the codec does not yet exist.
+- [x] Add exact boundary and qualitative assertions. Example test body:
 
 ```cpp
 assert(ExponentialRelativeCodec::Decode(64) == 0.0);
@@ -146,10 +146,10 @@ assert(ExponentialRelativeCodec::Decode(0) < ExponentialRelativeCodec::Decode(1)
 assert(ExponentialRelativeCodec::Decode(127) > ExponentialRelativeCodec::Decode(126));
 ```
 
-- [ ] Implement the analytic decoder, inverse, adjacent-code correction, and signed remainder as specified above. Add a sink fixture that accumulates decoded emitted movement and records every byte.
-- [ ] Test every code and every interval boundary: monotonicity, sign, positive/negative symmetry for magnitudes 1–63, inverse at each decoded value and immediately to either side, no emitted 64, and no byte outside 0–127. Independently calculate expected values in Python using `math.expm1`, not by invoking the C++ decoder as its own oracle. Use a tight numerical tolerance for transcendental calculations rather than requiring every platform to have bit-identical libm results.
-- [ ] Exercise repeated fractions smaller than the minimum, repeated base-step movements, alternating signs, zero input, and full frame movements up to ±0.15625. For each drain assert conservation `sum(decoded output) + remainder == sum(input)` within floating-point tolerance, `abs(remainder) < minimumDelta`, and packet signs consistent with the motion being drained. Exhaustively test all `q = -10..10` and gains `1..16` with residuals at zero and just below both minimum-delta boundaries; supplement with a deterministic dense sweep across the bounded range. Record the observed maximum and verify the conservative termination bound from the shrinking residual.
-- [ ] Save only compact test vectors as JSON for the future SmartGrid receiver. These are tests, not a runtime lookup table. Run the runner successfully and commit this independently usable codec.
+- [x] Implement the analytic decoder, inverse, adjacent-code correction, and signed remainder as specified above. Add a sink fixture that accumulates decoded emitted movement and records every byte.
+- [x] Test every code and every interval boundary: monotonicity, sign, positive/negative symmetry for magnitudes 1–63, inverse at each decoded value and immediately to either side, no emitted 64, and no byte outside 0–127. Independently calculate expected values in Python using `math.expm1`, not by invoking the C++ decoder as its own oracle. Use a tight numerical tolerance for transcendental calculations rather than requiring every platform to have bit-identical libm results.
+- [x] Exercise repeated fractions smaller than the minimum, repeated base-step movements, alternating signs, zero input, and full frame movements up to ±0.15625. For each drain assert conservation `sum(decoded output) + remainder == sum(input)` within floating-point tolerance, `abs(remainder) < minimumDelta`, and packet signs consistent with the motion being drained. Exhaustively test all `q = -10..10` and gains `1..16` with residuals at zero and just below both minimum-delta boundaries; supplement with a deterministic dense sweep across the bounded range. Record the observed maximum and verify the conservative termination bound from the shrinking residual.
+- [x] Save only compact test vectors as JSON for the future SmartGrid receiver. These are tests, not a runtime lookup table. Run the runner successfully and commit this independently usable codec.
 
 ### Task 2: Implement per-knob response and deterministic timing
 
@@ -157,7 +157,7 @@ assert(ExponentialRelativeCodec::Decode(127) > ExponentialRelativeCodec::Decode(
 
 **Interfaces:** Public `EncoderResponseConfig` contains the five `x_` constants above. Public struct `EncoderResponse` exposes `void Reset(uint32_t nowUs)`, `template<typename Sink> void Pulse(int8_t direction, uint32_t nowUs, Sink& sink)`, `template<typename Sink> void Advance(uint32_t nowUs, Sink& sink)`, and `template<typename Sink> void Flush(uint32_t nowUs, Sink& sink)`. `Pulse` accepts exactly -1 or +1. Sink supplies `void AddMovement(double delta)`; the hardware adapter feeds that method into `ExponentialRelativeCodec::Add`. `Flush` first advances due boundaries, then emits the incomplete frame without inventing a decay tick. Include a small public `ApplyFrame(int32_t q)` method returning the normalized movement and updating acceleration for direct recurrence tests.
 
-- [ ] Add failing tests for the recovered recurrence example and decay sequence before implementing the response struct. Example recurrence check after reset, with no clock service between calls:
+- [x] Add failing tests for the recovered recurrence example and decay sequence before implementing the response struct. Example recurrence check after reset, with no clock service between calls:
 
 ```cpp
 assert(response.ApplyFrame(1) == 1.0 / 1024.0);
@@ -167,10 +167,10 @@ assert(response.ApplyFrame(2) == 16.0 / 1024.0);
 assert(response.ApplyFrame(-2) == -2.0 / 1024.0);
 ```
 
-- [ ] Implement signed truncation, reversal reset, previous-gain output, cap, and empty-frame silence. `ApplyFrame` must also reset acceleration on a q/a sign mismatch so its standalone recurrence contract is correct.
-- [ ] Implement the chronological frame/decay service, including tie ordering, direction-change partial-frame flush, initialization at timestamp zero, and unsigned wraparound. No MIDI timestamps participate. If `Pulse` arrives after a long gap, settle previous due work before adding that pulse.
-- [ ] Add traces proving isolated pulses remain at base gain, dense same-direction pulses accelerate, a pause restores fine control, reversal starts at base gain, and idle service emits no spontaneous motion. Run the same timestamped pulse trace with frequent versus delayed `Advance` calls and assert identical deltas/timing at logical boundaries. Include wrap at `UINT32_MAX`, a long idle interval, multiple independent knobs, and a bounded-state saturation trace.
-- [ ] Exercise response plus codec as a pipeline and assert signed movement conservation. Document the per-knob state size and bounded work in the test output. Run the runner and commit the response helper.
+- [x] Implement signed truncation, reversal reset, previous-gain output, cap, and empty-frame silence. `ApplyFrame` must also reset acceleration on a q/a sign mismatch so its standalone recurrence contract is correct.
+- [x] Implement the chronological frame/decay service, including tie ordering, direction-change partial-frame flush, initialization at timestamp zero, and unsigned wraparound. No MIDI timestamps participate. If `Pulse` arrives after a long gap, settle previous due work before adding that pulse.
+- [x] Add traces proving isolated pulses remain at base gain, dense same-direction pulses accelerate, a pause restores fine control, reversal starts at base gain, and idle service emits no spontaneous motion. Run the same timestamped pulse trace with frequent versus delayed `Advance` calls and assert identical deltas/timing at logical boundaries. Include wrap at `UINT32_MAX`, a long idle interval, multiple independent knobs, and a bounded-state saturation trace.
+- [x] Exercise response plus codec as a pipeline and assert signed movement conservation. Document the per-knob state size and bounded work in the test output. Run the runner and commit the response helper.
 
 ### Task 3: Integrate the new opt-in mode into MAIN
 
@@ -178,21 +178,21 @@ assert(response.ApplyFrame(-2) == -2.0 / 1024.0);
 
 **Interfaces:** Add `rot_rel_exponential = 6` to the existing `rotaryModes` enum. Add explicit methods `bool IsExponentialEncoder(uint8_t encNo)`, `void ServiceExponentialEncoders(uint32_t nowUs)`, `void ResetExponentialEncoders(uint32_t nowUs)`, and `void SendExponentialRotaryMessage(uint8_t encNo, uint8_t value)`. Store response and codec state per physical encoder, outside `encoderBankData`. Integration sink adapters expose the exact `AddMovement` and `Emit` contracts from Tasks 1–2 and carry the physical encoder index.
 
-- [ ] Add failing integration tests with fake clock/SPI/MIDI sinks for: new mode bypasses existing acceleration and prescaling; legacy mode still reaches its existing path; 64 is never sent; startup dump and switch-generated rotary sends produce no exponential movement; configured channel and CC are honored; host feedback does not emit a movement event. Exercise actual integration methods or small extracted production helpers, not assertions against source text alone.
-- [ ] Add enum value 6 without growing `rotBehaviour.hwMode : 3`. Preserve values 0–5 and the serialized configuration layout. Search all mode checks so unsupported new-mode configurations cannot fall through to an absolute/zero-valued rotary message. New mode requires endless-pot E41H/E41V hardware and ordinary CC; reject unsupported rotary message/module combinations for this mode instead of interpreting them as legacy absolute mode.
-- [ ] Allocate per-physical response/codec state through the existing `memHost->AllocateRAM` initialization path. Include its real size in the existing RAM budget check and initialize every object explicitly. No per-bank duplication or runtime allocation. Keep existing feedback-value state for incoming LED/ring values.
-- [ ] In `DecodeRotaryDirection`, new mode consumes each reported activity bit with prescaler 1 regardless of legacy `speed`, `encFineAdjust`, or pressed state. In `EncoderAction`, intercept new mode before the existing speed-table logic, call `Pulse(direction, micros(), sink)`, and return. Do not store encoded values in `nextJump`, which is only a four-bit field.
-- [ ] While any configured encoder uses the new mode, read all configured encoder modules once on every existing 1 ms scan. Bypass the current priority-list shortcut, which can stop polling other modules when two are active. Avoid double-reading priority modules. Keep the old scan policy when the new mode is absent. Test three simultaneously active modules, not only one knob.
-- [ ] Call `ServiceExponentialEncoders(micros())` beside `encoderHw.Read()` while input processing is enabled, including iterations where `Read` returns for its minimum scan interval. Reset pending state when processing is disabled/reconfigured so resumption cannot release stale movement. Guard startup/uninitialized/no-encoder paths. A host page change does not touch this state.
-- [ ] Implement a separate CC emitter using configured `rotaryConfig` CC, MIDI port bits, and one-based MIDI-library channel. Its essential send operation is:
+- [x] Add failing integration tests with fake clock/SPI/MIDI sinks for: new mode bypasses existing acceleration and prescaling; legacy mode still reaches its existing path; 64 is never sent; startup dump and switch-generated rotary sends produce no exponential movement; configured channel and CC are honored; host feedback does not emit a movement event. Exercise actual integration methods or small extracted production helpers, not assertions against source text alone.
+- [x] Add enum value 6 without growing `rotBehaviour.hwMode : 3`. Preserve values 0–5 and the serialized configuration layout. Search all mode checks so unsupported new-mode configurations cannot fall through to an absolute/zero-valued rotary message. New mode requires endless-pot E41H/E41V hardware and ordinary CC; reject unsupported rotary message/module combinations for this mode instead of interpreting them as legacy absolute mode.
+- [x] Allocate per-physical response/codec state through the existing `memHost->AllocateRAM` initialization path. Include its real size in the existing RAM budget check and initialize every object explicitly. No per-bank duplication or runtime allocation. Keep existing feedback-value state for incoming LED/ring values.
+- [x] In `DecodeRotaryDirection`, new mode consumes each reported activity bit with prescaler 1 regardless of legacy `speed`, `encFineAdjust`, or pressed state. In `EncoderAction`, intercept new mode before the existing speed-table logic, call `Pulse(direction, micros(), sink)`, and return. Do not store encoded values in `nextJump`, which is only a four-bit field.
+- [x] While any configured encoder uses the new mode, read all configured encoder modules once on every existing 1 ms scan. Bypass the current priority-list shortcut, which can stop polling other modules when two are active. Avoid double-reading priority modules. Keep the old scan policy when the new mode is absent. Test three simultaneously active modules, not only one knob.
+- [x] Call `ServiceExponentialEncoders(micros())` beside `encoderHw.Read()` while input processing is enabled, including iterations where `Read` returns for its minimum scan interval. Reset pending state when processing is disabled/reconfigured so resumption cannot release stale movement. Guard startup/uninitialized/no-encoder paths. A host page change does not touch this state.
+- [x] Implement a separate CC emitter using configured `rotaryConfig` CC, MIDI port bits, and one-based MIDI-library channel. Its essential send operation is:
 
 ```cpp
 MIDI.sendControlChange(parameter, value, channelZeroBased + 1);
 ```
 
   Respect the USB bit for that call and the DIN bit for `MIDIHW.sendControlChange`. The supplied profile enables USB only. Return immediately for 64. Never update a guessed absolute parameter or local ring based on the encoded value.
-- [ ] Add early exits for new mode to both old `SendRotaryMessage` and `SendRotaryAltMessage`. Only the new response sink can emit new-mode movement; init dumps, buttons, alt/shift actions, and direct value feedback cannot accidentally send 0. Buttons continue their existing separate messages. On a controller firmware bank/configuration route change, flush current motion to the old route before changing pointers, then reset response and codec state; this is distinct from SmartGrid page changes.
-- [ ] Run the new host tests, `python3 tools/test_quarter_step_table.py`, `python3 tools/test_usb_reset.py`, and `make main`. Fix failures and commit integration. Report compiler RAM/flash usage and actual per-knob state cost. Do not run `make install`.
+- [x] Add early exits for new mode to both old `SendRotaryMessage` and `SendRotaryAltMessage`. Only the new response sink can emit new-mode movement; init dumps, buttons, alt/shift actions, and direct value feedback cannot accidentally send 0. Buttons continue their existing separate messages. On a controller firmware bank/configuration route change, flush current motion to the old route before changing pointers, then reset response and codec state; this is distinct from SmartGrid page changes.
+- [x] Run the new host tests, `python3 tools/test_quarter_step_table.py`, `python3 tools/test_usb_reset.py`, and `make main`. Fix failures and commit integration. Report compiler RAM/flash usage and actual per-knob state cost. Do not run `make install`.
 
 ### Task 4: Generate the opt-in WRLD.BLDR profile and publish the contract
 
@@ -200,8 +200,8 @@ MIDI.sendControlChange(parameter, value, channelZeroBased + 1);
 
 **Interfaces:** CLI `python3 tools/make_exponential_encoder_profile.py INPUT OUTPUT` writes a separate JSON `.ytx`; refuse identical input/output paths. Use Python's standard library only. No device connection or message transmission.
 
-- [ ] Add failing tests for transformation, source preservation, rejection of malformed/unsupported rotary configurations, and every unchanged configuration field. Validate the WRLD.BLDR source has 16 encoders, CC 0–15, supported endless-pot hardware, ordinary CC rotary messages, and compatible button modes before producing the profile.
-- [ ] Implement a deep-copy transformation of each bank's encoder entries. These are the only three changed leaf values per encoder:
+- [x] Add failing tests for transformation, source preservation, rejection of malformed/unsupported rotary configurations, and every unchanged configuration field. Validate the WRLD.BLDR source has 16 encoders, CC 0–15, supported endless-pot hardware, ordinary CC rotary messages, and compatible button modes before producing the profile.
+- [x] Implement a deep-copy transformation of each bank's encoder entries. These are the only three changed leaf values per encoder:
 
 ```python
 entry['encoder_mode']['hw_mode'] = 6
@@ -210,10 +210,10 @@ entry['rotary_config']['midi_port'] = 1
 ```
 
   Leave speed fields, min/max, switch settings, channel-0 rotation feedback, hardware identifiers, and all non-encoder controls intact. USB-only rotation avoids saturating DIN with the fine delta stream. Require valid CC numbers rather than silently masking incorrect configuration. Do not open/save the new mode through an older editor that might coerce an unknown mode.
-- [ ] Generate `configs/WRLD.BLDR.exponential-v1.ytx` from the read-only source `/Users/joyo/.codex/worktrees/f8f7/theallelectricsmartgrid/patches/WRLD.BLDR.ytx`. Record the source SHA-256 and transformation command in the documentation. Confirm exactly 48 changed leaves for its single bank of 16 encoders; the source remains unchanged.
-- [ ] Write `docs/encoder-response.md` containing the equations, all constants and example vectors above, channel numbering, opt-in/rollback procedure, distinction between response and codec tuning, compatibility matrix, state/memory and packet bounds, and the unverified Elektron provenance. State that the old profile continues to work with the new firmware; the new profile requires a new SmartGrid receiver; old SmartGrid ignores its rotation channel. Do not imply the host application has already been changed.
-- [ ] Include this hardware evaluation checklist for a later authorized deployment: compare slow full-range travel and micro-adjustments first; then medium/fast sweeps; stop/restart; immediate reversal; three simultaneous knobs on different modules; rapid SmartGrid page changes; boundary clamping; a discrete selector; ring feedback; startup dump; and USB disconnect/reconnect. Tune base sensitivity first, then grouping and acceleration coefficient, then decay, then maximum gain. Keep both codec constants fixed.
-- [ ] Run `python3 tools/test_exponential_encoder_profile.py`, the response suite, existing quarter-step and USB suites, `make main`, and `git diff --check`. Commit artifacts and documentation. Report the branch/worktree, exact test results, build path, and remaining hardware evaluation. Stop with reviewable artifacts; do not flash or change the live configuration.
+- [x] Generate `configs/WRLD.BLDR.exponential-v1.ytx` from the read-only source `/Users/joyo/.codex/worktrees/f8f7/theallelectricsmartgrid/patches/WRLD.BLDR.ytx`. Record the source SHA-256 and transformation command in the documentation. Confirm exactly 48 changed leaves for its single bank of 16 encoders; the source remains unchanged.
+- [x] Write `docs/encoder-response.md` containing the equations, all constants and example vectors above, channel numbering, opt-in/rollback procedure, distinction between response and codec tuning, compatibility matrix, state/memory and packet bounds, and the unverified Elektron provenance. State that the old profile continues to work with the new firmware; the new profile requires a new SmartGrid receiver; old SmartGrid ignores its rotation channel. Do not imply the host application has already been changed.
+- [x] Include this hardware evaluation checklist for a later authorized deployment: compare slow full-range travel and micro-adjustments first; then medium/fast sweeps; stop/restart; immediate reversal; three simultaneous knobs on different modules; rapid SmartGrid page changes; boundary clamping; a discrete selector; ring feedback; startup dump; and USB disconnect/reconnect. Tune base sensitivity first, then grouping and acceleration coefficient, then decay, then maximum gain. Keep both codec constants fixed.
+- [x] Run `python3 tools/test_exponential_encoder_profile.py`, the response suite, existing quarter-step and USB suites, `make main`, and `git diff --check`. Commit artifacts and documentation. Report the branch/worktree, exact test results, build path, and remaining hardware evaluation. Stop with reviewable artifacts; do not flash or change the live configuration.
 
 ## Required companion SmartGrid change (handoff contract, not YTX implementation scope)
 
