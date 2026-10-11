@@ -8,7 +8,7 @@ struct ExponentialRelativeCodec
 {
     static constexpr double x_minimumDelta = 1.0 / 65536.0;
     static constexpr double x_codesPerDoubling = 8.0;
-    static constexpr double x_maximumInput = 0.140625;
+    static constexpr double x_maximumInput = 0.15625;
     static constexpr unsigned x_maximumPackets = 12;
     double m_remainder = 0.0;
 

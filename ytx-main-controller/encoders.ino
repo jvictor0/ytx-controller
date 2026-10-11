@@ -32,6 +32,7 @@ SOFTWARE.
 // ENCODER FUNCTIONS
 //----------------------------------------------------------------------------------------------------
 void EncoderInputs::Init(uint8_t maxBanks, uint8_t numberOfEncoders, SPIAdressableBUS *spiBUS){
+  begun = false;
   nBanks = 0;
   nEncoders = 0;
   nModules = 0;    
@@ -85,7 +86,7 @@ void EncoderInputs::Init(uint8_t maxBanks, uint8_t numberOfEncoders, SPIAdressab
 
   // Reset to bootloader if there isn't enough RAM to fit this data
   if(FreeMemory() < ( nBanks*nEncoders*sizeof(encoderBankData) + 
-                      nEncoders*sizeof(encoderData) + 800)){
+                      nEncoders*(sizeof(encoderData) + sizeof(ExponentialEncoderState)) + 800)){
     SERIALPRINTLN("NOT ENOUGH RAM / ENCODERS -> REBOOTING TO BOOTLOADER...");
     
     delay(500);
@@ -94,6 +95,20 @@ void EncoderInputs::Init(uint8_t maxBanks, uint8_t numberOfEncoders, SPIAdressab
   }
   
   eHwData = (encoderData*) memHost->AllocateRAM(nEncoders*sizeof(encoderData));
+    m_exponentialState = static_cast<ExponentialEncoderState*>(
+        memHost->AllocateRAM(nEncoders * sizeof(ExponentialEncoderState)));
+    if (!m_exponentialState)
+    {
+        SelfReset(RESET_TO_BOOTLOADER);
+        return;
+    }
+    const uint32_t nowUs = micros();
+    for (uint8_t e = 0; e < nEncoders; ++e)
+    {
+        new (&m_exponentialState[e]) ExponentialEncoderState();
+        m_exponentialState[e].m_response.Reset(nowUs);
+    }
+
 
   // Second dimension is an array for each bank
   for (int b = 0; b < nBanks; b++){
@@ -341,6 +356,24 @@ void EncoderInputs::Read(){
 //    SERIALPRINT(F("Priority list emptied"));
   }
 
+    bool pollAll = false;
+    for (uint8_t e = 0; e < nEncoders; ++e)
+    {
+        if (encoder[e].rotBehaviour.hwMode == rotaryModes::rot_rel_exponential)
+        {
+            pollAll = true;
+            break;
+        }
+    }
+    if (pollAll)
+    {
+        for (uint8_t moduleNo = 0; moduleNo < nModules; ++moduleNo)
+        {
+            ReadModule(moduleNo);
+        }
+    }
+    else
+    {
   if(priorityCount >= 1){
     ReadModule(priorityList[0]);
   }
@@ -369,6 +402,8 @@ void EncoderInputs::Read(){
     SERIALPRINT(F("\n")); 
     #endif
   } 
+
+    }
 
   uint8_t encNo = 0; 
   uint8_t nEncodInMod = 0;
@@ -921,6 +956,10 @@ void EncoderInputs::SwitchAction(uint8_t moduleNo, uint8_t encNo, int8_t clicks,
 }
 
 bool EncoderInputs::RotaryHasConfiguration(uint8_t encNo){
+    if (encoder[encNo].rotBehaviour.hwMode == rotaryModes::rot_rel_exponential)
+    {
+        return IsExponentialEncoder(encNo);
+    }
   return (bool)(encoder[encNo].rotaryConfig.message != rotaryMessageTypes::rotary_msg_none);
 }
 
@@ -938,7 +977,12 @@ int EncoderInputs::DecodeRotaryDirection(uint8_t moduleNo, uint8_t encNo){
       bool getDirection=false;
       uint8_t prescaler;
 
-      if(encoder[encNo].rotBehaviour.speed == encoderRotarySpeed::rot_fixed_speed_1 ||
+      if (encoder[encNo].rotBehaviour.hwMode == rotaryModes::rot_rel_exponential)
+      {
+          if (!IsExponentialEncoder(encNo)) return 0;
+          prescaler = 1;
+      }
+      else if(encoder[encNo].rotBehaviour.speed == encoderRotarySpeed::rot_fixed_speed_1 ||
          encoder[encNo].rotBehaviour.speed == encoderRotarySpeed::rot_variable_speed_1 ||
          encoder[encNo].rotBehaviour.speed == encoderRotarySpeed::rot_variable_speed_2 ||
          encoder[encNo].rotBehaviour.speed == encoderRotarySpeed::rot_variable_speed_3 || 
@@ -1033,6 +1077,15 @@ int EncoderInputs::DecodeRotaryDirection(uint8_t moduleNo, uint8_t encNo){
   return direction;
 }
 void EncoderInputs::EncoderAction(uint8_t moduleNo, uint8_t encNo){
+    if (encoder[encNo].rotBehaviour.hwMode == rotaryModes::rot_rel_exponential)
+    {
+        if (enableProcessing && IsExponentialEncoder(encNo))
+        {
+            ExponentialSink sink{this, encNo};
+            m_exponentialState[encNo].m_response.Pulse(eHwData[encNo].encoderDirection, micros(), sink);
+        }
+        return;
+    }
   bool programChangeEncoder = (encoder[encNo].rotaryConfig.message == rotaryMessageTypes::rotary_msg_pc_rel);
   bool isKey = (encoder[encNo].rotaryConfig.message == rotaryMessageTypes::rotary_msg_key);
 
@@ -1105,6 +1158,11 @@ void EncoderInputs::EncoderAction(uint8_t moduleNo, uint8_t encNo){
 }
 
 void EncoderInputs::SendRotaryMessage(uint8_t moduleNo, uint8_t encNo, bool initDump){
+    // All movement for this mode comes exclusively from the response sink.
+    // Reject unsupported message/module combinations here as well.
+    //
+    if (encoder[encNo].rotBehaviour.hwMode == rotaryModes::rot_rel_exponential) return;
+
   uint16_t paramToSend = 0;
   uint8_t channelToSend = 0, portToSend = 0;
   uint16_t minValue = 0, maxValue = 0; 
@@ -1480,6 +1538,11 @@ void EncoderInputs::SendRotaryMessage(uint8_t moduleNo, uint8_t encNo, bool init
 }
 
 void EncoderInputs::SendRotaryAltMessage(uint8_t moduleNo, uint8_t encNo, bool initDump){
+    // All movement for this mode comes exclusively from the response sink.
+    // Reject unsupported message/module combinations here as well.
+    //
+    if (encoder[encNo].rotBehaviour.hwMode == rotaryModes::rot_rel_exponential) return;
+
   uint16_t paramToSend = 0;
   uint8_t channelToSend = 0, portToSend = 0;
   uint16_t minValue = 0, maxValue = 0; 
@@ -2358,4 +2421,74 @@ void EncoderInputs::RefreshData(uint8_t b, uint8_t e){
   if(encoder[e].switchConfig.mode != switchModes::switch_mode_velocity){
     eBankData[b][e].buttonSensitivityControlOn = false;  
   }
+}
+
+
+bool EncoderInputs::IsExponentialEncoder(uint8_t encNo)
+{
+    if (!begun || !m_exponentialState || encNo >= nEncoders ||
+        encNo >= config->inputs.encoderCount) return false;
+    const uint8_t moduleType = GetModuleType(encNo / 4);
+    return encoder[encNo].rotBehaviour.hwMode == rotaryModes::rot_rel_exponential &&
+           encoder[encNo].rotaryConfig.message == rotaryMessageTypes::rotary_msg_cc &&
+           (moduleType == EncoderModuleTypes::E41H || moduleType == EncoderModuleTypes::E41V);
+}
+
+void EncoderInputs::ServiceExponentialEncoders(uint32_t nowUs)
+{
+    if (!begun || !m_exponentialState) return;
+    if (!enableProcessing)
+    {
+        ResetExponentialEncoders(nowUs);
+        return;
+    }
+    for (uint8_t e = 0; e < nEncoders; ++e)
+    {
+        if (IsExponentialEncoder(e))
+        {
+            ExponentialSink sink{this, e};
+            m_exponentialState[e].m_response.Advance(nowUs, sink);
+        }
+    }
+}
+
+void EncoderInputs::ResetExponentialEncoders(uint32_t nowUs)
+{
+    if (!begun || !m_exponentialState) return;
+    for (uint8_t e = 0; e < nEncoders; ++e)
+    {
+        m_exponentialState[e].m_response.Reset(nowUs);
+        m_exponentialState[e].m_codec.Reset();
+    }
+}
+
+void EncoderInputs::FlushExponentialEncoder(uint8_t encNo, uint32_t nowUs)
+{
+    if (!begun || !m_exponentialState || encNo >= nEncoders) return;
+    if (enableProcessing && IsExponentialEncoder(encNo))
+    {
+        ExponentialSink sink{this, encNo};
+        m_exponentialState[encNo].m_response.Flush(nowUs, sink);
+    }
+    m_exponentialState[encNo].m_response.Reset(nowUs);
+    m_exponentialState[encNo].m_codec.Reset();
+}
+
+void EncoderInputs::FlushExponentialEncoders(uint32_t nowUs)
+{
+    if (!begun || !m_exponentialState) return;
+    for (uint8_t e = 0; e < nEncoders; ++e)
+    {
+        FlushExponentialEncoder(e, nowUs);
+    }
+}
+
+void EncoderInputs::SendExponentialRotaryMessage(uint8_t encNo, uint8_t value)
+{
+    if (value == 64 || !enableProcessing || !IsExponentialEncoder(encNo)) return;
+    const uint8_t parameter = encoder[encNo].rotaryConfig.parameter[rotary_LSB] & 0x7f;
+    const uint8_t channel = encoder[encNo].rotaryConfig.channel + 1;
+    const uint8_t ports = encoder[encNo].rotaryConfig.midiPort;
+    if (ports & (1 << MIDI_USB)) MIDI.sendControlChange(parameter, value, channel);
+    if (ports & (1 << MIDI_HW)) MIDIHW.sendControlChange(parameter, value, channel);
 }

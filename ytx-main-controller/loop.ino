@@ -156,10 +156,15 @@ void loop() {
   } 
 
   // if configuration is valid, and not in kwhat mode
+  if (!enableProcessing)
+  {
+    encoderHw.ResetExponentialEncoders(micros());
+  }
   if(enableProcessing){
 
     // Read all inputs
     encoderHw.Read();
+    encoderHw.ServiceExponentialEncoders(micros());
 
     analogHw.Read();        
     analogHw.SendNRPN();

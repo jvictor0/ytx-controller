@@ -11,9 +11,10 @@ struct EncoderResponseConfig
     static constexpr int32_t x_accelerationCoefficient = 18;
     static constexpr uint32_t x_decayUs = 10000;
     static constexpr int32_t x_maxGain = 16;
-    // A frame can intersect one more millis bucket than its rounded-up duration.
+    // A frame intersects an extra millis bucket; variable receipt latency can
+    // bring one earlier scan into the frame as well. Each knob is visited once.
     //
-    static constexpr int32_t x_maxFramePulses = (x_frameUs + 999) / 1000 + 1;
+    static constexpr int32_t x_maxFramePulses = (x_frameUs + 999) / 1000 + 2;
     static_assert(x_frameUs > 0 && x_decayUs > 0, "Intervals must be positive");
     static_assert(x_maxFramePulses * x_maxGain * x_baseStep <=
                   ExponentialRelativeCodec::x_maximumInput, "Revalidate codec bound after tuning");

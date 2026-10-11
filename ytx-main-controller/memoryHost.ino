@@ -182,6 +182,9 @@ uint8_t memoryHost::LoadBank(uint8_t bank)
 {
   static int first = 1;
   if(bank != bankNow){
+    // Drain against the old rotaryConfig before EEPROM replaces its route.
+    //
+    encoderHw.FlushExponentialEncoders(micros());
     if(first){
       first = 0;
       externalMemory->read(eepIndex+bankSize*bank, (byte*)bankChunk, bankSize);
@@ -228,6 +231,7 @@ uint8_t memoryHost::LoadBankSingleSection(uint8_t bank, uint8_t block, uint16_t 
   //  externalMemory->read(eepIndex+bankSize*bank, (byte*)bankChunk, bankSize);
   switch (block) {
     case ytxIOBLOCK::Encoder: {
+        encoderHw.FlushExponentialEncoder(sectionIndex, micros());
         ReadFromEEPROM(bank, ytxIOBLOCK::Encoder, sectionIndex, &encoder[sectionIndex], rotaryQSTB);
       } break;
     case ytxIOBLOCK::Digital: {

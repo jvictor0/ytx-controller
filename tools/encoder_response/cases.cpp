@@ -166,7 +166,8 @@ static void CheckTiming()
     a.Flush(1000000, pipeline);
     for (int i = 0; i < 100; ++i)
     {
-        assert(a.ApplyFrame(-9) == -9 * 16.0 / 1024);
+        assert(a.ApplyFrame(-EncoderResponseConfig::x_maxFramePulses) ==
+               -EncoderResponseConfig::x_maxFramePulses * 16.0 / 1024);
         assert(a.m_acceleration == -16);
     }
     assert(a.ApplyFrame(0) == 0.0 && a.m_acceleration == -16);
@@ -193,7 +194,7 @@ int main(int argc, char** argv)
         Sink invalidSink;
         if (std::strcmp(argv[1], "nan") == 0) invalidCodec.Add(NAN, invalidSink);
         if (std::strcmp(argv[1], "infinity") == 0) invalidCodec.Add(INFINITY, invalidSink);
-        if (std::strcmp(argv[1], "oversize") == 0) invalidCodec.Add(0.15, invalidSink);
+        if (std::strcmp(argv[1], "oversize") == 0) invalidCodec.Add(std::nextafter(ExponentialRelativeCodec::x_maximumInput, INFINITY), invalidSink);
         if (std::strcmp(argv[1], "bad_remainder") == 0)
         {
             invalidCodec.m_remainder = 1.0;
@@ -241,8 +242,10 @@ int main(int argc, char** argv)
     }
     ExponentialRelativeCodec codec;
     assert(codec.m_remainder == 0.0);
+    assert(EncoderResponseConfig::x_maxFramePulses == 10);
+    assert(ExponentialRelativeCodec::x_maximumInput == 10.0 * 16 / 1024);
     size_t maximum = 0;
-    for (int q = -9; q <= 9; ++q)
+    for (int q = -EncoderResponseConfig::x_maxFramePulses; q <= EncoderResponseConfig::x_maxFramePulses; ++q)
     {
         for (int gain = 1; gain <= 16; ++gain)
         {
@@ -259,7 +262,7 @@ int main(int argc, char** argv)
     {
         codec.Reset();
         codec.m_remainder = ((i + 100000) % 3 - 1) * std::nextafter(minimum, 0.0);
-        const size_t packets = CheckDrain(codec, i * 0.140625 / 100000.0);
+        const size_t packets = CheckDrain(codec, i * ExponentialRelativeCodec::x_maximumInput / 100000.0);
         if (packets > maximum) maximum = packets;
     }
     codec.Reset();

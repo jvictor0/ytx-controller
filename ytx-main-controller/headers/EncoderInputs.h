@@ -35,6 +35,14 @@ SOFTWARE.
 
 #include "modules.h"
 #include "FeedbackClass.h"
+#include "EncoderResponse.h"
+#include <new>
+
+struct ExponentialEncoderState
+{
+    EncoderResponse m_response;
+    ExponentialRelativeCodec m_codec;
+};
 
 //----------------------------------------------------------------------------------------------------
 // CLASS DEFINITION
@@ -167,6 +175,12 @@ public:
 
 	void Init(uint8_t,uint8_t, SPIAdressableBUS *);
 	void Read();
+    bool IsExponentialEncoder(uint8_t encNo);
+    void ServiceExponentialEncoders(uint32_t nowUs);
+    void ResetExponentialEncoders(uint32_t nowUs);
+    void FlushExponentialEncoders(uint32_t nowUs);
+    void FlushExponentialEncoder(uint8_t encNo, uint32_t nowUs);
+    void SendExponentialRotaryMessage(uint8_t encNo, uint8_t value);
 	void SwitchAction(uint8_t, uint8_t, int8_t, bool initDump = false);
 	void SendRotaryMessage(uint8_t, uint8_t, bool initDump = false);
 	void SendRotaryAltMessage(uint8_t, uint8_t, bool initDump = false);
@@ -216,7 +230,24 @@ private:
 	uint8_t nBanks;
 	uint8_t nEncoders;
 	uint8_t nModules;
-	bool begun;
+	bool begun = false;
+    ExponentialEncoderState* m_exponentialState = nullptr;
+
+    struct ExponentialSink
+    {
+        EncoderInputs* m_inputs;
+        uint8_t m_encoder;
+
+        void AddMovement(double delta)
+        {
+            m_inputs->m_exponentialState[m_encoder].m_codec.Add(delta, *this);
+        }
+
+        void Emit(uint8_t value)
+        {
+            m_inputs->SendExponentialRotaryMessage(m_encoder, value);
+        }
+    };
 
 	// pointers to modules objects
 	void **encodersModule;

@@ -290,6 +290,7 @@ void handleSystemExclusive(byte *message, unsigned size, bool midiSrc)
                     static bool newMemReset = false;
 
                     if(message[ytxIOStructure::BLOCK] == ytxIOBLOCK::Configuration){
+                      encoderHw.FlushExponentialEncoders(micros());
                       ytxConfigurationType* payload = (ytxConfigurationType *) decodedPayload;
                       // SERIALPRINT(F("\n Block 0 received"));
 

@@ -318,7 +318,9 @@ enum rotaryModes{
     rot_rel_complement2,            // 2-  2 Complement (positive 001 - 064 / negative 127 - 065)
     rot_rel_signedBit,              // 3 - Signed Bit (positive 065 - 127 / negative 001 - 063)
     rot_rel_signedBit2,             // 4 - Signed Bit 2 (positive 001 - 063 / negative 065 - 127)
-    rot_rel_singleValue             // 5 - Single Value (increment 096 / decrement 097)
+    rot_rel_singleValue,            // 5 - Single Value (increment 096 / decrement 097)
+    rot_rel_exponential = 6         // Exponential relative v1, ordinary CC on endless pots.
+    //
 };
 
 enum rotaryMessageTypes{
