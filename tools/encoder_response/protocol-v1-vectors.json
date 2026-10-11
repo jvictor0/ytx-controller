@@ -1,0 +1,57 @@
+{
+  "protocol": "exponential-relative-v1",
+  "minimumDelta": 1.52587890625e-05,
+  "codesPerDoubling": 8,
+  "vectors": [
+    {
+      "value": 0,
+      "ignored": false,
+      "delta": -0.04299070473158695
+    },
+    {
+      "value": 1,
+      "ignored": false,
+      "delta": -0.0394086576878187
+    },
+    {
+      "value": 32,
+      "ignored": false,
+      "delta": -0.002528864984210997
+    },
+    {
+      "value": 56,
+      "ignored": false,
+      "delta": -0.00016859099894739983
+    },
+    {
+      "value": 63,
+      "ignored": false,
+      "delta": -1.52587890625e-05
+    },
+    {
+      "value": 64,
+      "ignored": true,
+      "delta": 0.0
+    },
+    {
+      "value": 65,
+      "ignored": false,
+      "delta": 1.52587890625e-05
+    },
+    {
+      "value": 72,
+      "ignored": false,
+      "delta": 0.00016859099894739983
+    },
+    {
+      "value": 96,
+      "ignored": false,
+      "delta": 0.002528864984210997
+    },
+    {
+      "value": 127,
+      "ignored": false,
+      "delta": 0.0394086576878187
+    }
+  ]
+}
