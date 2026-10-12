@@ -1,33 +1,36 @@
 # Exponential encoder response v1
 
-This opt-in implementation changes MAIN firmware only. Mode 6 implements a tunable approximation inspired by static Digitone II research; it is not a measured Elektron cutoff match. Module firmware, AUX, SPI protocol and hardware remain unchanged. Existing modules report activity and direction, without a magnitude counter or timestamped queue. Motion can be lost before MAIN receives it; acceleration approximates the density of received reports.
+This opt-in implementation changes MAIN firmware only. Mode 6 now uses the ordinary-turn Digitone II cutoff profile and nominal timer periods recovered on 2026-10-12. Physical sensitivity remains a YTX adaptation, not a measured Elektron feel match. This revision updates MAIN only and keeps the existing mode-6 profile and exponential-relative v1 wire protocol. Module firmware, AUX, SPI protocol and hardware remain unchanged. Existing modules report activity and direction, without a magnitude counter or timestamped queue. Motion can be lost before MAIN receives it; acceleration approximates the density of received reports.
 
 ## Response and timing
 
 MAIN owns acceleration, timing, reversal and wire quantization. SmartGrid owns parameter values, limits, selector quantization, gestures and feedback. One response applies to all parameters, with no pressed-turn behavior.
 
-| Response control | Initial value |
-| --- | ---: |
-| `x_baseStep` | 1/1024 normalized range per reported pulse |
-| `x_frameUs` | 8000 µs |
-| `x_accelerationCoefficient` | 18 |
-| `x_decayUs` | 10000 µs |
-| `x_maxGain` | 16 |
+| Response control | Current value | Basis |
+| --- | ---: | --- |
+| `x_baseStep` | 1/32768 normalized range per accepted report at minimum gain | YTX sensitivity adaptation |
+| `x_frameUs` | 33334 µs | Native nominal batch period 33.334303 ms |
+| `x_accelerationCoefficient` | 18 | Ordinary-turn cutoff profile A |
+| `x_decayUs` | 100000 µs | Native nominal 10 Hz decay callback |
+| `x_batchLimit` | 30 reports per frame | Native signed input-batch clamp |
 
-Each physical knob holds signed acceleration `a`, frame pulse sum `q`, direction, frame/decay clocks and signed codec residual. At a nonempty frame boundary:
+The old 16× gain cap is removed. Each physical knob holds signed acceleration `a`, raw same-direction frame report sum `p`, direction, frame/decay clocks and signed codec residual. At a nonempty frame boundary:
 
 ```text
+q = clamp(p, -30, 30)
 movement = baseStep * q * max(1, abs(a))
 if abs(q) > 1 or abs(a) > 1:
-    a = clamp(a + trunc(accelerationCoefficient*q/8), -maxGain, maxGain)
-q = 0
+    a += trunc(18*q/8)
+p = 0
 ```
+
+The ±30 limit is input saturation, not an acceleration cap. Just as in the native input stage, the entire raw batch is cleared: reports beyond 30 in one frame are deliberately discarded. With MAIN's conservative 36-report frame bound, this can discard up to six reports in a saturated frame. All movement *after this explicit input clamp* and its codec residual are conserved; packet limits do not truncate movement. At reversal YTX retains its old-partial-frame drain before resetting acceleration; it does not copy the native panel stage's possible opposite-direction input loss.
 
 The output uses the previous gain. At each decay boundary `a = trunc(2*a/3)`. Signed division truncates toward zero. Empty frames and decay emit nothing. Isolated single pulses retain minimum gain. Without elapsed decay, frames `1, 2, 2, 2, -2` produce base-step movements `1, 2, 8, 16, -2` and acceleration `0, 4, 8, 12, -4`; decay from 12 produces `8, 5, 3, 2, 1, 0`.
 
 Frame boundaries are relative to each knob's initialized clock. Elapsed frame/decay boundaries run chronologically, with decay first at ties. A boundary pulse belongs to the next frame. Unsigned elapsed-time arithmetic handles micros rollover, including initialization at zero. Service must occur at least once per half uint32 microsecond range (about 35 minutes); longer gaps are unsupported because retained boundaries may predate the previous call. Long idle settles bounded acceleration then skips empty time. There is no blocking delay, heap allocation per event or USB-arrival timing dependency.
 
-Reversal advances due boundaries, flushes the old partial frame at its old gain, drains its representable movement, then resets acceleration before collecting the new direction. Signed sub-minimum residual persists as numerical error and cannot independently emit an opposite correction. Controller bank/configuration route changes drain to the old route then reset; SmartGrid page changes and incoming ring feedback do not reset acceleration. The reconstructed movement gate is omitted because its units are unknown and modules already apply hysteresis.
+Reversal advances due boundaries, flushes the old partial frame at its old gain, drains its representable movement, then resets acceleration before collecting the new direction. Signed sub-minimum residual persists as numerical error and cannot independently emit an opposite correction. Controller bank/configuration route changes drain to the old route then reset; SmartGrid page changes and incoming ring feedback do not reset acceleration. The native movement gate (threshold 24, reset 48, recovery +1 per 100 ms) remains omitted: conversion from its raw counts to YTX activity reports and its reset call sites are unestablished, and YTX modules already apply hysteresis.
 
 ## Wire codec
 
@@ -72,44 +75,47 @@ candidate = clamp(candidate, 0, remaining > 0 ? 63 : 64)
 
 Evaluate the candidate and adjacent code to correct floating-point rounding. Candidate zero retains residual and emits nothing. Otherwise emit `64 + sign(remaining)*candidate`, subtract its decoded movement and repeat. Double-precision residual accounting conserves repeated fine movement; each movement drains before accepting representable opposing motion. Firmware never emits 64.
 
-## Bounds and build evidence
+## Sensitivity adaptation
 
-The scan guard permits one scan per distinct millis bucket; variable SPI processing latency can move receipt times across buckets. The corrected frame bound is `ceil(frameUs/1000)+2 = 10` pulses, giving `10*16/1024 = 0.15625` maximum normalized frame movement plus sub-minimum residual. Re-derive this bound if grouping or gain changes. A conservative analytic ceiling is 12 packets per drain; exhaustive q=-10..10, gains 1..16, residual extremes and a 200,001-point dense sweep observed at most 8. Movement is never truncated to fit a packet budget. Host tests reject nonfinite and out-of-contract inputs.
+One module activity report is not proven equivalent to one native Digitone count. The cutoff range `0..0x7f00` (32512) therefore does not justify directly normalizing each YTX report by 32512. The chosen power-of-two base step, **1/32768**, is an engineering default selected jointly with the slower decay and uncapped gain. It is two wire minimum deltas, so an isolated report remains representable without waiting for another report.
 
-ARM state is 24 response bytes plus 8 codec bytes = **32 bytes per physical encoder**, 512 for 16 and 2048 for 64, allocated once through the existing checked RAM allocator; no per-bank replication. Static data is 448 bytes and BSS 15364. Bundled-core MAIN sketch is 123120 bytes, up 12340 from the 110780-byte baseline. Binary file size is 123576 bytes; SHA-256 `cde0424351d846fc0ff9ea69a30292e67c7c16178b2521b5069494f4f2c531cc`.
+An idealized constant-rate trace anchors fast motion to the previous implementation. Over the final five seconds of a ten-second, 1,000-report/s trace, the old 8 ms/10 ms/capped-16 response produced approximately 10.94 normalized ranges/s; the revised 33.334 ms/100 ms/uncapped response with this base step produces approximately 12.83. The new steady peak acceleration is 601 in the host trace. Isolated reports are 32 times finer than the original 1/1024 default, while dense sweeps remain in the same order of sensitivity. These are synthetic report-rate comparisons, not measurements of turns, angles, hardware latency or subjective feel. Base sensitivity is the first control to tune on the actual knobs.
+
+## Bounds and work
+
+The scan guard permits one read per distinct millis bucket; variable SPI latency can deliver one earlier scan inside the interval. For any service interval `T`, the adapter supplies at most `ceil(T/1000)+2` reports per physical encoder. Thus `x_maxFramePulses = 36` and `x_maxDecayPulses = 102`. The input batch passed to the profile is at most 30.
+
+A decay interval's emitted batches can include its 102 incoming reports plus one pending 36-report frame. Even with early partial flushes, the sum of acceleration increments is bounded by `B = floor(18*(102+36)/8) = 310`. Starting from reset, the invariant peak magnitude is `3*B = 930`: decay takes it to at most `2*B`, then another interval adds at most `B`. Reversal only lowers this bound. **930 is a derived assertion and never a clamp or a tuning control.** All signed integer arithmetic fits in 32 bits. Direct recurrence/clock users must honor the adapter's report-rate contract, not just a per-call pulse limit.
+
+The largest possible drain input is `30*930/32768 = 0.8514404296875`, plus a sub-minimum codec residual. This changes only the encoder's accepted-input/work bounds, not the v1 decoding formula or bytes. Let `M = Decode(127)`, `d = minimumDelta` and `alpha = 1 - 2^(-1/8)`. There are at most 21 full positive-size packets because `maximumInput+d < 22*M`; the negative full packet is larger. Below `M`, each floor-encoded packet leaves `R_next < alpha*R + d*(1-alpha)`. After four such packets, `R < d + (M-d)*alpha^4 < 2*d`; a fifth, if needed, leaves less than `d`. Therefore **26 packets per drain** is a conservative ceiling. Exhaustive batches -30..30, every integer gain 1..930, three residual extremes and a 200,001-point dense sweep observed **25**. Nonfinite and out-of-contract inputs fail assertions in host tests.
+
+Idle service performs only the decays required to settle the bounded acceleration, then jumps over empty frames in constant time. Per-event state size is unchanged: 24 response bytes plus 8 codec bytes = **32 bytes per physical encoder**, 512 for 16 and 2048 for 64. Allocation remains checked and occurs once, outside the motion path. USB transmission and actual Cortex-M0+ execution latency require hardware observation; a finite packet bound does not claim a measured service deadline.
 
 ## Profile and compatibility
 
-`configs/WRLD.BLDR.exponential-v1.ytx` is a deep copy of the read-only source `/Users/joyo/.codex/worktrees/f8f7/theallelectricsmartgrid/patches/WRLD.BLDR.ytx`, SHA-256 `642a6f0a1f73e077b088a607024033c11bf1a04d504d6b7acbef3bfc471c83bf`.
+The device already has mode 6, ordinary USB CC0–15 on human channel 9 (zero-based 8). This firmware revision requires **no new profile, profile generation or configuration upload**. The 2026-10-12 exported live profile is `/private/tmp/wrld-bldr-exponential-20261012/WRLD.BLDR.exponential-v1.ytx`; it also exists in SmartGrid's `patches/WRLD.BLDR.ytx`. USB→DIN forwarding was intentionally preserved when that profile was installed.
 
-```sh
-python3 tools/make_exponential_encoder_profile.py /Users/joyo/.codex/worktrees/f8f7/theallelectricsmartgrid/patches/WRLD.BLDR.ytx configs/WRLD.BLDR.exponential-v1.ytx
-```
-
-Only `encoder_mode.hw_mode = 6`, `rotary_config.channel = 8`, and `rotary_config.midi_port = 1` change for each of 16 encoders: exactly 48 leaves. Speed, min/max, switch settings, feedback, hardware identifiers and non-encoder controls are preserved. The original source is unchanged. Its `parameter` metadata swaps groups 4–7 and 8–11, while `parameter_lsb` follows physical indices. The generator validates each representation independently as the complete CC 0–15 set, with zero `parameter_msb`, and preserves both permutations; no editor serialization behavior is assumed.
+The historical generated `configs/WRLD.BLDR.exponential-v1.ytx` and profile generator remain unchanged. The original source used canonical `parameter` values with a groups-4–7/8–11 permutation and stale redundant `parameter_lsb` fields. The live device readback established that canonical `parameter` matched its actual CC routing. This revision preserves all actual device bytes, including that routing, instead of exporting or rewriting metadata.
 
 | Firmware/profile/receiver | Behavior |
 | --- | --- |
-| New MAIN + original profile + existing receiver | Existing protocol and response continue to work |
-| New MAIN + exponential profile + old SmartGrid | Channel-9 rotation ignored; buttons/feedback retain their routes |
-| New MAIN + exponential profile + updated receiver | Intended v1 path, pending receiver implementation and hardware evaluation |
-| Old MAIN + exponential profile | Unsupported; do not enable |
+| Revised MAIN + original legacy profile | Existing legacy response/protocol |
+| Revised MAIN + existing mode-6 profile + exponential v1 receiver | Corrected response over unchanged v1 protocol |
+| Revised MAIN + existing mode-6 profile + old receiver | Channel-9 rotation ignored |
 
-For a later authorized deployment, retain the original profile, install tested MAIN and the companion receiver, then load the separate exponential profile. Do not open/save mode 6 through an older editor that may coerce an unknown mode. Roll back by restoring the original WRLD.BLDR profile; the new MAIN supports it. These artifacts do not flash firmware, upload configuration, send diagnostics or modify SmartGrid.
+Do not open/save mode 6 through an editor that might coerce an unknown mode. To roll back this behavior revision while retaining mode 6, flash the previously deployed MAIN binary; its configuration is compatible. Restoring the pre-mode-6 legacy profile instead selects the existing legacy response.
 
-## Required SmartGrid handoff — still pending
+## Unchanged SmartGrid receiver contract
 
-Current `EncoderMidi::FromMidi` subtracts 64 on channel 0; `Encoder::HandleIncDec` adds timing-dependent acceleration. Already accelerated exponential movement must bypass both operations.
-
-1. Add `MessageIn::Mode::EncoderExponentialDelta` in `private/src/MessageIn.hpp`, carrying the raw byte in existing integer `m_amount`. Implement a standalone v1 analytic decoder with identical constants and shared test vectors.
-2. In `private/src/WrldBLDRMidi.hpp`, recognize CC 0–15 on zero-based channel 8, route to existing encoder grid positions, and ignore 64 before producing an event. Do not globally reinterpret channel 8 for other devices.
-3. In `EncoderBank::Apply` (`private/src/EncoderBank.hpp`), look up the visible **BankedEncoderCell**, decode the byte and call **`cell->Increment(delta)` directly**. Do not call `HandleIncDec`, `SetToValue` or `IncrementInternal`. `Increment` preserves gestures/scenes while bypassing the old acceleration layer.
-4. Preserve legacy channel-0 `EncoderIncDec`, buttons, feedback and parameter mappings. Continuous parameters receive normalized deltas; discrete selectors retain normalized accumulation and rounding.
-5. Verify all 128 bytes, invalid CC range, no-event 64, controller compatibility, identical results under different packet arrival timings, continuous/discrete parameters, gesture/scene handling and feedback. No MIDI callback changes or SysEx negotiation are needed.
+This task changes neither SmartGrid nor its deployment. The v1 path recognizes WRLD.BLDR CC0–15 on zero-based channel 8, ignores 64 before creating any event, and analytically decodes the remaining byte. `EncoderBank::Apply` passes that normalized delta directly to the visible `BankedEncoderCell::Increment`, bypassing `HandleIncDec`'s host acceleration. Legacy channel-0 processing, buttons, feedback, gestures/scenes and normalized discrete-selector accumulation retain their existing behavior. No receiver/protocol change is needed for the corrected MAIN timing and gain.
 
 ## Provenance and later hardware evaluation
 
-Static research examined Digitone II MAIN OS 1.10D, SHA-256 `8caf761317ec25848e47bd6c6907188e8d4de180e744a350fd8d4df8e5715a3f`. It supports signed acceleration, reversal reset, previous-gain output and truncating 2/3 decay. A candidate continuous profile has `(k, divisor, step) = (18, 1, 1)`. Cutoff assignment, input scaling, event grouping and physical timer frequency remain unverified. Timer registration argument 10 means every third parent dispatch, not a proven 10 ms period. The attempted isolated instruction-emulation verification did not run. The official manual does not specify these constants. Only coefficient 18 comes from that candidate; other defaults and the gain cap are engineering starting points.
+The 2026-10-12 static trace examined saved Digitone II MAIN OS 1.10D, SHA-256 `8caf761317ec25848e47bd6c6907188e8d4de180e744a350fd8d4df8e5715a3f`. FilterPageView encoder E maps to cutoff for all six filter machines, through parameter IDs 0x24, 0x27, 0x29, 0x36, 0x39 and 0x13e. All use ordinary profile A: coefficient 18, divisor 1, step 1, continuous, ordinary input multiplier 1, no ×256 output scale and no explicit gain cap. Pressed behavior is outside this implementation.
+
+The input callback batches four nominal PIT2 ticks: `4*64*(17187+1)/132000000` seconds = approximately 33.334303 ms, then clamps the signed batch to ±30 and clears it. Decay is every third nominal 30 Hz UI event: approximately 100 ms. Registration argument 10 denotes frequency, not milliseconds. Nominal timing comes from peripheral register interpretation and the firmware's intended 132 MHz scale; task scheduling and oscillator behavior were not measured.
+
+Evidence, byte assertions and bounded disassemblies are in `/Users/joyo/.codex/visualizations/2026/10/11/01a12c12-4359-74c3-8c28-622bf7502328/digitone-cutoff-firmware-20261012/README.txt` and its sibling `findings.json`/`extract.py`. This is verified static evidence, not instruction emulation or hardware measurement. The earlier attempted isolated emulation did not run. Native physical counts per turn, YTX/native input scaling and gate reset call sites remain unestablished.
 
 For later authorized hardware evaluation:
 
@@ -119,20 +125,24 @@ For later authorized hardware evaluation:
 - Check boundary clamping and a discrete selector.
 - Check ring feedback, startup dump and USB disconnect/reconnect.
 
-Tune base sensitivity first, then grouping and acceleration coefficient, then decay interval, then maximum gain. Keep both codec constants fixed, and initially keep 2/3 decay and integer division by 8 fixed. Revisit the lossy module protocol only if measured lost motion or a speed plateau cannot be resolved by response tuning. Hardware feel and receiver integration remain separate deliverables; no hardware success is claimed.
+Tune base sensitivity first; batching, coefficient, decay ratio/interval and batch saturation now have static cutoff evidence and should remain fixed for the initial comparison. Keep both codec constants fixed. Any future timing/coefficient change requires re-deriving the assertions and wire-drain ceiling. Revisit the lossy module protocol only if measured motion loss cannot be resolved by MAIN adaptation. Physical feel is not verified until the user tries it.
 
-## Final verification
+## Verification and deployment
 
-Verified in branch `codex/ytx-encoder-response`, worktree `/Users/joyo/.codex/worktrees/ytx-encoder-response/ytx-controller`:
+Current revision tests cover both signs of explicit input saturation, full batch clearing, previous-gain output above the old cap, exact 100 ms decay, 33,334 µs boundary ownership, decay-first ties, rollover, delayed versus frequent service, long idle, reversal, independent knobs, periodic partial flushes, sustained 601 acceleration, and codec conservation. Integration compiles actual production methods and checks 36 delayed receipts, the 30-report clamp, old-route drains, three-module fairness and same-millis service. Existing startup/button/feedback silence and legacy compatibility tests remain in place.
 
-| Command | Result |
+Software verification passed:
+
+| Check | Result |
 | --- | --- |
-| `python3 tools/test_exponential_encoder_profile.py` | 5 portable unittest cases passed |
-| `python3 tools/test_encoder_response.py` | Recurrence/timing/rollover/idle/independence/pipeline passed; response 24 bytes, pulse bound 10; codec conservation/dense sweep passed, observed maximum 8 packets, ceiling 12; all 128 independent decoder vectors passed under ASan/UBSan |
-| `python3 tools/test_encoder_integration.py` | Production init/allocation, dump/buttons, new/legacy motion, routes, disabled state, same-millis service, three-module fairness and ten delayed receipts passed; combined state 32 bytes |
-| `python3 tools/test_quarter_step_table.py` | Quarter-step table tests passed |
-| `python3 tools/test_usb_reset.py` | All 17 cases passed under ASan/UBSan |
-| `ARDUINO_DIRECTORIES_USER="$PWD" make main` | Exit 0; sketch 123120 bytes (53% of 229376) |
+| `python3 tools/test_encoder_response.py` | Recurrence, timing, both-sign batch clamp, sustained gain, partial flushes, idle, reversal, rollover and pipeline passed under ASan/UBSan; exhaustive/dense codec maximum 25 packets, bound 26; all 128 independent decoder vectors passed |
+| `python3 tools/test_encoder_integration.py` | Actual MAIN methods passed, including 36 delayed receipts, clamp, silence, routes, fairness and legacy behavior |
+| `python3 tools/test_quarter_step_table.py` | Passed |
+| `python3 tools/test_usb_reset.py` | All 17 ASan/UBSan cases passed |
+| `python3 tools/test_exponential_encoder_profile.py` | All 5 cases passed; no profile generated |
+| `ARDUINO_DIRECTORIES_USER="$PWD" make main` | Passed; sketch 123304 bytes (53% of 229376), +184 bytes from the prior response build |
 | `git diff --check` | Passed |
 
-Build output: `ytx-main-controller/build/ytx-main-controller.ino.app.bin`; build log `/private/tmp/ytx-task4-main.log`. Generated profile SHA-256: `078eaf5b7f5c6faf9ca39d1c577e394f38f69fd28cf717d6cceb0f523701b2da`. Independent recursive comparison confirmed precisely the 48 permitted changed leaves and identical remaining fields; the read-only source SHA-256 was recomputed unchanged. Tests/build verify software behavior; companion SmartGrid integration and physical calibration remain pending.
+ARM ELF: text 123312, data 448, BSS 15364. The exported application binary is 123760 bytes, SHA-256 `b842fe68114611c155680b5209781e4eb5cb96a194bc9f23fd40404bef1f8dea`. Build output remains `ytx-main-controller/build/ytx-main-controller.ino.app.bin`. Deployment evidence is saved under `/private/tmp/wrld-bldr-cutoff-response-20261012/`. AUX, modules and .ytx files are not written by this revision.
+
+Deployment completed on 2026-10-12: all **967 MAIN blocks** were acknowledged, the reset command completed, and a fresh MIDI client connected to WRLD.BLDR and successfully read configuration. All **215 sections / 6667 bytes** matched the pre-flash backup exactly (combined section-byte SHA-256 `de3882216848c202c495bbbc459b69a8b1798334de3d3cd301ddb02ec3e1dc68`). The existing mode-6 profile, CC routing and USB→DIN forwarding were preserved; no profile generation/upload or AUX/module flash occurred. `flash-transfer.json` and `configuration-verification.json` in the evidence directory record the checks. The firmware hash above identifies the acknowledged host binary; the bootloader has no firmware-hash readback API. Physical feel is still for the user to evaluate.

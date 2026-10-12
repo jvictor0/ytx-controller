@@ -231,7 +231,7 @@ void InitAndButtons()
     hw[0].lastSwitchBounce = millis() - DOUBLE_CLICK_WAIT - 1;
     encoderHw.SwitchCheck(0,0);
     assert(banks[0].encoderValue == 127 && hw[0].clickCount == 0);
-    encoderHw.ServiceExponentialEncoders(nowUs + 8000);
+    encoderHw.ServiceExponentialEncoders(nowUs + EncoderResponseConfig::x_frameUs);
     assert(MIDI.m_cc.empty());
 }
 
@@ -259,10 +259,10 @@ void MotionAndSilence()
     encoderHw.SendExponentialRotaryMessage(0,64);
     encoderHw.SetEncoderValue(0,0,45);
     assert(MIDI.m_cc.empty() && banks[0].encoderValue == 45);
-    nowUs += 2000;
+    nowUs += EncoderResponseConfig::x_frameUs - 6000;
     encoderHw.ServiceExponentialEncoders(nowUs);
     assert(!MIDI.m_cc.empty());
-    assert(std::abs(Sum() + response[0].m_codec.m_remainder - 6.0/1024) < 1e-15);
+    assert(std::abs(Sum() + response[0].m_codec.m_remainder - 6.0*EncoderResponseConfig::x_baseStep) < 1e-15);
     for (const auto& m : MIDI.m_cc) assert(m.parameter == 0 && m.channel == 9);
     assert(MIDIHW.m_cc.empty() && banks[0].encoderValue == 45);
     Setup();
@@ -299,7 +299,7 @@ void LegacyAndUnsupported()
     configuration.hwMapping.encoder[0] = E41H_D;
     assert(!encoderHw.IsExponentialEncoder(0));
     encoderHw.EncoderAction(0,0);
-    encoderHw.ServiceExponentialEncoders(nowUs + 8000);
+    encoderHw.ServiceExponentialEncoders(nowUs + EncoderResponseConfig::x_frameUs);
     assert(MIDI.m_cc.empty());
 }
 
@@ -314,7 +314,7 @@ void FairScanAndDelayedReceipt()
     for (unsigned i = 0; i < 3; ++i) { assert(spi[i].m_reads == 1); assert(response[4*i].m_response.m_framePulses == 1); }
     encoderHw.Read();
     for (const auto& module : spi) assert(module.m_reads == 1);
-    nowUs += 8000;
+    nowUs += EncoderResponseConfig::x_frameUs;
     encoderHw.ServiceExponentialEncoders(nowUs);
     bool seen[3] = {};
     for (const auto& m : MIDI.m_cc) seen[m.parameter/4] = true;
@@ -328,28 +328,32 @@ void FairScanAndDelayedReceipt()
     assert(spi[0].m_reads == 1 && spi[1].m_reads == 1 && spi[2].m_reads == 0);
     Setup();
     nowUs = 95100;
-    encoderHw.ResetExponentialEncoders(88100);
-    spi[0].m_state = 0x11; spi[0].m_delay = 1800;
+    encoderHw.ResetExponentialEncoders(63566);
+    spi[0].m_state = 0x11; spi[0].m_delay = 1850;
     encoderHw.Read();
-    assert(nowUs == 96900);
+    assert(nowUs == 96950);
     spi[0].m_delay = 0;
-    for (uint32_t receipt : {96950,97010,98010,99010,100010,101010,102010,103010,104010})
+    nowUs = 96980; encoderHw.Read();
+    for (uint32_t receipt = 97010; receipt <= 130010; receipt += 1000)
     { nowUs = receipt; encoderHw.Read(); }
-    assert(response[0].m_response.m_framePulses == 10);
-    nowUs = 104100;
+    assert(response[0].m_response.m_framePulses == 36);
+    nowUs = 130234;
     encoderHw.ServiceExponentialEncoders(nowUs);
-    assert(std::abs(Sum() + response[0].m_codec.m_remainder - 10.0/1024) < 1e-15);
+    assert(std::abs(Sum() + response[0].m_codec.m_remainder - 30.0*EncoderResponseConfig::x_baseStep) < 1e-15);
+    assert(response[0].m_response.m_framePulses == 0);
+    assert(response[0].m_response.m_acceleration == 67);
+
 }
 
 void SameMillisService()
 {
     Setup();
-    nowUs += 100;
+    nowUs = (nowUs / 100000 + 1) * 100000 + 100;
     encoderHw.ResetExponentialEncoders(nowUs);
     spi[0].m_state = 0x0f11;
     encoderHw.Read();
     spi[0].m_state = 0x0f00;
-    nowUs += 7900;
+    nowUs += EncoderResponseConfig::x_frameUs - 100;
     encoderHw.Read();
     encoderHw.ServiceExponentialEncoders(nowUs);
     assert(MIDI.m_cc.empty());
@@ -359,7 +363,7 @@ void SameMillisService()
     assert(spi[0].m_reads == reads);
     encoderHw.ServiceExponentialEncoders(nowUs);
     assert(!MIDI.m_cc.empty());
-    assert(std::abs(Sum() + response[0].m_codec.m_remainder - 1.0/1024) < 1e-15);
+    assert(std::abs(Sum() + response[0].m_codec.m_remainder - 1.0*EncoderResponseConfig::x_baseStep) < 1e-15);
 }
 
 void RoutesAndDisabled()
@@ -396,9 +400,9 @@ void RoutesAndDisabled()
     MIDI.m_cc.clear();
     encoderHw.EncoderAction(0,0);
     enableProcessing = false;
-    encoderHw.ServiceExponentialEncoders(nowUs + 8000);
+    encoderHw.ServiceExponentialEncoders(nowUs + EncoderResponseConfig::x_frameUs);
     enableProcessing = true;
-    encoderHw.ServiceExponentialEncoders(nowUs + 16000);
+    encoderHw.ServiceExponentialEncoders(nowUs + 2 * EncoderResponseConfig::x_frameUs);
     assert(MIDI.m_cc.empty());
     encoderHw.begun = false; encoderHw.m_exponentialState = nullptr;
     encoderHw.ServiceExponentialEncoders(nowUs);
@@ -409,5 +413,5 @@ void RoutesAndDisabled()
 int main()
 {
     InitAndButtons(); MotionAndSilence(); LegacyAndUnsupported(); FairScanAndDelayedReceipt(); SameMillisService(); RoutesAndDisabled();
-    std::printf("MAIN production integration: init/allocation, dump/buttons, motion/legacy, silence/routes, disabled, same-millis service, three-module fairness and ten delayed receipts passed; state = %zu bytes.\n", sizeof(ExponentialEncoderState));
+    std::printf("MAIN production integration: init/allocation, dump/buttons, motion/legacy, silence/routes, disabled, same-millis service, three-module fairness and 36 delayed receipts with explicit30-report batch clamp passed; state = %zu bytes.\n", sizeof(ExponentialEncoderState));
 }

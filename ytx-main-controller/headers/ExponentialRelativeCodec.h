@@ -8,8 +8,11 @@ struct ExponentialRelativeCodec
 {
     static constexpr double x_minimumDelta = 1.0 / 65536.0;
     static constexpr double x_codesPerDoubling = 8.0;
-    static constexpr double x_maximumInput = 0.15625;
-    static constexpr unsigned x_maximumPackets = 12;
+    // Adapter bounds only; the v1 Decode/EncodeFloor equations are unchanged.
+    // At most 21 largest positive packets plus five shrinking-tail packets.
+    //
+    static constexpr double x_maximumInput = 30.0 * 930.0 / 32768.0;
+    static constexpr unsigned x_maximumPackets = 26;
     double m_remainder = 0.0;
 
     static double Decode(uint8_t value)

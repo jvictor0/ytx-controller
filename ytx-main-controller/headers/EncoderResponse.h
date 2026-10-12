@@ -6,17 +6,27 @@
 
 struct EncoderResponseConfig
 {
-    static constexpr double x_baseStep = 1.0 / 1024.0;
-    static constexpr uint32_t x_frameUs = 8000;
+    static constexpr double x_baseStep = 1.0 / 32768.0;
+    static constexpr uint32_t x_frameUs = 33334;
     static constexpr int32_t x_accelerationCoefficient = 18;
-    static constexpr uint32_t x_decayUs = 10000;
-    static constexpr int32_t x_maxGain = 16;
+    static constexpr uint32_t x_decayUs = 100000;
+    static constexpr int32_t x_batchLimit = 30;
     // A frame intersects an extra millis bucket; variable receipt latency can
     // bring one earlier scan into the frame as well. Each knob is visited once.
     //
     static constexpr int32_t x_maxFramePulses = (x_frameUs + 999) / 1000 + 2;
+    // In one decay interval, emitted batches can contain the reports received
+    // during that interval plus one pending frame, including partial flushes.
+    // With increment <= coefficient*pulses/8 and decay 2/3, 3*increment is an
+    // invariant magnitude bound from reset. This is an assertion, not a gain cap.
+    //
+    static constexpr int32_t x_maxDecayPulses = (x_decayUs + 999) / 1000 + 2;
+    static constexpr int32_t x_incrementPerDecayBound =
+        x_accelerationCoefficient * (x_maxDecayPulses + x_maxFramePulses) / 8;
+    static constexpr int32_t x_accelerationBound = 3 * x_incrementPerDecayBound;
+    static_assert(x_accelerationBound <= INT32_MAX / 2, "Decay arithmetic must fit");
     static_assert(x_frameUs > 0 && x_decayUs > 0, "Intervals must be positive");
-    static_assert(x_maxFramePulses * x_maxGain * x_baseStep <=
+    static_assert(x_batchLimit * x_accelerationBound * x_baseStep <=
                   ExponentialRelativeCodec::x_maximumInput, "Revalidate codec bound after tuning");
 };
 
@@ -46,10 +56,16 @@ struct EncoderResponse
         m_boundaryUs = nowUs;
     }
 
-    double ApplyFrame(int32_t q)
+    // p is raw reported activity. The native input-stage batch limit is separate
+    // from the uncapped profile accumulator. EmitFrame clears the entire batch.
+    // Direct recurrence callers must honor the same report-rate/clock contract.
+    //
+    double ApplyFrame(int32_t p)
     {
-        assert(q >= -EncoderResponseConfig::x_maxFramePulses &&
-               q <= EncoderResponseConfig::x_maxFramePulses);
+        assert(p >= -EncoderResponseConfig::x_maxFramePulses &&
+               p <= EncoderResponseConfig::x_maxFramePulses);
+        const int32_t q = p > EncoderResponseConfig::x_batchLimit ? EncoderResponseConfig::x_batchLimit :
+                          p < -EncoderResponseConfig::x_batchLimit ? -EncoderResponseConfig::x_batchLimit : p;
         if (q == 0) return 0.0;
         if ((q < 0 && m_acceleration > 0) || (q > 0 && m_acceleration < 0))
         {
@@ -60,8 +76,8 @@ struct EncoderResponse
         if (q > 1 || q < -1 || magnitude > 1)
         {
             m_acceleration += EncoderResponseConfig::x_accelerationCoefficient * q / 8;
-            if (m_acceleration > EncoderResponseConfig::x_maxGain) m_acceleration = EncoderResponseConfig::x_maxGain;
-            if (m_acceleration < -EncoderResponseConfig::x_maxGain) m_acceleration = -EncoderResponseConfig::x_maxGain;
+            assert(m_acceleration >= -EncoderResponseConfig::x_accelerationBound &&
+                   m_acceleration <= EncoderResponseConfig::x_accelerationBound);
         }
         return movement;
     }
@@ -114,7 +130,9 @@ struct EncoderResponse
     }
 
     // The adapter must supply exactly -1/+1 and at most x_maxFramePulses
-    // same-direction pulses per frame, including any receipt-time scheduling jitter.
+    // same-direction pulses per frame. In any interval T, at most ceil(T/1000)+2
+    // reports may arrive, including receipt-time jitter; partial Flush does not
+    // waive this physical scan-rate precondition.
     //
     template<typename Sink> void Pulse(int8_t direction, uint32_t nowUs, Sink& sink)
     {

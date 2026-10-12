@@ -1,5 +1,7 @@
 # YTX Elektron-inspired encoder response implementation plan
 
+> Historical completed plan. The 2026-10-12 firmware-evidence correction supersedes its timing, gain cap, base sensitivity and derived bounds; see `docs/encoder-response.md`. The existing profile and v1 wire format are retained. This follow-up was implemented directly without the Superpowers workflow.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking. The user has already requested implementation in a separate Codex chat; proceed with that handoff without another design-approval round.
 
 **Goal:** Give WRLD.BLDR's endless pots one tunable, controller-side acceleration profile inspired by Digitone II filter cutoff, transmitting normalized relative movement over an analytic exponential MIDI encoding.
