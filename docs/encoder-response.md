@@ -1,6 +1,6 @@
 # Exponential encoder response v1
 
-This opt-in implementation changes MAIN firmware only. Mode 6 now uses the ordinary-turn Digitone II cutoff profile and nominal timer periods recovered on 2026-10-12. Physical sensitivity remains a YTX adaptation, not a measured Elektron feel match. This revision updates MAIN only and keeps the existing mode-6 profile and exponential-relative v1 wire protocol. Module firmware, AUX, SPI protocol and hardware remain unchanged. Existing modules report activity and direction, without a magnitude counter or timestamped queue. Motion can be lost before MAIN receives it; acceleration approximates the density of received reports.
+This opt-in implementation changes MAIN firmware only. Mode 6 uses the Digitone II cutoff recurrence and nominal timer periods recovered on 2026-10-12, with an empirical WRLD.BLDR sensitivity trial: base step 1/1500 and acceleration coefficient 8. This replaces the earlier 1/32768 and coefficient-18 calibration. It is a subjective test candidate, not a validated Elektron feel match. This revision updates MAIN only and keeps the existing mode-6 profile and exponential-relative v1 wire protocol. Module firmware, AUX, SPI protocol and hardware remain unchanged. Existing modules report activity and direction, without a magnitude counter or timestamped queue. Motion can be lost before MAIN receives it; acceleration approximates the density of received reports.
 
 ## Response and timing
 
@@ -8,9 +8,9 @@ MAIN owns acceleration, timing, reversal and wire quantization. SmartGrid owns p
 
 | Response control | Current value | Basis |
 | --- | ---: | --- |
-| `x_baseStep` | 1/32768 normalized range per accepted report at minimum gain | YTX sensitivity adaptation |
+| `x_baseStep` | 1/1500 normalized range per accepted report at minimum gain | Rounded empirical quarter-turn fit |
 | `x_frameUs` | 33334 µs | Native nominal batch period 33.334303 ms |
-| `x_accelerationCoefficient` | 18 | Ordinary-turn cutoff profile A |
+| `x_accelerationCoefficient` | 8 | Empirical YTX adaptation; native cutoff profile A uses 18 |
 | `x_decayUs` | 100000 µs | Native nominal 10 Hz decay callback |
 | `x_batchLimit` | 30 reports per frame | Native signed input-batch clamp |
 
@@ -20,13 +20,13 @@ The old 16× gain cap is removed. Each physical knob holds signed acceleration `
 q = clamp(p, -30, 30)
 movement = baseStep * q * max(1, abs(a))
 if abs(q) > 1 or abs(a) > 1:
-    a += trunc(18*q/8)
+    a += trunc(8*q/8)
 p = 0
 ```
 
 The ±30 limit is input saturation, not an acceleration cap. Just as in the native input stage, the entire raw batch is cleared: reports beyond 30 in one frame are deliberately discarded. With MAIN's conservative 36-report frame bound, this can discard up to six reports in a saturated frame. All movement *after this explicit input clamp* and its codec residual are conserved; packet limits do not truncate movement. At reversal YTX retains its old-partial-frame drain before resetting acceleration; it does not copy the native panel stage's possible opposite-direction input loss.
 
-The output uses the previous gain. At each decay boundary `a = trunc(2*a/3)`. Signed division truncates toward zero. Empty frames and decay emit nothing. Isolated single pulses retain minimum gain. Without elapsed decay, frames `1, 2, 2, 2, -2` produce base-step movements `1, 2, 8, 16, -2` and acceleration `0, 4, 8, 12, -4`; decay from 12 produces `8, 5, 3, 2, 1, 0`.
+The output uses the previous gain. At each decay boundary `a = trunc(2*a/3)`. Signed division truncates toward zero. Empty frames and decay emit nothing. Isolated single pulses retain minimum gain. Without elapsed decay, frames `1, 2, 2, 2, -2` produce base-step movements `1, 2, 4, 8, -2` and acceleration `0, 2, 4, 6, -2`; decay from 12 produces `8, 5, 3, 2, 1, 0`.
 
 Frame boundaries are relative to each knob's initialized clock. Elapsed frame/decay boundaries run chronologically, with decay first at ties. A boundary pulse belongs to the next frame. Unsigned elapsed-time arithmetic handles micros rollover, including initialization at zero. Service must occur at least once per half uint32 microsecond range (about 35 minutes); longer gaps are unsupported because retained boundaries may predate the previous call. Long idle settles bounded acceleration then skips empty time. There is no blocking delay, heap allocation per event or USB-arrival timing dependency.
 
@@ -77,17 +77,23 @@ Evaluate the candidate and adjacent code to correct floating-point rounding. Can
 
 ## Sensitivity adaptation
 
-One module activity report is not proven equivalent to one native Digitone count. The cutoff range `0..0x7f00` (32512) therefore does not justify directly normalizing each YTX report by 32512. The chosen power-of-two base step, **1/32768**, is an engineering default selected jointly with the slower decay and uncapped gain. It is two wire minimum deltas, so an isolated report remains representable without waiting for another report.
+One module activity report is not proven equivalent to one native Digitone count. The cutoff internal range `0..0x7f00` (32512) therefore does not justify directly normalizing each YTX report by 32512. The first calibration selected 1/32768 using a synthetic 1,000-report/s trace. Actual quarter-turn captures exposed much sparser reports and substantially finer movement than the Digitone.
 
-An idealized constant-rate trace anchors fast motion to the previous implementation. Over the final five seconds of a ten-second, 1,000-report/s trace, the old 8 ms/10 ms/capped-16 response produced approximately 10.94 normalized ranges/s; the revised 33.334 ms/100 ms/uncapped response with this base step produces approximately 12.83. The new steady peak acceleration is 601 in the host trace. Isolated reports are 32 times finer than the original 1/1024 default, while dense sweeps remain in the same order of sensitivity. These are synthetic report-rate comparisons, not measurements of turns, angles, hardware latency or subjective feel. Base sensitivity is the first control to tune on the actual knobs.
+The current trial uses **1/1500** and **coefficient 8**, rounded from an endpoint fit of approximately 1/1500.63 and coefficient 8. The base is 21.85 times larger than the prior calibration; reducing the coefficient limits the accompanying increase in accelerated motion. Each isolated report is immediately representable, with fractional wire error retained by the unchanged codec.
+
+The 2026-10-12 WB quarter-turn capture yielded 31–40 accepted reports per individual turn across slow, medium and fast gestures, inferred from exact production-code replay of 317 positive MIDI packets. The first slow turn had 38 reports and no stored acceleration. Measured movement was 0.12–0.17% of full range for slow turns, 1.22–1.31% for medium, and 1.75–2.31% for fast. Corresponding Digitone quarter-turn observations were 2.25–3.82%, 14.3–18.8%, and 10.1–19.1%. Its measured NRPN wire range was 0–16256, distinct from the internal range.
+
+The fit minimizes log error of total movement for six individual turns while retaining the recovered timing and recurrence. It is not a physical trajectory fit: angles and speeds were approximate, and the two paired turns excluded from fitting overshot their target by about 1.6–3.2 times. The user authorized a subjective trial after these limitations were reported. This change intentionally makes the earlier fine response coarser; timing, reversal and codec semantics remain unchanged.
+
+Raw captures and analysis are under `/private/tmp/wrld-bldr-quarter-turn-experiment-20261012/` and `/private/tmp/digitone-cutoff-experiment-20261012/`; `offline-fit.json` records the objective, candidates and limitations. The earlier half-turn dataset is `/private/tmp/wrld-bldr-speed-experiment-20261012/`. The new deployment evidence belongs under `/private/tmp/wrld-bldr-fitted-response-20261012/`.
 
 ## Bounds and work
 
 The scan guard permits one read per distinct millis bucket; variable SPI latency can deliver one earlier scan inside the interval. For any service interval `T`, the adapter supplies at most `ceil(T/1000)+2` reports per physical encoder. Thus `x_maxFramePulses = 36` and `x_maxDecayPulses = 102`. The input batch passed to the profile is at most 30.
 
-A decay interval's emitted batches can include its 102 incoming reports plus one pending 36-report frame. Even with early partial flushes, the sum of acceleration increments is bounded by `B = floor(18*(102+36)/8) = 310`. Starting from reset, the invariant peak magnitude is `3*B = 930`: decay takes it to at most `2*B`, then another interval adds at most `B`. Reversal only lowers this bound. **930 is a derived assertion and never a clamp or a tuning control.** All signed integer arithmetic fits in 32 bits. Direct recurrence/clock users must honor the adapter's report-rate contract, not just a per-call pulse limit.
+A decay interval's emitted batches can include its 102 incoming reports plus one pending 36-report frame. Even with early partial flushes, the sum of acceleration increments is bounded by `B = floor(8*(102+36)/8) = 138`. Starting from reset, the invariant peak magnitude is `3*B = 414`: decay takes it to at most `2*B`, then another interval adds at most `B`. Reversal only lowers this bound. **414 is a derived assertion and never a clamp or a tuning control.** All signed integer arithmetic fits in 32 bits. Direct recurrence/clock users must honor the adapter's report-rate contract, not just a per-call pulse limit.
 
-The largest possible drain input is `30*930/32768 = 0.8514404296875`, plus a sub-minimum codec residual. This changes only the encoder's accepted-input/work bounds, not the v1 decoding formula or bytes. Let `M = Decode(127)`, `d = minimumDelta` and `alpha = 1 - 2^(-1/8)`. There are at most 21 full positive-size packets because `maximumInput+d < 22*M`; the negative full packet is larger. Below `M`, each floor-encoded packet leaves `R_next < alpha*R + d*(1-alpha)`. After four such packets, `R < d + (M-d)*alpha^4 < 2*d`; a fifth, if needed, leaves less than `d`. Therefore **26 packets per drain** is a conservative ceiling. Exhaustive batches -30..30, every integer gain 1..930, three residual extremes and a 200,001-point dense sweep observed **25**. Nonfinite and out-of-contract inputs fail assertions in host tests.
+The largest possible drain input is `30*414/1500 = 8.28`, plus a sub-minimum codec residual. This changes only the encoder's accepted-input/work bounds, not the v1 decoding formula or bytes. Let `M = Decode(127)`, `d = minimumDelta` and `alpha = 1 - 2^(-1/8)`. There are at most 210 full positive-size packets because `maximumInput+d < 211*M`; the negative full packet is larger. Below `M`, each floor-encoded packet leaves `R_next < alpha*R + d*(1-alpha)`. After four such packets, `R < d + (M-d)*alpha^4 < 2*d`; a fifth, if needed, leaves less than `d`. Therefore **215 packets per drain** is a conservative ceiling. Exhaustive batches -30..30, every integer gain 1..414, three residual extremes and a 200,001-point dense sweep observed **214**. Nonfinite and out-of-contract inputs fail assertions in host tests.
 
 Idle service performs only the decays required to settle the bounded acceleration, then jumps over empty frames in constant time. Per-event state size is unchanged: 24 response bytes plus 8 codec bytes = **32 bytes per physical encoder**, 512 for 16 and 2048 for 64. Allocation remains checked and occurs once, outside the motion path. USB transmission and actual Cortex-M0+ execution latency require hardware observation; a finite packet bound does not claim a measured service deadline.
 
@@ -125,11 +131,17 @@ For later authorized hardware evaluation:
 - Check boundary clamping and a discrete selector.
 - Check ring feedback, startup dump and USB disconnect/reconnect.
 
-Tune base sensitivity first; batching, coefficient, decay ratio/interval and batch saturation now have static cutoff evidence and should remain fixed for the initial comparison. Keep both codec constants fixed. Any future timing/coefficient change requires re-deriving the assertions and wire-drain ceiling. Revisit the lossy module protocol only if measured motion loss cannot be resolved by MAIN adaptation. Physical feel is not verified until the user tries it.
+The current trial changes base sensitivity and acceleration together using the measured comparison. Keep batching, decay ratio/interval, batch saturation and both codec protocol constants fixed while evaluating it. Any future timing/coefficient change requires re-deriving the assertions and wire-drain ceiling. Revisit the lossy module protocol only if measured motion loss cannot be resolved by MAIN adaptation. Physical feel is not verified until the user tries it.
 
-## Verification and deployment
+## Current trial verification
 
-Current revision tests cover both signs of explicit input saturation, full batch clearing, previous-gain output above the old cap, exact 100 ms decay, 33,334 µs boundary ownership, decay-first ties, rollover, delayed versus frequent service, long idle, reversal, independent knobs, periodic partial flushes, sustained 601 acceleration, and codec conservation. Integration compiles actual production methods and checks 36 delayed receipts, the 30-report clamp, old-route drains, three-module fairness and same-millis service. Existing startup/button/feedback silence and legacy compatibility tests remain in place.
+Response and production-integration tests passed under ASan/UBSan, along with quarter-step, all 17 USB reset cases and all five profile-generator cases (no profile generated). The recurrence expectations now use coefficient 8 and base 1/1500; the synthetic sustained peak is 268, below the derived assertion bound of 414. Exhaustive/dense codec tests observed 214 packets below the 215-packet ceiling, with all 128 independent decoder values unchanged. Conservation checks use an operation-count-scaled floating-point error allowance for the larger drains; sub-minimum residual and packet ceilings remain independently enforced.
+
+Current MAIN build and deployment details are recorded in `/private/tmp/wrld-bldr-fitted-response-20261012/deployment.json` after deployment. The previous deployment below is retained as the rollback reference.
+
+## Previous timing-correction deployment (rollback)
+
+The previous revision tests covered both signs of explicit input saturation, full batch clearing, previous-gain output above the old cap, exact 100 ms decay, 33,334 µs boundary ownership, decay-first ties, rollover, delayed versus frequent service, long idle, reversal, independent knobs, periodic partial flushes, sustained 601 acceleration, and codec conservation. Integration compiles actual production methods and checks 36 delayed receipts, the 30-report clamp, old-route drains, three-module fairness and same-millis service. Existing startup/button/feedback silence and legacy compatibility tests remain in place.
 
 Software verification passed:
 
@@ -143,6 +155,6 @@ Software verification passed:
 | `ARDUINO_DIRECTORIES_USER="$PWD" make main` | Passed; sketch 123304 bytes (53% of 229376), +184 bytes from the prior response build |
 | `git diff --check` | Passed |
 
-ARM ELF: text 123312, data 448, BSS 15364. The exported application binary is 123760 bytes, SHA-256 `b842fe68114611c155680b5209781e4eb5cb96a194bc9f23fd40404bef1f8dea`. Build output remains `ytx-main-controller/build/ytx-main-controller.ino.app.bin`. Deployment evidence is saved under `/private/tmp/wrld-bldr-cutoff-response-20261012/`. AUX, modules and .ytx files are not written by this revision.
+ARM ELF: text 123312, data 448, BSS 15364. The exported application binary is 123760 bytes, SHA-256 `b842fe68114611c155680b5209781e4eb5cb96a194bc9f23fd40404bef1f8dea`. Build output remains `ytx-main-controller/build/ytx-main-controller.ino.app.bin`. Deployment evidence is saved under `/private/tmp/wrld-bldr-cutoff-response-20261012/`. AUX, modules and .ytx files were not written by that revision.
 
 Deployment completed on 2026-10-12: all **967 MAIN blocks** were acknowledged, the reset command completed, and a fresh MIDI client connected to WRLD.BLDR and successfully read configuration. All **215 sections / 6667 bytes** matched the pre-flash backup exactly (combined section-byte SHA-256 `de3882216848c202c495bbbc459b69a8b1798334de3d3cd301ddb02ec3e1dc68`). The existing mode-6 profile, CC routing and USB→DIN forwarding were preserved; no profile generation/upload or AUX/module flash occurred. `flash-transfer.json` and `configuration-verification.json` in the evidence directory record the checks. The firmware hash above identifies the acknowledged host binary; the bootloader has no firmware-hash readback API. Physical feel is still for the user to evaluate.

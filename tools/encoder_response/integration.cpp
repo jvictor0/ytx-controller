@@ -341,7 +341,7 @@ void FairScanAndDelayedReceipt()
     encoderHw.ServiceExponentialEncoders(nowUs);
     assert(std::abs(Sum() + response[0].m_codec.m_remainder - 30.0*EncoderResponseConfig::x_baseStep) < 1e-15);
     assert(response[0].m_response.m_framePulses == 0);
-    assert(response[0].m_response.m_acceleration == 67);
+    assert(response[0].m_response.m_acceleration == 30);
 
 }
 

@@ -6,9 +6,10 @@
 
 struct EncoderResponseConfig
 {
-    static constexpr double x_baseStep = 1.0 / 32768.0;
+    // Empirical WRLD.BLDR trial fit; native count units are not module reports.
+    static constexpr double x_baseStep = 1.0 / 1500.0;
     static constexpr uint32_t x_frameUs = 33334;
-    static constexpr int32_t x_accelerationCoefficient = 18;
+    static constexpr int32_t x_accelerationCoefficient = 8;
     static constexpr uint32_t x_decayUs = 100000;
     static constexpr int32_t x_batchLimit = 30;
     // A frame intersects an extra millis bucket; variable receipt latency can
