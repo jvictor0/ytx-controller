@@ -1,6 +1,6 @@
 # Exponential encoder response v1
 
-This opt-in implementation changes MAIN firmware only. Mode 6 uses the Digitone II cutoff recurrence and nominal timer periods recovered on 2026-10-12, with an empirical WRLD.BLDR sensitivity trial: base step 1/1500 and acceleration coefficient 8. This replaces the earlier 1/32768 and coefficient-18 calibration. It is a subjective test candidate, not a validated Elektron feel match. This revision updates MAIN only and keeps the existing mode-6 profile and exponential-relative v1 wire protocol. Module firmware, AUX, SPI protocol and hardware remain unchanged. Existing modules report activity and direction, without a magnitude counter or timestamped queue. Motion can be lost before MAIN receives it; acceleration approximates the density of received reports.
+This opt-in implementation changes MAIN firmware only. Mode 6 uses the Digitone II cutoff recurrence and nominal timer periods recovered on 2026-10-12, with an empirical WRLD.BLDR sensitivity trial: base step 1/1500 and acceleration coefficient 8. This replaces the earlier 1/32768 and coefficient-18 calibration. The user approved its feel after the hardware trial on 2026-10-12; this does not establish an exact Elektron feel match. This revision updates MAIN only and keeps the existing mode-6 profile and exponential-relative v1 wire protocol. Module firmware, AUX, SPI protocol and hardware remain unchanged. Existing modules report activity and direction, without a magnitude counter or timestamped queue. Motion can be lost before MAIN receives it; acceleration approximates the density of received reports.
 
 ## Response and timing
 
@@ -131,13 +131,13 @@ For later authorized hardware evaluation:
 - Check boundary clamping and a discrete selector.
 - Check ring feedback, startup dump and USB disconnect/reconnect.
 
-The current trial changes base sensitivity and acceleration together using the measured comparison. Keep batching, decay ratio/interval, batch saturation and both codec protocol constants fixed while evaluating it. Any future timing/coefficient change requires re-deriving the assertions and wire-drain ceiling. Revisit the lossy module protocol only if measured motion loss cannot be resolved by MAIN adaptation. Physical feel is not verified until the user tries it.
+The current trial changes base sensitivity and acceleration together using the measured comparison. Keep batching, decay ratio/interval, batch saturation and both codec protocol constants fixed while evaluating it. Any future timing/coefficient change requires re-deriving the assertions and wire-drain ceiling. Revisit the lossy module protocol only if measured motion loss cannot be resolved by MAIN adaptation. The user tried the fitted response and approved its feel on 2026-10-12. The broader hardware checklist above remains available for further evaluation.
 
 ## Current trial verification
 
 Response and production-integration tests passed under ASan/UBSan, along with quarter-step, all 17 USB reset cases and all five profile-generator cases (no profile generated). The recurrence expectations now use coefficient 8 and base 1/1500; the synthetic sustained peak is 268, below the derived assertion bound of 414. Exhaustive/dense codec tests observed 214 packets below the 215-packet ceiling, with all 128 independent decoder values unchanged. Conservation checks use an operation-count-scaled floating-point error allowance for the larger drains; sub-minimum residual and packet ceilings remain independently enforced.
 
-Current MAIN build and deployment details are recorded in `/private/tmp/wrld-bldr-fitted-response-20261012/deployment.json` after deployment. The previous deployment below is retained as the rollback reference.
+Current MAIN build and deployment details are recorded in `/private/tmp/wrld-bldr-fitted-response-20261012/deployment.json`. Firmware source commit `e572a4225c395f00fac22854560692b743fdfc98` built successfully (123296 sketch bytes; application image 123752 bytes, SHA-256 `09062b2379e4951226a35d4af031c4922bffb890a97acb586d157c31e8f44c9f`). All 967 MAIN blocks were acknowledged, the application reconnected, and all 215 configuration sections / 6667 bytes matched the pre-flash backup, preserving the profile and USB→DIN forwarding. The user approved the hardware trial and requested landing without redeployment on 2026-10-12. The previous deployment below is retained as the rollback reference.
 
 ## Previous timing-correction deployment (rollback)
 
